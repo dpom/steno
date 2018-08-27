@@ -1,0 +1,19 @@
+* steno
+  :PROPERTIES:
+  :CUSTOM_ID: steno
+  :END:
+
+steno is a personal project to digitize my stenographic writings.
+
+** Tasks
+
+*** TODO convert a jpg image in a binary image
+*** TODO visualize  a binary image
+*** TODO extract steno words from image and normalize them
+
+
+** License
+
+Copyright © 2018 Dan Pomohaci
+
+This project is licensed under the terms of the  Eclipse License 1.0.
