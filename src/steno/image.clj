@@ -1,12 +1,11 @@
 (ns steno.image
- "Functions related to image manipulation."
- (:import (java.awt.image BufferedImage)
-          (boofcv.io.image UtilImageIO ConvertBufferedImage)
-          (boofcv.struct.image GrayF32 GrayU8)
-          (boofcv.gui.binary VisualizeBinaryData)
-          (boofcv.alg.filter.binary BinaryImageOps GThresholdImageOps ThresholdImageOps)
-          (boofcv.gui.image ShowImages)))
-
+  "Functions related to image manipulation."
+  (:import (java.awt.image BufferedImage)
+           (boofcv.io.image UtilImageIO ConvertBufferedImage)
+           (boofcv.struct.image GrayF32 GrayU8)
+           (boofcv.gui.binary VisualizeBinaryData)
+           (boofcv.alg.filter.binary BinaryImageOps GThresholdImageOps ThresholdImageOps)
+           (boofcv.gui.image ShowImages)))
 
 (defn load-image
   "Load the an image from a file."
@@ -22,7 +21,6 @@
                      (ConvertBufferedImage/convertTo nil)
                      (ShowImages/showWindow title))))
 
-
 (defn filter-image!
   "Apply a function to all image pixels.
 
@@ -35,7 +33,7 @@
   (doseq [x (range (.width image))]
     (doseq [y (range (.height image))]
       (func image x y))))
-  
+
 (defn clean-image!
   "Clean an binary image."
   [image]

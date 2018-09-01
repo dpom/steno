@@ -13,12 +13,14 @@ steno is a personal project to digitize my stenographic writings.
     - State "DONE"       from "STARTED"    [2018-08-30 Jo 12:06]
     CLOCK: [2018-08-28 Ma 13:08]--[2018-08-28 Ma 13:33] =>  0:25
     :END:
-*** STARTED visualize  a binary image
-    SCHEDULED: <2018-08-30 Jo>
+*** DONE visualize  a binary image
+    CLOSED: [2018-08-30 Jo 15:46] SCHEDULED: <2018-08-30 Jo>
     :LOGBOOK:
+    - State "DONE"       from "STARTED"    [2018-08-30 Jo 15:46]
     CLOCK: [2018-08-30 Jo 12:06]--[2018-08-30 Jo 12:31] =>  0:25
     :END:
 *** TODO extract steno words from image and normalize them
+    SCHEDULED: <2018-09-01 Sb>
 *** TODO build a db with steno words
 
 
