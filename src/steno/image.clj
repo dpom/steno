@@ -39,3 +39,13 @@
   [image]
   (let [threshold (GThresholdImageOps/computeOtsu image 0.0 255.0)]
     (filter-image! image (fn [img x y] (.set img x y (if (< (.get img x y) threshold) 0 255))))))
+
+(defn check-pixel
+  [img acc [x y]]
+  (if (zero? (.get img x y))
+    (conj acc [x y])
+    acc))
+
+(defn get-black-pixels
+  [img]
+  (for [x (range (.width img)) y (range (.height img)) :when (zero? (.get img x y))] [x y]))
