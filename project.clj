@@ -1,4 +1,4 @@
-(defproject steno "0.1.0-dev03"
+(defproject steno "0.1.0-dev04"
   :description "Digitize stenographic writings"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}

@@ -67,6 +67,7 @@
 ;; (s/exercise-fn `get-neighbors 1) 
 
 ;; (stest/summarize-results (stest/check `get-neighbors)) 
+
 (defn get-word
   [blacks neighbors]
   (loop [bs blacks
@@ -76,13 +77,14 @@
       word
       (let [w (st/union word nebs)
             b (st/difference bs w)] 
-        (recur b w (get-neighbors b nebs))))))
+        (if (empty? b)
+          w
+          (recur b w (get-neighbors b nebs)))))))
 
 (s/fdef get-word
   :args (s/and (s/cat :blacks ::points
                       :neibrs ::points)
-               #(pos-int? (count (:blacks %)))
-               #(st/subset? (:neibrs %) (:blacks %)))
+               #(pos-int? (count (:blacks %))))
   :ret ::points)
 
 (stest/instrument `get-word)
@@ -101,7 +103,7 @@
 
 (s/fdef get-words
   :args (s/cat :blacks ::points
-               :words  (s/coll-of ::points :min-count 0))
+               :words  (s/coll-of ::points :min-count 0 :type vector?))
   :ret (s/coll-of ::points :min-count 0))
 
 (stest/instrument `get-words)

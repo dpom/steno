@@ -1,5 +1,5 @@
 (ns steno.word-test
-  (:require [steno.word :refer :all]
+  (:require [steno.word :as w]
             [clojure.spec.alpha      :as s]
             [clojure.spec.test.alpha :as stest]
             [clojure.string          :as str]
@@ -36,8 +36,8 @@
 
 
 
-(defspec-test get-neighbor-test `get-neighbor)
-(defspec-test get-one-neighbors-test `get-one-neighbors)
-(defspec-test get-neighbors-test `get-neighbors)
-(defspec-test get-word-test `get-word)
-(defspec-test get-words-test `get-words)
+(defspec-test get-neighbor-test `w/get-neighbor)
+(defspec-test get-one-neighbors-test `w/get-one-neighbors)
+(defspec-test get-neighbors-test `w/get-neighbors)
+(defspec-test get-word-test `w/get-word)
+(defspec-test get-words-test `w/get-words)
