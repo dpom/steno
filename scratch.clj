@@ -369,6 +369,94 @@
 (def words (get-words blacks #{}))
 
 
+;; 2018-09-04
 
+
+(require '[steno.image :as img]
+         '[steno.word :as wd]
+         '[com.rpl.specter :refer [transform select selected? select-one submap must ALL FIRST MAP-VALS]]
+         '[clojure.java.io :as io]
+         '[clojure.set :as st]
+         '[clojure.edn :as edn]
+         '[clojure.spec.alpha :as s]
+         '[clojure.spec.gen.alpha :as gen]
+         '[clojure.spec.test.alpha :as stest])
+
+
+(def page (img/load-image "test/ex1.jpg"))
+
+(img/show-image page)
+
+(def blacks (into (sorted-set) (img/get-black-pixels page)))
  
+(def words (wd/get-words blacks []))
+
+(defn write-dataset-edn! [out-file raw-dataset-map]
+  (with-open [w (clojure.java.io/writer out-file)]
+    (binding [*out* w]
+      (clojure.pprint/write raw-dataset-map))))
+
+(write-dataset-edn! "~/pers/steno/tmp/words.edn" words)
+
+(defn get-words-as-file!
+  [blacks filename]
+  (set! *print-length* -1)
+  (spit filename "" :append false)
+  (loop [bks blacks]
+    (if (empty? bks)
+      filename
+      (let [point (first bks)
+            word (wd/get-word bks #{point})]
+        (spit filename (prn-str word) :append true)
+        (recur (st/difference bks word))))))
+
+(get-words-as-file! blacks "/home/dan/pers/steno/tmp/words.edn")
+
+(def word #{[1676 1222] [1674 1221] [1678 1222] [1677 1222] [1675 1221]})
+
+(defn mx-min
+  [word]
+  (reduce (fn [[x1 y1] [x2 y2]] [(min x1 x2) (min y1 y2)]) word))
+
+(def w2
+   #{[1496 883] [1506 896] [1507 897] [1495 887] [1496 884] [1505 895] [1502 893] [1498 885] [1510 898] [1497 889] [1492 876] [1493 878] [1495 881] [1495 886] [1510 899] [1493 877] [1500 891] [1495 883] [1503 895] [1499 886] [1494 879] [1509 898] [1492 875] [1495 885] [1507 896] [1499 891] [1500 887] [1496 886] [1503 894] [1504 894] [1498 889] [1503 892] [1502 890] [1504 891] [1497 885] [1498 887] [1498 890] [1498 888] [1503 890] [1495 882] [1501 891] [1508 897] [1497 887] [1508 898] [1495 884] [1501 888] [1501 889] [1497 884] [1495 880]})
+
+(def min-w2 (mx-min w2))
+(defn normalize-word
+  [word]
+  (let [[min-x min-y] (mx-min word)]
+    (transform [ALL] (fn [[x y]] [(- x min-x) (- y min-y)]) word)))
+
+(def nw2 (normalize-word w2))
+
+(defn apply-word
+  [word func]
+  (reduce (fn [[x1 y1] [x2 y2]] [(func x1 x2) (func y1 y2)]) word))
+
+(apply-word nw2 max)
+
+(defn transform-words!
+  [in-file out-file func]
+  (with-open [rdr (io/reader in-file)]
+    (with-open [w (io/writer out-file)]
+      (doseq [line (line-seq rdr)]
+        (if-let [word (edn/read-string line)]
+           (.write w (prn-str (func word))))))))
+  
+;; 2018-09-05
+
+(require '[steno.image :as img]
+         '[steno.word :as wd]
+         '[com.rpl.specter :refer [transform select selected? select-one submap must ALL FIRST MAP-VALS]]
+         '[clojure.java.io :as io]
+         '[clojure.set :as st]
+         '[clojure.edn :as edn]
+         '[clojure.spec.alpha :as s]
+         '[clojure.spec.gen.alpha :as gen]
+         '[clojure.spec.test.alpha :as stest])
+
+(def in-file "/home/dan/pers/steno/tmp/words.edn")
+(def out-file "/home/dan/pers/steno/tmp/normalized_words.edn")
+
+(wd/transform-words! in-file out-file wd/normalize-word)
 

@@ -5,6 +5,7 @@
   :dependencies [[org.clojure/clojure "1.9.0"]
                  [org.clojure/test.check "0.10.0-alpha3"]
                  [expound "0.7.1"]
+                 [com.rpl/specter "1.1.1"]
                  [org.boofcv/boofcv-core "0.30"]
                  [org.boofcv/boofcv-swing "0.30"]]
 

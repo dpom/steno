@@ -41,3 +41,5 @@
 (defspec-test get-neighbors-test `w/get-neighbors)
 (defspec-test get-word-test `w/get-word)
 (defspec-test get-words-test `w/get-words)
+;; (defspec-test test-stats-word `w/stats-word)
+(defspec-test test-normalize-word `w/normalize-word)
