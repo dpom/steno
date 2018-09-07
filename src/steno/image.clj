@@ -1,5 +1,6 @@
 (ns steno.image
   "Functions related to image manipulation."
+  (:require [steno.word :as wd])
   (:import (java.awt.image BufferedImage)
            (boofcv.io.image UtilImageIO ConvertBufferedImage)
            (boofcv.struct.image GrayF32 GrayU8)
@@ -49,3 +50,12 @@
 (defn get-black-pixels
   [img]
   (for [x (range (.width img)) y (range (.height img)) :when (zero? (.get img x y))] [x y]))
+
+(defn show-word
+  "Visualise a steno word."
+  ([word] (show-word word true))
+  ([word standard?] (let [[w h] (if standard? wd/word-dims (wd/stats-word max word))
+                           image (GrayU8. w h)]
+                       (doseq [[x y] word]
+                         (.set image x y 255))
+                       (show-image image "Steno Word"))))

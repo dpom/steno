@@ -19,13 +19,19 @@ steno is a personal project to digitize my stenographic writings.
     - State "DONE"       from "STARTED"    [2018-08-30 Jo 15:46]
     CLOCK: [2018-08-30 Jo 12:06]--[2018-08-30 Jo 12:31] =>  0:25
     :END:
-*** STARTED extract steno words from image and normalize them
-    SCHEDULED: <2018-09-01 Sb>
+*** DONE extract steno words from image and normalize them
+    CLOSED: [2018-09-05 Mi 12:17] SCHEDULED: <2018-09-01 Sb>
     :LOGBOOK:
+    - State "DONE"       from "STARTED"    [2018-09-05 Mi 12:17]
+    CLOCK: [2018-09-04 Ma 12:00]--[2018-09-04 Ma 12:02] =>  0:02
     CLOCK: [2018-09-03 Lu 13:33]--[2018-09-03 Lu 13:58] =>  0:25
     CLOCK: [2018-09-03 Lu 13:01]--[2018-09-03 Lu 13:26] =>  0:25
     :END:
+*** TODO visualize steno words
+    SCHEDULED: <2018-09-05 Mi>
+*** TODO implement a compressed format for steno words
 *** TODO build a db with steno words
+
 
 
 ** License

@@ -440,7 +440,7 @@
   (with-open [rdr (io/reader in-file)]
     (with-open [w (io/writer out-file)]
       (doseq [line (line-seq rdr)]
-        (if-let [word (edn/read-string line)]
+        (if-let [word (edn/read-string line)] 
            (.write w (prn-str (func word))))))))
   
 ;; 2018-09-05
@@ -460,3 +460,30 @@
 
 (wd/transform-words! in-file out-file wd/normalize-word)
 
+
+(def out-file2 "/home/dan/pers/steno/tmp/max_words.edn")
+
+(wd/transform-words! out-file out-file2 (partial wd/stats-word max))
+
+(def word-max
+  (with-open [rdr (io/reader out-file2)]
+    (wd/stats-word max (set (mapv edn/read-string (line-seq rdr))))))
+
+[23 24]
+  
+
+;; 2018-09-06
+
+(require '[steno.image :as img]
+         '[steno.word :as wd]
+         '[com.rpl.specter :refer [transform select selected? select-one submap must ALL FIRST MAP-VALS]]
+         '[clojure.java.io :as io]
+         '[clojure.set :as st]
+         '[clojure.edn :as edn]
+         '[clojure.spec.alpha :as s]
+         '[clojure.spec.gen.alpha :as gen]
+         '[clojure.spec.test.alpha :as stest])
+
+(def w1 #{[2 2] [0 0] [3 3] [3 4] [2 4] [1 2] [0 1]})
+
+(img/show-word w1)

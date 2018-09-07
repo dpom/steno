@@ -10,6 +10,9 @@
       [com.rpl.specter :refer [transform select selected? select-one submap must ALL FIRST MAP-VALS]]))
 
 
+(def word-dims [24 24])
+
+
 ;; Specs
 
 (s/def ::x (s/and nat-int? #(< % 5000)))
@@ -131,11 +134,11 @@
         (recur (st/difference bks word))))))
 
 (defn stats-word
-  [word func]
+  [func word]
   (reduce (fn [[x1 y1] [x2 y2]] [(func x1 x2) (func y1 y2)]) word))
 
 (s/fdef stats-word
-  :args (s/and (s/cat :word ::points :func tst/function?)
+  :args (s/and (s/cat :func tst/function? :word ::points)
                #(pos-int? (count (:word %))))
   :ret ::point)
 
@@ -149,7 +152,7 @@
 
 (defn normalize-word
   [word]
-  (let [[min-x min-y] (stats-word word min)]
+  (let [[min-x min-y] (stats-word min word)]
     (transform [ALL] (fn [[x y]] [(- x min-x) (- y min-y)]) word)))
 
 (s/fdef normalize-word
@@ -168,6 +171,7 @@
 (defn transform-words!
   [in-file out-file func]
   (with-open [rdr (io/reader in-file)]
+    (set! *print-length* -1)
     (with-open [w (io/writer out-file)]
       (doseq [line (line-seq rdr)]
         (if-let [word (edn/read-string line)]
