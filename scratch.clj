@@ -487,3 +487,111 @@
 (def w1 #{[2 2] [0 0] [3 3] [3 4] [2 4] [1 2] [0 1]})
 
 (img/show-word w1)
+
+
+;; 2018-09-07
+
+(require 
+         '[steno.word :as wd]
+         '[mikera.image.core :as mik]
+         '[mikera.image.filters :as filt]
+         '[com.rpl.specter :refer [transform select selected? select-one submap must ALL FIRST MAP-VALS]]
+         '[clojure.java.io :as io]
+         '[clojure.set :as st]
+         '[clojure.edn :as edn]
+         '[clojure.spec.alpha :as s]
+         '[clojure.spec.gen.alpha :as gen]
+         '[clojure.spec.test.alpha :as stest])
+
+(def page (mik/load-image "/home/dan/pers/steno/test/ex1.jpg"))
+
+(mik/show page :zoom 0.5 :title "Orig Image")
+
+(def pixels (mik/get-pixels page))
+
+(count pixels)
+
+(mik/width page)
+
+(mik/height page)
+
+(defrecord Page [image width height pixels])
+
+(defn load-page
+  [filename]
+  (let [image (mik/load-image filename)]
+    (map->Page {:image (mik/filter-image image (filt/quantize 2))
+                :width (mik/width image)
+                :height (mik/height image)
+                :pixels (mik/get-pixels image)})))
+
+(def filename "/home/dan/pers/steno/test/ex1.jpg")
+
+(def page (load-page filename))
+
+(mik/show (mik/filter-image (:image page) (filt/invert)))
+
+(mik/show (mik/filter-image (:image page) (filt/quantize 2)))
+
+(defn show-page
+  [{:keys [image pixels]} & opts]
+  (mik/set-pixels image pixels)
+  (apply mik/show image opts))
+
+(show-page page :zoom 0.5 :title "cucu")
+
+
+(defn xy2idx
+  [page x y]
+  (+ x (* y (:width page))))
+
+(xy2idx page 0 3)
+
+(defn get-pixel
+  [page x y]
+  (aget (:pixels page) (xy2idx page x y)))
+
+(get-pixel page 0 0)
+
+(defn get-pixel-hex
+   [page x y]
+   (format "%08x" (get-pixel page x y)))
+
+(get-pixel-hex page 48 216)
+
+(get-pixel-hex page 48 214)
+
+(get-pixel-hex page 0 0)
+
+
+(get-pixel-hex page 49 200)
+
+-16777216
+
+(take 10 (map-indexed (fn [idx val] [idx val]) (:pixels page)))
+
+(defn idx2xy
+  [{:keys [width]} idx]
+  [(mod idx width) (quot idx width)])
+
+
+(defn get-black-pixels
+  [page]
+  (let  [xform (comp
+                 (map-indexed (fn [idx v] [idx v]))
+                 (filter (fn [[idx v]] (= v -16777216)))
+                 (map first)
+                 (map (fn [idx] (idx2xy page idx))))]
+    (into (sorted-set) xform (:pixels page))))
+
+(def blacks2 (get-black-pixels page))
+
+(class (:pixels page))
+(type (:pixels page))
+
+(instance? (Class/forName "[I") (:pixels page))
+(class (:image page))
+
+java.awt.image.BufferedImage
+
+(count (:pixels page))

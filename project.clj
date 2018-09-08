@@ -1,4 +1,4 @@
-(defproject steno "0.1.0-dev05"
+(defproject steno "0.1.0-dev06"
   :description "Digitize stenographic writings"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
@@ -6,6 +6,7 @@
                  [org.clojure/test.check "0.10.0-alpha3"]
                  [expound "0.7.1"]
                  [com.rpl/specter "1.1.1"]
+                 [net.mikera/imagez "0.12.0"]
                  [org.boofcv/boofcv-core "0.30"]
                  [org.boofcv/boofcv-swing "0.30"]]
 
