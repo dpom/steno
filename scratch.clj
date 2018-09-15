@@ -595,3 +595,30 @@
 java.awt.image.BufferedImage
 
 (count (:pixels page))
+
+;; 2018-09-15
+
+(require 
+ '[steno.word :as wd]
+ '[steno.page :as pg]
+ '[mikera.image.core :as mik]
+ '[mikera.image.filters :as filt]
+ '[com.rpl.specter :refer [transform select selected? select-one submap must ALL FIRST MAP-VALS]]
+ '[clojure.java.io :as io]
+ '[clojure.set :as st]
+ '[clojure.edn :as edn]
+ '[clojure.spec.alpha :as s]
+ '[clojure.spec.gen.alpha :as gen]
+ '[clojure.spec.test.alpha :as stest])
+
+(s/def ::wid (s/ge))
+(s/def ::pic (s/with-gen (s/keys :req-un [::width])))
+
+
+
+
+(defn show-word
+  "Visualise a steno word."
+  ([word] (show-word word true))
+  ([word standard?] (let [[w h] (if standard? wd/word-dims (wd/stats-word max word))])))
+
