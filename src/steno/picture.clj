@@ -3,11 +3,10 @@
   (:require
    [clojure.spec.alpha :as s]
    [clojure.spec.test.alpha :as stest]
-   [clojure.spec.gen.alpha :as gen]
    [steno.word :as wd]
+   [com.rpl.specter :refer [transform ALL]]
    [mikera.image.core :as mik]
    [mikera.image.filters :as filt]))
-  
 
 (def BLACK -16777216)
 (def MAX-DIM 3000)
@@ -32,25 +31,22 @@
   "Load a picture from the filename file."
   [filename]
   (let [image (mik/load-image filename)]
-    (map->Picture {:image (mik/filter-image image (filt/quantize 2))
-                :width (mik/width image)
-                :height (mik/height image)
-                :pixels (mik/get-pixels image)})))
+    (map->Picture {:image image
+                   :width (mik/width image)
+                   :height (mik/height image)
+                   :pixels (mik/get-pixels image)})))
 
 (s/fdef load-picture
-  :args (s/cat :filename string?)
-  :ret ::picture)
+        :args (s/cat :filename string?)
+        :ret ::picture)
 
 (stest/instrument `load-picture)
 
-
-(defn show-picture
+(defn show-picture!
   "Visualise a picture."
   [{:keys [image pixels]} & opts]
   (mik/set-pixels image pixels)
   (apply mik/show image opts))
-
-
 
 (defn xy2idx
   "Convert cartezian coordinates in array index."
@@ -58,9 +54,9 @@
   (+ x (* y (:width picture))))
 
 (s/fdef xy2idx
-  :args (s/and (s/cat :picture (s/keys :req-un [::width ::height]) :x ::coordinate :y ::coordinate)
-               #(and (< (:x %) (-> % :picture :width)) (< (:y %) (-> % :picture :height))))
-  :ret ::arrayidx)
+        :args (s/and (s/cat :picture (s/keys :req-un [::width ::height]) :x ::coordinate :y ::coordinate)
+                     #(and (< (:x %) (-> % :picture :width)) (< (:y %) (-> % :picture :height))))
+        :ret ::arrayidx)
 
 (stest/instrument `xy2idx)
 
@@ -75,10 +71,10 @@
   [(mod idx width) (quot idx width)])
 
 (s/fdef idx2xy
-  :args (s/and (s/cat :picture (s/keys :req-un [::width ::height])
-                      :idx  ::arrayidx)
-               #(< (:idx %) (* (-> % :picture :width) (-> % :picture :height))))
-  :ret (s/tuple ::coordinate ::coordinate))
+        :args (s/and (s/cat :picture (s/keys :req-un [::width ::height])
+                            :idx  ::arrayidx)
+                     #(< (:idx %) (* (-> % :picture :width) (-> % :picture :height))))
+        :ret (s/tuple ::coordinate ::coordinate))
 
 (stest/instrument `idx2xy)
 
@@ -96,8 +92,8 @@
     (into (sorted-set) xform (:pixels picture))))
 
 (s/fdef get-black-pixels
-  :args (s/cat :picture (s/keys :req-un [::pixels]))
-  :ret :steno.word/points)
+        :args (s/cat :picture (s/keys :req-un [::pixels]))
+        :ret :steno.word/points)
 
 (stest/instrument `get-black-pixels)
 
@@ -106,4 +102,20 @@
 ;; (stest/summarize-results (stest/check `get-black-pixels)) 
 
 
+(defn show-word!
+  "Visualise a steno word."
+  [word & {:keys [standard? zoom title] :or {standard? true zoom 5 title "Steno Word"}}]
+  (let [[w h] (if standard? wd/word-dims (transform [ALL] inc (wd/stats-word max word)))
+        image (mik/new-image w h)
+        pixels (mik/get-pixels image)
+        picture (map->Picture {:width w
+                               :height h
+                               :image image
+                               :pixels pixels})]
+    (doseq [[x y] word]
+      (aset pixels (xy2idx picture x y) BLACK))
+    (show-picture! picture :zoom zoom :title title)))
+
+(s/fdef show-word!
+        :args (s/cat :word :steno.word/word :standard? (s/? boolean?)))
 

@@ -12,7 +12,6 @@
 
 (def binary (ConvertBufferedImage/convertFromSingle image nil GrayU8))
 
-
 (def bin-data (VisualizeBinaryData/renderBinary binary true nil))
 
 (ShowImages/showWindow image "Image")
@@ -64,7 +63,6 @@
 
 (filterv #(< % 255) (get-row page 400))
 
-
 (defn filter-image
   [image func]
   (doseq [x (range (.width image))]
@@ -72,9 +70,8 @@
       (func image x y))))
 
 (filter-image page (fn [img x y] (.set img x y (if (< (.get img x y) 200) 0 255))))
-  
-(show-image page)
 
+(show-image page)
 
 (def page (load-image "test/ex1.jpg"))
 
@@ -83,7 +80,6 @@
   (-> filename
       UtilImageIO/loadImage
       (ConvertBufferedImage/convertFromSingle nil GrayF32)))
-
 
 (def page (load-image32 "test/ex1.jpg"))
 (def page8 (load-image "test/ex1.jpg"))
@@ -96,14 +92,11 @@
 
 (def bin2 (ThresholdImageOps/threshold page binary (float threshold) true))
 
-
 (show-image bin2)
-
 
 (filter-image page (fn [img x y] (.set img x y (if (< (.get img x y) 151) 0 255))))
 
 (require '[steno.image :as img])
-
 
 (def page (img/load-image "test/ex1.jpg"))
 
@@ -117,9 +110,7 @@
 
 (def page4 (BinaryImageOps/erode8 page 1 page3))
 
-
 (img/show-image page3 "page3")
-
 
 (img/show-image page4 "page4")
 
@@ -141,7 +132,6 @@
     (conj acc [x y])
     acc))
 
-
 (defn get-black-pixels
   [img]
   (for [x (range (.width img)) y (range (.height img)) :when (zero? (.get img x y))] [x y]))
@@ -152,14 +142,12 @@
 
 (img/clean-image! page)
 
-
 (def blaks2 (get-black-pixels page))
 
 (declare get-neighbor
          get-neighbors)
 
-(def directions [[0 1] [-1 1] [1 0] [1 1]]) 
-
+(def directions [[0 1] [-1 1] [1 0] [1 1]])
 
 (defn get-neighbors
   [blacks word pixel]
@@ -174,8 +162,6 @@
       (recur (disj blacks pixel) (conj word pixel))
       #{pixel}
       #{})))
-  
-
 
 (count blaks2)
 
@@ -186,8 +172,6 @@
 (defn get-word
   [blacks pixel]
   (get-neighbors blacks #{pixel}  pixel))
-
-
 
 (defn get-words
   [blacks words]
@@ -206,7 +190,6 @@
          '[clojure.spec.gen.alpha :as gen]
          '[clojure.spec.test.alpha :as stest])
 
-
 (def page (img/load-image "test/ex1.jpg"))
 
 (img/show-image page)
@@ -219,20 +202,17 @@
 
 (s/def ::points (s/coll-of ::point :distinct true :into (sorted-set)))
 
-
 (def blacks (into (sorted-set) (img/get-black-pixels page)))
 
 (s/valid? ::points blacks)
-
 
 (count blacks)
 (.width page)
 (.height page)
 
-(def directions [[0 1] [-1 1] [1 0] [1 1]]) 
+(def directions [[0 1] [-1 1] [1 0] [1 1]])
 
 (s/def ::direction (set directions))
-
 
 (defn get-neighbor
   [blacks [x y] [dx dy]]
@@ -241,18 +221,14 @@
       point)))
 
 (s/fdef get-neighbor
-  :args (s/and (s/cat :blacks ::points
-                      :point ::point
-                      :dir ::direction)
-               #(pos-int? (count (:blacks %))))
-  :ret (s/or :rnil nil?
-             :rpoint ::point))
-
-
-
-   ;; :fn (s/or :nil #(nil? (:ret %))
+        :args (s/and (s/cat :blacks ::points
+                            :point ::point
+                            :dir ::direction)
+                     #(pos-int? (count (:blacks %))))
+        :ret (s/or :rnil nil?
+                   :rpoint ::point));; :fn (s/or :nil #(nil? (:ret %))
             ;; :point #(contains? (-> % :args :blacks) (:ret %))))
-  
+
 
 (gen/generate (s/gen ::points))
 
@@ -260,17 +236,12 @@
 
 (stest/check `get-neighbor)
 
-
 (def point (first blacks))
 (def neib (second blacks))
 
-
 (get-neighbor blacks point (first directions))
 
-
 (get-neighbor #{[0 1] [0 2]} [0 1] [0 1])
-
-
 
 (defn get-one-neighbors
   [blacks point]
@@ -278,12 +249,11 @@
        (map #(get-neighbor blacks point %))
        (remove nil?)))
 
-
 (s/fdef get-one-neighbors
-  :args (s/and (s/cat :blacks ::points
-                      :point ::point)
-               #(pos-int? (count (:blacks %))))
-  :ret (s/coll-of ::point :min-count 0))
+        :args (s/and (s/cat :blacks ::points
+                            :point ::point)
+                     #(pos-int? (count (:blacks %))))
+        :ret (s/coll-of ::point :min-count 0))
 
 (stest/instrument `get-one-neighbors)
 
@@ -291,24 +261,22 @@
 
 (get-one-neighbors blacks point)
 
-
 (defn get-neighbors
   [blacks points]
   (let [gon (partial get-one-neighbors blacks)]
-     (reduce into #{} (map gon points))))
+    (reduce into #{} (map gon points))))
 
 (s/fdef get-neighbors
-  :args (s/and (s/cat :blacks ::points
-                      :points (s/coll-of ::point))
-               #(pos-int? (count (:blacks %))))
-  :ret ::points)
+        :args (s/and (s/cat :blacks ::points
+                            :points (s/coll-of ::point))
+                     #(pos-int? (count (:blacks %))))
+        :ret ::points)
 
 (stest/instrument `get-neighbors)
 
-(s/exercise-fn `get-neighbors 1) 
+(s/exercise-fn `get-neighbors 1)
 
-(stest/summarize-results (stest/check `get-neighbors)) 
-
+(stest/summarize-results (stest/check `get-neighbors))
 
 (get-neighbors blacks [point])
 
@@ -322,27 +290,25 @@
     (if (empty? nebs)
       word
       (let [w (st/union word nebs)
-            b (st/difference bs w)] 
+            b (st/difference bs w)]
         (recur b w (get-neighbors b nebs))))))
 
 (s/fdef get-word
-  :args (s/and (s/cat :blacks ::points
-                      :neibrs ::points)
-               #(pos-int? (count (:blacks %)))
-               #(st/subset? (:neibrs %) (:blacks %)))
-  :ret ::points)
+        :args (s/and (s/cat :blacks ::points
+                            :neibrs ::points)
+                     #(pos-int? (count (:blacks %)))
+                     #(st/subset? (:neibrs %) (:blacks %)))
+        :ret ::points)
 
 (stest/instrument `get-word)
 
-(s/exercise-fn `get-word 1) 
+(s/exercise-fn `get-word 1)
 
-(stest/summarize-results (stest/check `get-word)) 
+(stest/summarize-results (stest/check `get-word))
 
 (defspec-test test-get-word [`get-word])
 
-
 (get-word blacks #{point})
-
 
 (defn get-words
   [blacks words]
@@ -351,23 +317,21 @@
     (let [point (first blacks)
           word (get-word blacks #{point})]
       (recur (st/difference blacks word) (conj words word)))))
-  
+
 (s/fdef get-words
-  :args (s/cat :blacks ::points
-               :words  (s/coll-of ::points :min-count 0))
-  :ret (s/coll-of ::points :min-count 0))
+        :args (s/cat :blacks ::points
+                     :words  (s/coll-of ::points :min-count 0))
+        :ret (s/coll-of ::points :min-count 0))
 
 (stest/instrument `get-words)
 
-(s/exercise-fn `get-words 1) 
+(s/exercise-fn `get-words 1)
 
-(stest/summarize-results (stest/check `get-word)) 
+(stest/summarize-results (stest/check `get-word))
 
 (defspec-test test-get-words [`get-word])
 
-
 (def words (get-words blacks #{}))
-
 
 ;; 2018-09-04
 
@@ -382,13 +346,12 @@
          '[clojure.spec.gen.alpha :as gen]
          '[clojure.spec.test.alpha :as stest])
 
-
 (def page (img/load-image "test/ex1.jpg"))
 
 (img/show-image page)
 
 (def blacks (into (sorted-set) (img/get-black-pixels page)))
- 
+
 (def words (wd/get-words blacks []))
 
 (defn write-dataset-edn! [out-file raw-dataset-map]
@@ -419,7 +382,7 @@
   (reduce (fn [[x1 y1] [x2 y2]] [(min x1 x2) (min y1 y2)]) word))
 
 (def w2
-   #{[1496 883] [1506 896] [1507 897] [1495 887] [1496 884] [1505 895] [1502 893] [1498 885] [1510 898] [1497 889] [1492 876] [1493 878] [1495 881] [1495 886] [1510 899] [1493 877] [1500 891] [1495 883] [1503 895] [1499 886] [1494 879] [1509 898] [1492 875] [1495 885] [1507 896] [1499 891] [1500 887] [1496 886] [1503 894] [1504 894] [1498 889] [1503 892] [1502 890] [1504 891] [1497 885] [1498 887] [1498 890] [1498 888] [1503 890] [1495 882] [1501 891] [1508 897] [1497 887] [1508 898] [1495 884] [1501 888] [1501 889] [1497 884] [1495 880]})
+  #{[1496 883] [1506 896] [1507 897] [1495 887] [1496 884] [1505 895] [1502 893] [1498 885] [1510 898] [1497 889] [1492 876] [1493 878] [1495 881] [1495 886] [1510 899] [1493 877] [1500 891] [1495 883] [1503 895] [1499 886] [1494 879] [1509 898] [1492 875] [1495 885] [1507 896] [1499 891] [1500 887] [1496 886] [1503 894] [1504 894] [1498 889] [1503 892] [1502 890] [1504 891] [1497 885] [1498 887] [1498 890] [1498 888] [1503 890] [1495 882] [1501 891] [1508 897] [1497 887] [1508 898] [1495 884] [1501 888] [1501 889] [1497 884] [1495 880]})
 
 (def min-w2 (mx-min w2))
 (defn normalize-word
@@ -440,9 +403,9 @@
   (with-open [rdr (io/reader in-file)]
     (with-open [w (io/writer out-file)]
       (doseq [line (line-seq rdr)]
-        (if-let [word (edn/read-string line)] 
-           (.write w (prn-str (func word))))))))
-  
+        (if-let [word (edn/read-string line)]
+          (.write w (prn-str (func word))))))))
+
 ;; 2018-09-05
 
 (require '[steno.image :as img]
@@ -460,7 +423,6 @@
 
 (wd/transform-words! in-file out-file wd/normalize-word)
 
-
 (def out-file2 "/home/dan/pers/steno/tmp/max_words.edn")
 
 (wd/transform-words! out-file out-file2 (partial wd/stats-word max))
@@ -470,7 +432,6 @@
     (wd/stats-word max (set (mapv edn/read-string (line-seq rdr))))))
 
 [23 24]
-  
 
 ;; 2018-09-06
 
@@ -488,20 +449,19 @@
 
 (img/show-word w1)
 
-
 ;; 2018-09-07
 
-(require 
-         '[steno.word :as wd]
-         '[mikera.image.core :as mik]
-         '[mikera.image.filters :as filt]
-         '[com.rpl.specter :refer [transform select selected? select-one submap must ALL FIRST MAP-VALS]]
-         '[clojure.java.io :as io]
-         '[clojure.set :as st]
-         '[clojure.edn :as edn]
-         '[clojure.spec.alpha :as s]
-         '[clojure.spec.gen.alpha :as gen]
-         '[clojure.spec.test.alpha :as stest])
+(require
+ '[steno.word :as wd]
+ '[mikera.image.core :as mik]
+ '[mikera.image.filters :as filt]
+ '[com.rpl.specter :refer [transform select selected? select-one submap must ALL FIRST MAP-VALS]]
+ '[clojure.java.io :as io]
+ '[clojure.set :as st]
+ '[clojure.edn :as edn]
+ '[clojure.spec.alpha :as s]
+ '[clojure.spec.gen.alpha :as gen]
+ '[clojure.spec.test.alpha :as stest])
 
 (def page (mik/load-image "/home/dan/pers/steno/test/ex1.jpg"))
 
@@ -540,7 +500,6 @@
 
 (show-page page :zoom 0.5 :title "cucu")
 
-
 (defn xy2idx
   [page x y]
   (+ x (* y (:width page))))
@@ -554,15 +513,14 @@
 (get-pixel page 0 0)
 
 (defn get-pixel-hex
-   [page x y]
-   (format "%08x" (get-pixel page x y)))
+  [page x y]
+  (format "%08x" (get-pixel page x y)))
 
 (get-pixel-hex page 48 216)
 
 (get-pixel-hex page 48 214)
 
 (get-pixel-hex page 0 0)
-
 
 (get-pixel-hex page 49 200)
 
@@ -574,14 +532,13 @@
   [{:keys [width]} idx]
   [(mod idx width) (quot idx width)])
 
-
 (defn get-black-pixels
   [page]
   (let  [xform (comp
-                 (map-indexed (fn [idx v] [idx v]))
-                 (filter (fn [[idx v]] (= v -16777216)))
-                 (map first)
-                 (map (fn [idx] (idx2xy page idx))))]
+                (map-indexed (fn [idx v] [idx v]))
+                (filter (fn [[idx v]] (= v -16777216)))
+                (map first)
+                (map (fn [idx] (idx2xy page idx))))]
     (into (sorted-set) xform (:pixels page))))
 
 (def blacks2 (get-black-pixels page))
@@ -598,9 +555,9 @@ java.awt.image.BufferedImage
 
 ;; 2018-09-15
 
-(require 
+(require
  '[steno.word :as wd]
- '[steno.page :as pg]
+ '[steno.picture :as pic]
  '[mikera.image.core :as mik]
  '[mikera.image.filters :as filt]
  '[com.rpl.specter :refer [transform select selected? select-one submap must ALL FIRST MAP-VALS]]
@@ -611,14 +568,123 @@ java.awt.image.BufferedImage
  '[clojure.spec.gen.alpha :as gen]
  '[clojure.spec.test.alpha :as stest])
 
-(s/def ::wid (s/ge))
-(s/def ::pic (s/with-gen (s/keys :req-un [::width])))
+;; (s/def ::wid (s/ge))
+;; (s/def ::pic (s/with-gen (s/keys :req-un [::width])))
+
+(def filename "/home/dan/pers/steno/test/ex1.jpg")
+(def words-file "/home/dan/pers/steno/tmp/words2.edn")
+(def nwords-file "/home/dan/pers/steno/tmp/normalized_words2.edn")
+
+(def page (pic/load-picture filename))
+
+(pic/show-picture! page :zoom 0.25 :title "page")
+
+(def blacks (pic/get-black-pixels page))
+
+(wd/get-words-as-file! blacks words-file)
+
+(wd/transform-words! words-file nwords-file wd/normalize-word)
+
+(def w2
+  #{[4 3] [2 2] [0 0] [2 8] [1 0] [3 3] [0 5] [3 4] [6 5] [4 6] [1 4] [1 3] [5 5] [2 7] [3 6] [4 5] [2 0] [0 4] [2 1] [4 4] [3 7]})
+
+(pic/show-word! w2  :zoom 10)
+
+;; 2018-09-16
+
+(require
+ '[steno.word :as wd]
+ '[steno.picture :as pic]
+ '[mikera.image.core :as mik]
+ '[mikera.image.filters :as filt]
+ '[com.rpl.specter :refer [transform select selected? select-one submap must ALL FIRST MAP-VALS]]
+ '[clojure.java.io :as io]
+ '[clojure.set :as st]
+ '[clojure.edn :as edn]
+ '[clojure.spec.alpha :as s]
+ '[clojure.spec.gen.alpha :as gen]
+ '[clojure.spec.test.alpha :as stest])
+ 
+(def filename "/home/dan/pers/steno/test/ex2.jpg")
+(def words-file "/home/dan/pers/steno/tmp/words3.edn")
+(def words-file2 "/home/dan/pers/steno/tmp/words4.edn")
+(def nwords-file "/home/dan/pers/steno/tmp/normalized_words3.edn")
 
 
+(def page (pic/load-picture filename))
+
+(pic/show-picture! page :zoom 0.25 :title "page")
+
+(def blacks (pic/get-black-pixels page))
+
+(count blacks)
+
+(wd/get-words-as-file! blacks words-file)
+
+(wd/transform-words! words-file words-file2 #(apply sorted-set %))
 
 
-(defn show-word
-  "Visualise a steno word."
-  ([word] (show-word word true))
-  ([word standard?] (let [[w h] (if standard? wd/word-dims (wd/stats-word max word))])))
+(wd/transform-words! words-file nwords-file wd/normalize-word)
 
+;; 2018-09-29
+
+(require
+ '[steno.word :as wd]
+ '[steno.picture :as pic]
+ '[mikera.image.core :as mik]
+ '[mikera.image.filters :as filt]
+ '[com.rpl.specter :refer [transform select selected? select-one submap must ALL FIRST MAP-VALS]]
+ '[clojure.java.io :as io]
+ '[clojure.set :as st]
+ '[clojure.edn :as edn]
+ '[clojure.spec.alpha :as s]
+ '[clojure.spec.gen.alpha :as gen]
+ '[clojure.spec.test.alpha :as stest])
+
+(def filename "/home/dan/pers/steno/test/ex2.jpg")
+(def words-file "/home/dan/pers/steno/tmp/words3.edn")
+(def words-file2 "/home/dan/pers/steno/tmp/words4.edn")
+(def nwords-file "/home/dan/pers/steno/tmp/normalized_words3.edn")
+
+
+(def page (pic/load-picture filename))
+
+(pic/show-picture! page :zoom 0.25 :title "page")
+
+(def blacks (pic/get-black-pixels page))
+
+(count blacks)
+
+(def pixel (first blacks))
+
+(def pixels #{(first blacks)})
+
+(def next-pixels (set (mapcat #(wd/get-one-neighbors blacks %) pixels)))
+
+(def next-pixels (set (mapcat #(wd/get-one-neighbors blacks %) next-pixels)))
+
+
+(defn get-word
+  [blacks]
+  (loop [pixels #{(first blacks)}
+         word #{(first blacks)}]
+    ;; (printf "pixels: %s, word: %s\n" pixels word)
+    (if (empty? pixels)
+      word
+      (let [next-pixels (set (mapcat #(wd/get-one-neighbors blacks %) pixels))]
+        (recur (st/difference next-pixels word) (st/union word next-pixels))))))
+
+(def word (get-word blacks))
+
+(def nword (wd/normalize-word word))
+
+(pic/show-word! nword)
+
+(def word2 (get-word (st/difference blacks word)))
+
+(def nword2 (wd/normalize-word word2))
+
+(pic/show-word! nword2)
+
+
+  
