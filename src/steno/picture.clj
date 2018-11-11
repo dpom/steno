@@ -5,10 +5,13 @@
    [clojure.spec.test.alpha :as stest]
    [steno.word :as wd]
    [com.rpl.specter :refer [transform ALL]]
-   [mikera.image.core :as mik]
-   [mikera.image.filters :as filt]))
+   [mikera.image.core :as mik]))
 
-(def BLACK -16777216)
+(def WHITE 0xffffffff)
+(def BLACK 0xff000000)
+(def MASK 0xff)
+(def THRESHOLD 200) 
+
 (def MAX-DIM 3000)
 (def MAX-IDX 9000000)
 
@@ -86,7 +89,7 @@
   [picture]
   (let  [xform (comp
                 (map-indexed (fn [idx v] [idx v]))
-                (filter (fn [[_ v]] (= v BLACK)))
+                (remove (fn [[_ v]] (>= (bit-and v MASK) THRESHOLD)))
                 (map first)
                 (map (fn [idx] (idx2xy picture idx))))]
     (into (sorted-set) xform (:pixels picture))))
@@ -101,18 +104,26 @@
 
 ;; (stest/summarize-results (stest/check `get-black-pixels)) 
 
+(defn get-pixel
+  [picture x y]
+  (aget (:pixels picture) (xy2idx picture x y)))
+
+(defn get-pixel-hex
+  [picture x y]
+  (format "%08x" (get-pixel picture x y)))
 
 (defn show-word!
   "Visualise a steno word."
   [word & {:keys [standard? zoom title] :or {standard? true zoom 5 title "Steno Word"}}]
-  (let [[w h] (if standard? wd/word-dims (transform [ALL] inc (wd/stats-word max word)))
+  (let [nword (wd/normalize-word word)
+        [w h] (if standard? wd/word-dims (transform [ALL] inc (wd/stats-word max nword)))
         image (mik/new-image w h)
         pixels (mik/get-pixels image)
         picture (map->Picture {:width w
                                :height h
                                :image image
                                :pixels pixels})]
-    (doseq [[x y] word]
+    (doseq [[x y] nword]
       (aset pixels (xy2idx picture x y) BLACK))
     (show-picture! picture :zoom zoom :title title)))
 

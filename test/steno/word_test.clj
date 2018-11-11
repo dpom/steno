@@ -10,3 +10,5 @@
 (defspec-test get-words-test `w/get-words)
 ;; (defspec-test test-stats-word `w/stats-word)
 (defspec-test test-normalize-word `w/normalize-word)
+(defspec-test test-get-gaps `w/get-gaps)
+(defspec-test test-split-zones `w/split-zones)

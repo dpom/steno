@@ -9,8 +9,8 @@
       [clojure.test :as tst]
       [com.rpl.specter :refer [transform select selected? select-one submap must ALL FIRST MAP-VALS]]))
 
-
-(def word-dims [24 24])
+ 
+(def word-dims [300 200])
 
 
 ;; Specs
@@ -21,16 +21,20 @@
 (s/def ::points (s/coll-of ::point :distinct true :into (sorted-set)))
 (s/def ::word ::points)
 
-(def directions [[0 1] [-1 1] [1 0] [1 1]]) 
+(def directions [[-1 -1] [0 -1] [1 -1] [-1 0]  [1 0] [-1 1] [0 1] [1 1]]) 
 
 (s/def ::direction (set directions))
 
 ;; Functions
 
+(defn valid-point?
+  [[x y]]
+  (and (nat-int? x) (nat-int? y)))
+
 (defn get-neighbor
   [blacks [x y] [dx dy]]
   (let [point [(+ x dx) (+ y dy)]]
-    (if (contains? blacks point)
+    (if (and (valid-point? point) (contains? blacks point))
       point)))
 
 (s/fdef get-neighbor
@@ -82,9 +86,19 @@
 
 ;; (stest/summarize-results (stest/check `get-word)) 
 
+
+(defn second-<
+  "Compare 2 points by second coordinate."
+  [x y]
+  (let [c (compare (second x) (second y))]
+    (if (zero? c)
+      (compare x y)
+      c)))
+
+
 (defn get-words
   [blacks]
-  (loop [bks blacks
+  (loop [bks (apply sorted-set-by second-< blacks)
          words []]
     (if (empty? bks)
         words
@@ -102,16 +116,7 @@
 ;; (stest/summarize-results (stest/check `get-words)) 
 
 
-(defn get-words-as-file!
-  [blacks filename]
-  (set! *print-length* -1)
-  (spit filename "" :append false)
-  (loop [bks blacks]
-    (if (empty? bks)
-      filename
-      (let [word (get-word bks)]
-        (spit filename (prn-str word) :append true)
-        (recur (st/difference bks word))))))
+
 
 (defn stats-word
   [func word]
@@ -157,15 +162,63 @@
         (if-let [word (edn/read-string line)]
           (.write w (prn-str (func word))))))))
 
+(defn get-gaps
+  [blacks line?]
+  (let [func (if line? second first)
+        blk (set (mapv func blacks))
+        max-val (inc (apply max blk))
+        mis (apply sorted-set (st/difference (set (range max-val)) blk))
+        gaps (conj (:res (reduce (fn [{:keys [prev res]} elm]
+                                     {:prev elm :res (if (> (- elm prev) 1) (conj res prev) res)})
+                                 {:prev 0 :res []}
+                                 mis))
+                   max-val)]
+    (if (zero? (first gaps))
+        (vec (rest gaps))
+        gaps)))
+
+(s/fdef get-gaps
+  :args (s/and (s/cat :blacks ::points :line? boolean?)
+               #(pos-int? (count (:blacks %))))
+  :ret (s/coll-of ::x :distinct true))
+
+(stest/instrument `get-gaps)
+
+;; (s/exercise-fn `get-gaps 1) 
+
+;; (stest/summarize-results (stest/check `get-gaps)) 
+
+(defn split-zones
+  [blacks line?]
+  (let [gaps (get-gaps blacks line?)
+        func (if line? second first)]
+    (if (seq gaps)
+      (:zones (reduce (fn [{:keys [blk zones]} gap]
+                        (let [zone (set (filter #(< (func %) gap) blk))]
+                          {:blk (st/difference blk zone) :zones (conj zones zone)}))
+                      {:blk blacks :zones []}
+                      gaps))
+      [blacks])))
 
 
+(s/fdef split-zones
+  :args (s/and (s/cat :blacks ::points :line? boolean?)
+               #(pos-int? (count (:blacks %))))
+  :ret (s/coll-of ::points :distinct true))
 
+(stest/instrument `split-zones)
 
+;; (s/exercise-fn `split-zones 1) 
 
+;; (stest/summarize-results (stest/check `split-zones)) 
 
-
-
-
-
+(defn get-words-as-file!
+  [blacks filename]
+  (with-bindings {#'*print-length* -1}
+    (spit filename "" :append false)
+    (let [page-words (pmap get-words (remove empty? (mapcat #(split-zones % false) (split-zones blacks true))))]
+      (doseq [words page-words]
+        (doseq [word words]
+          (spit filename (prn-str word) :append true))))))
 
 

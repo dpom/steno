@@ -1,11 +1,13 @@
-(defproject steno "0.1.0-dev08"
+(defproject steno "0.1.0-dev09"
   :description "Digitize stenographic writings"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[org.clojure/clojure "1.9.0"]
                  [org.clojure/test.check "0.10.0-alpha3"]
+                 [clj-time "0.15.0"]
                  [expound "0.7.1"]
                  [com.rpl/specter "1.1.1"]
+                 [com.hypirion/clj-xchart "0.2.0"]
                  [net.mikera/imagez "0.12.0"]]
 
   :plugins [[lein-ancient "0.6.10" :exclusions [commons-logging org.clojure/clojure]]

@@ -37,9 +37,21 @@ steno is a personal project to digitize my stenographic writings.
     CLOCK: [2018-09-15 Sb 18:51]--[2018-09-15 Sb 19:16] =>  0:25
     CLOCK: [2018-09-15 Sb 16:16]--[2018-09-15 Sb 16:41] =>  0:25
     :END:
-*** TODO clean image
-    SCHEDULED: <2018-09-29 Sb>
+*** DONE clean image
+    CLOSED: [2018-10-14 Du 16:02] SCHEDULED: <2018-09-29 Sb>
+    :LOGBOOK:
+    - State "DONE"       from "STARTED"    [2018-10-14 Du 16:02]
+    CLOCK: [2018-10-09 Ma 11:56]--[2018-10-09 Ma 11:57] =>  0:01
+    CLOCK: [2018-09-30 Du 16:39]--[2018-09-30 Du 17:04] =>  0:25
+    :END:
 
+*** STARTED improve word detection
+    SCHEDULED: <2018-11-10 Sb>
+    :LOGBOOK:
+    CLOCK: [2018-11-11 Du 10:35]--[2018-11-11 Du 11:00] =>  0:25
+    CLOCK: [2018-11-04 Du 10:50]--[2018-11-04 Du 11:14] =>  0:24
+    CLOCK: [2018-10-14 Du 16:03]--[2018-10-14 Du 16:28] =>  0:25
+    :END:
 *** TODO implement a compressed format for steno words
 *** TODO build a db with steno words
 
