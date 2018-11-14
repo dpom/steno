@@ -54,11 +54,11 @@
 (defn xy2idx
   "Convert cartezian coordinates in array index."
   [picture x y]
-  (+ x (* y (:width picture))))
+  (+ y (* x (:width picture))))
 
 (s/fdef xy2idx
         :args (s/and (s/cat :picture (s/keys :req-un [::width ::height]) :x ::coordinate :y ::coordinate)
-                     #(and (< (:x %) (-> % :picture :width)) (< (:y %) (-> % :picture :height))))
+                     #(and (< (:y %) (-> % :picture :width)) (< (:x %) (-> % :picture :height))))
         :ret ::arrayidx)
 
 (stest/instrument `xy2idx)
@@ -71,7 +71,7 @@
 (defn idx2xy
   "Convert array index in cartezian coordinates."
   [{:keys [width]} idx]
-  [(mod idx width) (quot idx width)])
+  [ (quot idx width) (mod idx width)])
 
 (s/fdef idx2xy
         :args (s/and (s/cat :picture (s/keys :req-un [::width ::height])

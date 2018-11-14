@@ -45,14 +45,16 @@ steno is a personal project to digitize my stenographic writings.
     CLOCK: [2018-09-30 Du 16:39]--[2018-09-30 Du 17:04] =>  0:25
     :END:
 
-*** STARTED improve word detection
-    SCHEDULED: <2018-11-10 Sb>
+*** DONE improve word detection
+    CLOSED: [2018-11-12 Lu 13:50] SCHEDULED: <2018-11-10 Sb>
     :LOGBOOK:
+    - State "DONE"       from "STARTED"    [2018-11-12 Lu 13:50]
     CLOCK: [2018-11-11 Du 10:35]--[2018-11-11 Du 11:00] =>  0:25
     CLOCK: [2018-11-04 Du 10:50]--[2018-11-04 Du 11:14] =>  0:24
     CLOCK: [2018-10-14 Du 16:03]--[2018-10-14 Du 16:28] =>  0:25
     :END:
 *** TODO implement a compressed format for steno words
+    SCHEDULED: <2018-11-17 Sb>
 *** TODO build a db with steno words
 
 

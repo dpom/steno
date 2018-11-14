@@ -15,13 +15,14 @@
 
 ;; Specs
 
-(s/def ::x (s/and nat-int? #(< % 5000)))
-(s/def ::y (s/and nat-int? #(< % 5000)))
-(s/def ::point (s/tuple ::x ::y))
+(s/def ::row (s/and nat-int? #(< % 5000)))
+(s/def ::column (s/and nat-int? #(< % 5000)))
+(s/def ::point (s/tuple ::row ::column))
 (s/def ::points (s/coll-of ::point :distinct true :into (sorted-set)))
 (s/def ::word ::points)
 
-(def directions [[-1 -1] [0 -1] [1 -1] [-1 0]  [1 0] [-1 1] [0 1] [1 1]]) 
+;; w, nw, n, ne, e, se, s, sw
+(def directions [[0 -1] [-1 -1] [-1 0] [-1 1]  [0 1] [1 1] [1 0] [1 -1]]) 
 
 (s/def ::direction (set directions))
 
@@ -87,18 +88,18 @@
 ;; (stest/summarize-results (stest/check `get-word)) 
 
 
-(defn second-<
-  "Compare 2 points by second coordinate."
-  [x y]
-  (let [c (compare (second x) (second y))]
+(defn compare-points
+  "Compare 2 points."
+  [[x1 y1] [x2 y2]]
+  (let [c (compare x1 x2)]
     (if (zero? c)
-      (compare x y)
+      (compare y1 y2)
       c)))
 
 
 (defn get-words
   [blacks]
-  (loop [bks (apply sorted-set-by second-< blacks)
+  (loop [bks (apply sorted-set-by compare-points blacks)
          words []]
     (if (empty? bks)
         words
@@ -164,7 +165,7 @@
 
 (defn get-gaps
   [blacks line?]
-  (let [func (if line? second first)
+  (let [func (if line? first second)
         blk (set (mapv func blacks))
         max-val (inc (apply max blk))
         mis (apply sorted-set (st/difference (set (range max-val)) blk))
@@ -180,7 +181,7 @@
 (s/fdef get-gaps
   :args (s/and (s/cat :blacks ::points :line? boolean?)
                #(pos-int? (count (:blacks %))))
-  :ret (s/coll-of ::x :distinct true))
+  :ret (s/coll-of ::row :distinct true))
 
 (stest/instrument `get-gaps)
 
@@ -191,7 +192,7 @@
 (defn split-zones
   [blacks line?]
   (let [gaps (get-gaps blacks line?)
-        func (if line? second first)]
+        func (if line? first second)]
     (if (seq gaps)
       (:zones (reduce (fn [{:keys [blk zones]} gap]
                         (let [zone (set (filter #(< (func %) gap) blk))]
