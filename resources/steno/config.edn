@@ -1,0 +1,12 @@
+{:duct.core/project-ns  steno
+ :duct.core/environment :production
+
+ :duct.module/logging {}
+ :duct.module.web/api {}
+ :duct.module/sql {}
+
+ :duct.module/ataraxy
+ {[:get "/example"] [:example]}
+
+ :steno.handler/example
+ {:db #ig/ref :duct.database/sql}}
