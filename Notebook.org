@@ -4,3 +4,10 @@
 #+EMAIL: dan.pomohaci@gmail.com
 #+STARTUP: overview indent align inlineimages
 #+PROPERTY: header-args :cache yes :results silent :padline no
+
+* 2024-12-29
+
+- implement extract-words:
+  #+begin_src clojure
+
+  #+end_src

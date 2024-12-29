@@ -50,7 +50,6 @@
             # Create package overlay from workspace.
             overlay = workspace.mkPyprojectOverlay {
               # Prefer prebuilt binary wheels as a package source.
-              # Sdists are less likely to "just work" because of the metadata missing from uv.lock.
               # Binary wheels are more likely to, but may still require overrides for library dependencies.
               sourcePreference = "wheel"; # or sourcePreference = "sdist";
               # Optionally customise PEP 508 environment
@@ -101,7 +100,15 @@
                   pkgs.babashka
                   pkgs.clj-kondo
                   pkgs.uv
+                  pkgs.ruff
                   python
+                ];
+                LD_LIBRARY_PATH = lib.makeLibraryPath [
+                  pkgs.stdenv.cc.cc
+                  pkgs.libgcc.lib
+                  pkgs.zlib
+                  pkgs.libGL
+                  pkgs.glib.out
                 ];
                 shellHook = ''
             unset PYTHONPATH

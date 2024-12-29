@@ -1,5 +1,4 @@
 from basilisp.main import bootstrap
 
-
 def main():
-     bootstrap("steno.core:hello")
+     bootstrap("steno.core:cli")

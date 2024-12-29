@@ -2,12 +2,19 @@
   (:require
     [basilisp.string :as str])
   (:import
+    [argparse :as arg]
     [os :as os]
-    [datetime :as dt]))
+    [cv2 :as cv2]
+    ))
 
-
-(defn hello
+(defn cli
   []
-  (let [now (dt.datetime/now)]
-    (println "Hello world!")
-    (println (.strftime now "%Y-%m-%d"))))
+  (let [now (dt.datetime/now)
+        parser (arg/ArgumentParser)]
+    (.add_argument parser "input_image_path" ** :help "the path of the input image")
+    (.add_argument parser "output_directory" ** :help "the output directory path")
+    (let [args (.parse_args parser)]
+      (println "Hello world!")
+      (println (.strftime now "%Y-%m-%d"))
+      (println (.- args input_image_path))
+      (println (.- args output_directory)))))
