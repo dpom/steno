@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+set -e
+
+bin_dir="$(dirname "$PWD"/"$0")"
+project_dir="$(dirname "$bin_dir")"
+lwd=$(pwd)
+
+cd "$project_dir"
+bb style
+bb kondo
+cd "$lwd"

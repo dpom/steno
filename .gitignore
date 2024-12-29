@@ -1,14 +1,23 @@
-pom.xml
-pom.xml.asc
-*.jar
-*.class
-/lib/
-/classes/
-/target/
-/checkouts/
-.lein-deps-sum
-.lein-repl-history
-.lein-plugins/
-.lein-failures
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+.direnv
+
+# Misc files
+*~
+*.tex
+#tmp
+#.ent.el
+#Notebook.org
+/.envrc.local
+/log/*.log
 .nrepl-port
-.cpcache/
+/.stfolder/
+/tmp/
