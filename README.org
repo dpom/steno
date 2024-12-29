@@ -1,19 +1,59 @@
 * steno
-  :PROPERTIES:
-  :CUSTOM_ID: steno
-  :END:
 
 steno is a personal project to digitize my stenographic writings.
 
-** Tasks
+** Description
 
-*** TODO convert a jpg image in a binary image
-*** TODO visualize  a binary image
-*** TODO extract steno words from image and normalize them
+*** Archtecture
+
+** Getting Started
+
+*** Linux, MacOS, and Windows (WSL2)
+
+1. Install
+   - direnv
+   - nix (https://nixos.org/download/#nix-install-linux)
+2. Create an ~.envrc.local~ file (see [[file:doc/SDA.pdf][.envrc.local.example]]).
+3. In the project folder run:
+   #+begin_src shell
+direnv allow
+   #+end_src
+   first time it will be a long process to download all packages and libraries.
+
+*** Windows (non WSL2)
+
+1. Install
+   - python 3.12+
+   - uv (https://docs.astral.sh/uv/getting-started/installation/)
+   - babashka
+   - cljstyle
+   - kondo 
+2. Create manually the user variables defined in  ~.envrc.local.example~.
+3. In the project folder run:
+   #+begin_src shell
+uv venv
+uv sync
+   #+end_src
+
+** Development
+
+To format the code run:
+#+begin_src shell
+bb format
+#+end_src
+
+To lint the code run:
+#+begin_src shell
+bb kondo
+#+end_src
+
+To make sure that no unformatted commits with lint errors end up in the main branch run initially:
+#+begin_src shell
+	git config core.hooksPath hooks
+#+end_src
+The ~pre-push~ script will block the push if there are style or lint errors in code.
 
 
 ** License
 
-Copyright © 2018 Dan Pomohaci
-
-This project is licensed under the terms of the  Eclipse License 1.0.
+This project is released under the GNU General Public License. See the [[file:LICENSE][file]] for details.

@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+#
+# prepend a issue number to a commit message automatically
+#
+[ -n "$3" ] && exit; # if amend, don't do anything
+fname=$1
+branch=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD)
+# parse github ticket assuming git branch name follows  recommended pattern
+github=$(echo $branch | sed -n 's_\([0-9]*\)-.*$_[\1]_p')
+# if issue ticket found prepend ticket number enclosed in brackets to the temp message file
+[ -n "$github" ] && $(sed "1s/^/${github} /" $fname > $fname.$$; mv $fname.$$ $fname)
+exit 0

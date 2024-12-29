@@ -1,0 +1,25 @@
+{:paths ["src"]
+ :tasks
+ {nrepl     {:doc  "Starts the REPL"
+             :task (shell "basilisp nrepl-server")}
+  kondo     {:doc  "Runs kondo linter on default or specific file"
+             :task (let [[src-file] *command-line-args*]
+                     (shell (str "clj-kondo --lint "
+                                 (if (empty? src-file)
+                                   "src"
+                                   src-file))))}
+  style     {:doc  "Checks code style on default or specific file"
+             :task (let [[src-file] *command-line-args*]
+                     (shell (str "cljstyle check "
+                                 (if (empty? src-file)
+                                   "src test resources"
+                                   src-file))))}
+  format    {:doc  "Formats codebase on default or specific file"
+             :task (let [[src-file] *command-line-args*]
+                     (shell  (str "cljstyle fix "
+                                  (if (empty? src-file)
+                                    "src test resources"
+                                    src-file))))}
+  app    {:doc  "Run the application"
+          :task (shell "uv run steno")}
+  }}

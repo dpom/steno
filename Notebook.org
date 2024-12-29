@@ -1,0 +1,6 @@
+#+TITLE: Notebook
+#+DESCRIPTION: notebook for pyproj project
+#+AUTHOR: Dan Pomohaci
+#+EMAIL: dan.pomohaci@gmail.com
+#+STARTUP: overview indent align inlineimages
+#+PROPERTY: header-args :cache yes :results silent :padline no
