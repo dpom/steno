@@ -21,5 +21,7 @@
                                     "src test resources"
                                     src-file))))}
   app    {:doc  "Run the application"
-          :task (shell "uv run steno")}
+          :requires ([clojure.string :as str])
+          :task (shell (str "uv run steno "
+                         (str/join " " *command-line-args*)))}
   }}
