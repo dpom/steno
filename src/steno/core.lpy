@@ -1,20 +1,22 @@
 (ns steno.core
   (:require
-    [basilisp.string :as str])
+    [basilisp.string :as str]
+    [steno.extractor :as ext])
   (:import
     [argparse :as arg]
     [os :as os]
-    [cv2 :as cv2]
-    ))
+    [cv2 :as cv2]))
+
 
 (defn cli
   []
-  (let [now (dt.datetime/now)
-        parser (arg/ArgumentParser)]
+  (let [parser (arg/ArgumentParser)]
     (.add_argument parser "input_image_path" ** :help "the path of the input image")
     (.add_argument parser "output_directory" ** :help "the output directory path")
-    (let [args (.parse_args parser)]
-      (println "Hello world!")
-      (println (.strftime now "%Y-%m-%d"))
-      (println (.- args input_image_path))
-      (println (.- args output_directory)))))
+    (let [args (.parse_args parser)
+          page-filename (.- args input_image_path)
+          outdir (.- args output_directory)
+          _ (println "Extract words from " page-filename)
+          words (ext/extract-word-images page-filename)]
+      (doall (ext/save-word-images words outdir))
+      (println "Saved words in " outdir))))

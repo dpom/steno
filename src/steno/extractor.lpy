@@ -1,0 +1,28 @@
+(ns steno.extractor
+  "Functions to extract word images from a page image"
+  (:import
+    [cv2 :as cv2]))
+
+
+(defn extract-word-images
+  "Extract word images from the page image stored in PAGE-FILENAME file. Returns the word images vector."
+  [page-filename]
+  (let [image (cv2/imread page-filename)
+        gray (cv2/cvtColor image cv2/COLOR_BGR2GRAY)
+        blur (cv2/GaussianBlur gray [5 5] 0)
+        thresh (second (cv2/threshold blur 0 255 (+ cv2/THRESH_BINARY_INV
+                                                   cv2/THRESH_OTSU)))
+        kernel (cv2/getStructuringElement cv2/MORPH_RECT [7 7])
+        dilate (cv2/dilate thresh kernel ** :iterations 1)
+        cnts* (cv2/findContours dilate cv2/RETR_EXTERNAL cv2/CHAIN_APPROX_SIMPLE)
+        cnts (if (= (count cnts*) 2) (first cnts*) (second cnts*))]
+    (map (fn [contour]
+           (let [[x y w h] (cv2/boundingRect contour)]
+             (aget image #py ((slice y (+ y h)) (slice x (+ x w))))))
+      cnts)))
+
+
+(defn save-word-images
+  "Save the WORDS images vector in files in OUTDIR folder. The filename format is wordXXX.png where XXX is the index of the word in the vector."
+  [words outdir]
+  (map-indexed #(cv2/imwrite (format "%s/word%03d.png" outdir %1) %2)  words))

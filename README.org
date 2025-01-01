@@ -35,7 +35,21 @@ uv venv
 uv sync
    #+end_src
 
+** Usage
+
+The application could be run with the command:
+#+begin_src shell
+bb app <params>
+#+end_src
+
+To see the =params= available run:
+#+begin_src shell
+bb app -h
+#+end_src
+
+
 ** Development
+
 
 To format the code run:
 #+begin_src shell
