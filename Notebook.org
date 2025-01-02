@@ -157,7 +157,7 @@
   [matplotlib :as matp]
   [matplotlib.pyplot :as plt])
 
-(matp/use "tkagg")
+;; (matp/use "tkagg")
 
 (def img (cv2/imread "test/resources/orig.png"))
 
@@ -169,5 +169,6 @@
   (plt/show))
 
 (show img)
-
+(show edges)
+;; Valuerror: 'gtkagg' is not a valid value for backend; supported values are ['gtk3agg', 'gtk3cairo', 'gtk4agg', 'gtk4cairo', 'macosx', 'nbagg', 'notebook', 'qtagg', 'qtcairo', 'qt5agg', 'qt5cairo', 'tkagg', 'tkcairo', 'webagg', 'wx', 'wxagg', 'wxcairo', 'agg', 'cairo', 'pdf', 'pgf', 'ps', 'svg', 'template']
   #+end_src 
