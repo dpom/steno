@@ -146,3 +146,28 @@
 (defmacro mget [m r1 r2 c1 c2]
   `(aget ~m (python/tuple [(python/slice ~r1 ~r2) (python/slice ~c1 ~c2)])))
   #+end_src
+
+* 2025-01-01
+
+- incerc sa reduc grosimea liniilor la un pixel:
+  #+begin_src clojure
+(import
+  [cv2 :as cv2]
+  [numpy :as np]
+  [matplotlib :as matp]
+  [matplotlib.pyplot :as plt])
+
+(matp/use "tkagg")
+
+(def img (cv2/imread "test/resources/orig.png"))
+
+(def edges (cv2/Canny  img 100 200))
+
+(defn show
+  [img]
+  (plt/imshow img ** :cmap "gray")
+  (plt/show))
+
+(show img)
+
+  #+end_src 

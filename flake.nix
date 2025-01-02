@@ -64,14 +64,17 @@
             # This is an additional overlay implementing build fixups.
             # See:
             # - https://pyproject-nix.github.io/uv2nix/FAQ.html
-            pyprojectOverrides = _final: _prev: {
-              # Implement build fixups here.
+            pyprojectOverrides = final: prev: {
+              matplotlib = prev.matplotlib.ovverridePythonAttrs (
+                old: {
+                  enableTk = true;
+                });
             };
 
             mypkgs = mynixpkgs.packages.${system};
             
             # Use Python 3.12 from nixpkgs
-            python = pkgs.python312;
+            python = pkgs.python312Full;
 
             # Construct package set
             pythonSet =
@@ -102,6 +105,7 @@
                   pkgs.uv
                   pkgs.ruff
                   python
+                  pkgs.qt6.full
                 ];
                 LD_LIBRARY_PATH = lib.makeLibraryPath [
                   pkgs.stdenv.cc.cc
