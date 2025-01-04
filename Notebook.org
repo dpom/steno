@@ -146,3 +146,198 @@
 (defmacro mget [m r1 r2 c1 c2]
   `(aget ~m (python/tuple [(python/slice ~r1 ~r2) (python/slice ~c1 ~c2)])))
   #+end_src
+
+* 2025-01-01
+
+- incerc sa reduc grosimea liniilor la un pixel:
+  #+begin_src clojure
+(import
+  [cv2 :as cv2]
+  [numpy :as np]
+  [matplotlib :as matp]
+  [matplotlib.pyplot :as plt])
+
+;; (matp/use "tkagg")
+
+(def img (cv2/imread "test/resources/orig.png"))
+
+(def edges (cv2/Canny  img 100 200))
+
+(defn show
+  [img]
+  (plt/imshow img ** :cmap "gray")
+  (plt/show))
+
+(show img)
+(show edges)
+;; Valuerror: 'gtkagg' is not a valid value for backend; supported values are ['gtk3agg', 'gtk3cairo', 'gtk4agg', 'gtk4cairo', 'macosx', 'nbagg', 'notebook', 'qtagg', 'qtcairo', 'qt5agg', 'qt5cairo', 'tkagg', 'tkcairo', 'webagg', 'wx', 'wxagg', 'wxcairo', 'agg', 'cairo', 'pdf', 'pgf', 'ps', 'svg', 'template']
+  #+end_src 
+
+* 2025-01-02
+
+- continui cu modificarea parametrilor de la canny:
+  #+begin_src clojure
+(import
+  [cv2 :as cv2]
+  [numpy :as np]
+  [matplotlib :as matp]
+  [matplotlib.pyplot :as plt])
+
+
+(def img (cv2/imread "test/resources/orig.png"))
+
+
+(defn show
+  [img]
+  (plt/imshow img ** :cmap "gray")
+  (plt/show))
+
+
+(def edges (cv2/Canny  img 100 200))
+
+(show edges)
+  #+end_src
+
+* 2025-01-03
+
+- incerc noi methode:
+  #+begin_src clojure
+(import
+  [cv2 :as cv2])
+
+(require '[steno.utils :as utl])
+
+(def img (cv2/imread "test/resources/words/word010.png"))
+
+(utl/show img)
+  #+end_src
+
+* 2025-01-04
+
+- testez metoda gasita in https://docs.opencv.org/3.4/d9/d61/tutorial_py_morphological_ops.html
+  #+begin_src clojure
+(import
+  [cv2 :as cv2]
+  [numpy :as np])
+
+(require '[steno.utils :as utl])
+
+(def img (cv2/imread "test/resources/words/word010.png"))
+
+(utl/show img)
+
+(def invert (cv2/bitwise_not img))
+
+(utl/show invert)
+
+
+(def kernel (np/ones [5 5] np/uint8))
+
+(def erosion (cv2/erode invert kernel ** :iterations 1))
+
+(utl/show erosion)
+  #+end_src
+
+- testez metoda gasita in https://theailearner.com/tag/skeletonization-opencv/:
+  #+begin_src clojure
+(import
+  [cv2 :as cv2]
+  [numpy :as np])
+
+(require '[steno.utils :as utl])
+
+(def img (cv2/imread "test/resources/words/word010.png"))
+
+(utl/show img)
+
+;; inversez imaginea
+(def invert (cv2/bitwise_not img))
+
+(utl/show invert)
+
+;; incerc o filtrare intai 
+
+kernel = np.ones((5,5),np.float32)/25
+dst = cv.filter2D(img,-1,kernel)
+
+(def kernel (/ (np/ones [5 5] np/float32) 25))
+
+(def filter-img (cv2/filter2D invert -1 kernel))
+
+(utl/show filter-img)
+
+;; blur
+
+(def blur (cv2/blur invert [5,5]))
+
+(utl/show blur)
+
+;; skeletonization
+
+(def kernel (cv2/getStructuringElement cv2/MORPH_CROSS [3 3]))
+
+(def thin (np/zeros (.- blur shape) ** :dtype "uint8"))
+
+(cv2/countNonZero thin)
+
+
+(def img2
+  (loop [image blur
+         result thin]
+    (println "step")
+    (if (zero? (cv2/countNonZero image))
+      result
+      (let [erode (cv2/erode image kernel)
+            opening (cv2/morphologyEx erode cv2/MORPH_OPEN kernel)
+            subset (- erode opening)]
+        (recur erode (cv2/bitwise_or subset result))))))
+
+;; binary
+
+(def bin-image
+  (second (cv2/threshold blur 175 255 cv2/THRESH_BINARY)))
+
+(utl/show bin-image)
+
+  #+end_src
+- incerc scikit
+  #+begin_src clojure
+(import
+  [cv2 :as cv2]
+  [numpy :as np]
+  [skimage.morphology :as skim])
+(require '[steno.utils :as utl])
+
+(def img
+  (-> (cv2/imread "test/resources/words/word010.png")
+      (cv2/bitwise_not)
+      (cv2/blur [5,5])))
+
+
+
+(import [skimage.morphology :as skim])
+
+
+
+
+(def img1  (skim/skeletonize img))
+
+
+(import [skimage.util :as skiu])
+
+(def img2
+  (skiu/img_as_ubyte img1))
+
+
+
+(utl/show img2)
+
+(def img
+  (-> (cv2/imread "test/resources/words/word010.png")
+      (cv2/bitwise_not)
+      (cv2/blur [5,5])
+      (skim/skeletonize)
+      (skiu/img_as_ubyte)))
+
+(utl/show img)
+  #+end_src
