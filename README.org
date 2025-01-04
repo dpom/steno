@@ -67,7 +67,16 @@ To make sure that no unformatted commits with lint errors end up in the main bra
 #+end_src
 The ~pre-push~ script will block the push if there are style or lint errors in code.
 
+** References
+
+1. https://opencv.org/
+2. https://theailearner.com/tag/skeletonization-opencv/
+3. https://github.com/Wesley-Li/skeleton
+4. https://web.archive.org/web/20140429184236/http://opencv-python-tutroals.readthedocs.org/en/latest/py_tutorials/py_imgproc/py_canny/py_canny.html
+5. https://docs.opencv.org/4.x/d9/d61/tutorial_py_morphological_ops.html
+6. https://docs.opencv.org/3.4/d9/d61/tutorial_py_morphological_ops.html
 
 ** License
+
 
 This project is released under the GNU General Public License. See the [[file:LICENSE][file]] for details.

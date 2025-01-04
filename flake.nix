@@ -1,5 +1,5 @@
 {
-  description = "Template for basilisp projects";
+  description = "steno";
   
   inputs = {
     flake-parts.url = "github:hercules-ci/flake-parts";

@@ -1,0 +1,9 @@
+(ns steno.utils
+  (:import
+    [matplotlib.pyplot :as plt]))
+
+(defn show
+  "Display an image using pyplot."
+  [img]
+  (plt/imshow img ** :cmap "gray")
+  (plt/show))
