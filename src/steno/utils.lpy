@@ -2,6 +2,7 @@
   (:import
     [matplotlib.pyplot :as plt]))
 
+
 (defn show
   "Display an image using pyplot."
   [img]

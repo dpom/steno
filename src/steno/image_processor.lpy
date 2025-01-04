@@ -5,11 +5,12 @@
     [skimage.morphology :as skim]
     [skimage.util :as skiu]))
 
+
 (defn process_image
   "Process the image in order to obtain a clear 1 pixel thick stenogram."
   [image]
   (-> image
-      (cv2/bitwise_not) ; invert image
-      (cv2/blur [5,5]) ; smooth the image
-      (skim/skeletonize) ; skeltonize
-      (skiu/img_as_ubyte)))
+    (cv2/bitwise_not) ; invert image
+    (cv2/blur [5,5]) ; smooth the image
+    (skim/skeletonize) ; skeltonize
+    (skiu/img_as_ubyte)))

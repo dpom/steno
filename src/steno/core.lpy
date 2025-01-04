@@ -1,7 +1,8 @@
 (ns steno.core
   (:require
     [basilisp.string :as str]
-    [steno.extractor :as ext])
+    [steno.extractor :as ext]
+    [steno.image-processor :as img])
   (:import
     [argparse :as arg]
     [os :as os]
@@ -16,7 +17,7 @@
     (let [args (.parse_args parser)
           page-filename (.- args input_image_path)
           outdir (.- args output_directory)
-          _ (println "Extract words from " page-filename)
-          words (ext/extract-word-images page-filename)]
+          _ (println "Extract and process word images from " page-filename)
+          words (map img/process_image (ext/extract-word-images page-filename))]
       (doall (ext/save-word-images words outdir))
       (println "Saved words in " outdir))))
