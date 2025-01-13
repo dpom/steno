@@ -1,0 +1,11 @@
+(ns steno.converter)
+
+(defn image->matrix
+  "Convert an image to binary matrix."
+  [img]
+  (let [[rows cols _] (.- img shape)]
+    (mapv (fn [i]
+            (mapv (fn [j]
+                    (if (bool (zero? (apply + (aget img i j)))) 0 1))
+                  (range 0 cols)))
+          (range 0 rows))))

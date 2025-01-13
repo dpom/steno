@@ -341,3 +341,101 @@ dst = cv.filter2D(img,-1,kernel)
 
 (utl/show img)
   #+end_src
+
+* 2025-01-12
+
+** #5 Convert a word image in a number sequence
+
+- afiseaza o matrice binara:
+  #+begin_src clojure
+;; import numpy as np
+;; import matplotlib.pyplot as plt
+
+;; # create a random binary bidimensional matrix of size 10x10
+;; matrix = np.random.randint(2, size=(10, 10))
+
+;; plt.imshow(matrix, cmap='binary', interpolation='nearest')
+;; plt.show()
+
+
+(import
+  [numpy.random :as np]
+  [cv2 :as cv2]
+  [matplotlib :as matp]
+  [matplotlib.pyplot :as plt])
+
+(matp/use "tkagg")
+
+
+(def matrix (np/randint 2 ** :size [10 10]))
+
+(plt/imshow matrix ** :cmap "gray" :interpolation "nearest")
+
+(plt/show)
+
+(defn show-matrix
+  [mat]
+  (plt/imshow mat ** :cmap "gray" :interpolation "nearest")
+  (plt/show))
+
+(show-matrix matrix)
+
+(defn convert-cell
+  [val]
+  (println (apply + val))
+  (if (zero? (apply + val)) 0 1))
+
+(def img (cv2/imread "test/resources/words/word010.png"))
+
+
+(def word010
+  (mapv #(mapv convert-cell %) img))
+
+(show-matrix word010)
+
+(def bw (cv2/threshold img 127 255 cv2/THRESH_BINARY))
+
+(require '[steno.utils :as utl])
+
+(utl/show bw)
+
+
+(let [shape (.- img shape)]
+  (def rows (first shape))
+  (def cols (second shape)))
+
+
+;; => #py (62 256 3)
+
+(zero? (apply + (aget img 2 2)))
+
+;; => np.uint8(0)
+
+(defn convert-image
+  [img]
+  (let [[rows cols _] (.- img shape)]
+    (mapv (fn [i]
+            (mapv (fn [j]
+                    (if (bool (zero? (apply + (aget img i j)))) 0 1))
+                  (range 0 cols)))
+          (range 0 rows))))
+
+(def word010 (convert-image img))
+
+(show-matrix word010)
+
+# 8 151-161
+
+(bool (zero? (apply + (aget img 8 151))))
+;; => false
+
+(bool (zero? (apply + (aget img 8 150))))
+;; => true
+
+
+;; => np.False_
+
+
+
+
+  #+end_src
