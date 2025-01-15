@@ -1,10 +1,18 @@
 (ns steno.utils
   (:import
+    [matplotlib :as matp]
     [matplotlib.pyplot :as plt]))
 
 
-(defn show
+(defn show-image
   "Display an image using pyplot."
   [img]
   (plt/imshow img ** :cmap "gray")
+  (plt/show))
+
+
+(defn show-matrix
+  "Display a binary matrix."
+  [mat]
+  (plt/imshow mat ** :cmap "gray" :interpolation "nearest")
   (plt/show))
