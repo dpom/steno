@@ -439,3 +439,282 @@ dst = cv.filter2D(img,-1,kernel)
 
 
   #+end_src
+
+* 2025-01-13
+
+** #5 Convert a word image in a number sequence
+
+- continui implementarea converter:
+  #+begin_src clojure
+(def directions
+  [[ 0  1] ; E
+   [ 1  1] ; SE
+   [ 1  0] ; S
+   [ 1 -1] ; SV
+   [ 0 -1] ; V
+   [-1 -1] ; NV
+   [-1  0] ; N
+   [-1  1] ; NE
+   ])
+
+(def matrix
+  [[0 0 0]
+   [0 1 1]
+   [0 0 0]])
+
+
+(aget matrix 1 1)
+;; => 1
+
+
+(defn get-neighbor
+  [mat [r c] [dr dc]]
+  (try
+    (aget mat (+ r dr) (+ c dc))
+    (catch Exception e
+      0)))
+
+(get-neighbor matrix [1 1] (first directions))
+;; => 1
+
+(get-neighbor matrix [1 1] (nth directions 2))
+;; => 0
+
+(get-neighbor matrix [0 0] (nth directions 4))
+;; => 0
+
+(defn get-cell-number
+  [mat point]
+  (reduce (fn [[count num] dir]
+            (let [v (get-neighbor mat point dir)]
+              [(+ count v) (+ (* num 2) v)]))
+          [0 0]
+          directions))
+
+(get-cell-number matrix [1 1])
+;; => [1 128]
+
+(format "%x" 128)
+;; => "80"
+
+
+(get-cell-number matrix [2 1])
+;; => [3 11]
+
+(format "%x" 11)
+;; => "b"
+;; 1011
+
+(doseq [d directions]
+  (println (get-neighbor matrix [2 1] d)))
+
+(def mat1
+  [[6 7 8]
+   [5 0 1]
+   [4 3 2]])
+
+(mapv #(get-neighbor mat1 [1 1] %) directions)
+;; => [1 2 3 4 5 6 7 8]
+
+(mapv #(get-neighbor mat1 [2 1] %) directions)
+;; => [2 0 0 0 4 5 0 1]
+  #+end_src
+  
+
+* 2025-01-14
+
+
+** #5 Convert a word image in a number sequence
+
+- continui implementarea converter:
+  #+begin_src clojure
+(require '[steno.converter :as cnv]
+         '[steno.utils :as utl])
+
+(defn get-neighbor
+  [mat [r c] [dr dc]]
+  (let [nr (+ r dr)
+        nc (+ c dc)]
+    (try
+      [[nr nc] (aget mat nr nc)]
+      (catch Exception e
+        [[-1 -1] 0]))))
+
+
+(defn get-cell-number-and-neighbors
+  [mat point]
+  (reduce (fn [[neighbors num] dir]
+            (let [[np v] (get-neighbor mat point dir)]
+              [(if (zero? v) neighbors (conj neighbors np)) (+ (* num 2) v)]))
+          [#{} 0]
+          cnv/directions))
+
+(def mat1
+  [[6 7 8]
+   [5 0 1]
+   [4 3 2]])
+
+(mapv #(get-neighbor mat1 [1 1] %) cnv/directions)
+;; => [[[1 2] 1] [[2 2] 2] [[2 1] 3] [[2 0] 4] [[1 0] 5] [[0 0] 6] [[0 1] 7] [[0 2] 8]]
+
+(def mat2
+  [[1 1 1]
+   [1 0 1]
+   [1 1 1]])
+
+(get-cell-number-and-neighbors mat2 [1 1])
+;; => [#{[1 2] [2 2] [1 0] [0 2] [2 0] [0 1] [0 0] [2 1]} 255]
+
+
+(defn get-liniar-sequence
+  [mat start-cell prev-cell acc]
+  (let [[neighbors val] (get-cell-number-and-neighbors mat start-cell)
+        new-neighbors (disj neighbors prev-cell)
+        new-acc (conj acc val)
+        num (count new-neighbors)]
+    (cond
+      (zero? num) [[-1 -1] start-cell new-acc]
+      (= num 1) (get-liniar-sequence mat (first new-neighbors) start-cell new-acc)
+      :else [start-cell prev-cell acc])))
+
+(defn get-start-cell
+  [mat strict?]
+  (let [max-column (count mat)
+        max-row (count (first mat))]
+    (loop [column 0
+           row 0]
+      (let [[neighbors _] (get-cell-number-and-neighbors mat [row column])
+            n (count neighbors)][]
+        (if (or (and strict? (= 1 n))
+                (> n 0))
+          [row column]
+          (let [new-row (+ row 1)
+                new-column (if (= new-row max-row) (+ column 1) column)
+                new-row (if (= new-row max-row) 0 new-row)]
+            (if (= new-column max-column)
+              [-1 -1]
+              (recur new-column new-row))))))))
+
+
+(import [cv2 :as cv2])
+
+
+(def word010 (cnv/image->matrix (cv2/imread "test/resources/words/word010.png")))
+
+(utl/show-matrix word010)
+
+(get-start-cell word010 true)
+;; => [42 6]
+
+(get-liniar-sequence word010 [42 6] [-1 -1] [])
+;; => [[34 150] [35 149] [64 128 136 9 144 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 9 144 136 136 72 132 9 144 136 136 136 136 136 136 136 136 136 136 136 136 136 72 132 136 72 132 136 136 136 136 136 136 136 136 72 132 136 136 136 9 144 136 136 136 136 72 132 136 72 68 68 68 68 36 66 132 136 136 136 136 136 136 136 136 9 144 9 144 136 9 144 9 144 136 136 136 136 9 144 136 136 9 144 136 136 136 9 144 136 136 9 144 136 136 136 9 17 17 144 136 136 9 144 136 136 9 144 9 17 18 33]]
+  #+end_#+begin_src  
+
+  #+end_src
+
+* 2025-01-15
+
+** #5 Convert a word image in a number sequence
+
+#+begin_src clojure
+  (def neighbors
+    (-> (get-cell-number-and-neighbors word010 [34 150])
+        first
+        (disj [35 149])))
+  ;; => #{[33 149] [34 151]}
+  
+  (def seq1 (get-liniar-sequence word010 [33 149] [34 150] []))
+  ;; => [[29 177] [28 177] [66 34 36 66 36 68 68 68 66 34 34 34 34 34 36 66 34 34 33 18 33 17 17 17 144 136 9 144 136 136 136 136 136 136 136 136 136 72 132 136 136 136 136 136 136 72 132 72 68 68 68 68 36 34 34 34 34 66 36 18 33 34 66 36 34 34]]
+
+  (def seq2 (get-liniar-sequence word010 [34 151] [34 150] []))
+  seq2
+  ;; => [[30 176] [31 175] [136 136 136 136 136 136 136 72 5 144 136 136 136 136 136 136 136 9 17 144 136 136 9 144 9]]
+
+  (defn get-next-neighbors
+    [mat start-cell prev-cell]
+    (-> (get-cell-number-and-neighbors word010 start-cell)
+        first
+        (disj prev-cell)))
+
+  (get-next-neighbors word010 [29 177] [28 177])
+  ;; => #{[30 177] [30 176]}
+
+  (get-next-neighbors word010 [30 176] [31 175])
+  ;; => #{[30 177] [29 177]}
+
+  (get-cell-number-and-neighbors word010 [30 177])
+  ;; => [#{[30 176] [31 178] [29 177]} 74]
+
+  (require '[basilisp.set :as set])
+
+  (def start-cell [34 150])
+
+  (def prev-cell [35 149])
+  
+  
+  (def neighbors (get-next-neighbors word010 start-cell prev-cell))
+  ;; => #{[33 149] [34 151]}
+
+  (def res (map (fn [cell]
+                  (get-liniar-sequence word010 cell start-cell []))
+                neighbors))
+  ;; => ([[29 177] [28 177] [66 34 36 66 36 68 68 68 66 34 34 34 34 34 36 66 34 34 33 18 33 17 17 17 144 136 9 144 136 136 136 136 136 136 136 136 136 72 132 136 136 136 136 136 136 72 132 72 68 68 68 68 36 34 34 34 34 66 36 18 33 34 66 36 34 34]] [[30 176] [31 175] [136 136 136 136 136 136 136 72 5 144 136 136 136 136 136 136 136 9 17 144 136 136 9 144 9]])
+
+  (def seqs (mapv #(nth % 2) res))
+  ;; => [[66 34 36 66 36 68 68 68 66 34 34 34 34 34 36 66 34 34 33 18 33 17 17 17 144 136 9 144 136 136 136 136 136 136 136 136 136 72 132 136 136 136 136 136 136 72 132 72 68 68 68 68 36 34 34 34 34 66 36 18 33 34 66 36 34 34] [136 136 136 136 136 136 136 72 5 144 136 136 136 136 136 136 136 9 17 144 136 136 9 144 9]]
+
+  (def new-prevs (set (map first res)))
+  
+  (def next-neighbors
+    (->> res
+         (map (fn [[start prev _]]
+                (get-next-neighbors word010 start prev)))
+         (apply set/union)
+         (set)))
+  ;; => #{[30 177] [30 176] [29 177]}
+
+  (def next (first (set/difference next-neighbors new-prevs)))
+  
+  (def next-res (get-cell-number-and-neighbors word010 next))
+  ;; => [#{[30 176] [31 178] [29 177]} 74]
+
+  (def new-start-cell (-> (first next-res)
+                          (set/difference next-neighbors)
+                          first))
+  
+  (defn get-parallel-sequence
+    [mat start prev]
+    (let [neighbors (get-next-neighbors mat start prev)
+          res (map (fn [cell]
+                     (get-liniar-sequence mat cell start []))
+                   neighbors)
+          seqs (mapv #(nth % 2) res)
+          new-prevs (set (map first res))
+          next-neighbors (->> res
+                              (map (fn [[s p _]]
+                                     (get-next-neighbors mat s p)))
+                              (apply set/union)
+                              (set))
+          new-prev (first (set/difference next-neighbors new-prevs))
+          [new-neighbors _] (get-cell-number-and-neighbors mat new-prev)
+          new-start (-> new-neighbors
+                        (set/difference next-neighbors)
+                        first)]
+      [new-start new-prev seqs]))
+
+  
+  (defn matrix->numseq
+    [mat start-cell]
+    (loop [start start-cell
+           prev dummy-cell
+           acc []]
+      (let [[new-start new-prev seq] (get-liniar-sequence mat start prev [])]
+        (if (= new-start dummy-cell)
+          (conj acc seq)
+          (let [[st pr pseqs] (get-parallel-sequence mat new-start new-prev)]
+            (recur st pr (conj acc seq pseqs)))))))
+
+  (matrix->numseq word010 [42 6])
+  ;; => [[64 128 136 9 144 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 9 144 136 136 72 132 9 144 136 136 136 136 136 136 136 136 136 136 136 136 136 72 132 136 72 132 136 136 136 136 136 136 136 136 72 132 136 136 136 9 144 136 136 136 136 72 132 136 72 68 68 68 68 36 66 132 136 136 136 136 136 136 136 136 9 144 9 144 136 9 144 9 144 136 136 136 136 9 144 136 136 9 144 136 136 136 9 144 136 136 9 144 136 136 136 9 17 17 144 136 136 9 144 136 136 9 144 9 17 18 33] [[66 34 36 66 36 68 68 68 66 34 34 34 34 34 36 66 34 34 33 18 33 17 17 17 144 136 9 144 136 136 136 136 136 136 136 136 136 72 132 136 136 136 136 136 136 72 132 72 68 68 68 68 36 34 34 34 34 66 36 18 33 34 66 36 34 34] [136 136 136 136 136 136 136 72 5 144 136 136 136 136 136 136 136 9 17 144 136 136 9 144 9]] [132 72 132 136 136 72 132 136 136 136 72 132 72 132 136 136 136 136 72 132 136 136 72 132 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 9 17 17 17 17 17 17 17 17 17 18 34 33 18 34 34 32]]
+
+#+end_src

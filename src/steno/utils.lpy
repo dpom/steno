@@ -10,6 +10,7 @@
   (plt/imshow img ** :cmap "gray")
   (plt/show))
 
+
 (defn show-matrix
   "Display a binary matrix."
   [mat]

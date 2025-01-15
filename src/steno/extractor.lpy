@@ -26,3 +26,16 @@
   "Save the WORDS images vector in files in OUTDIR folder. The filename format is wordXXX.png where XXX is the index of the word in the vector."
   [words outdir]
   (map-indexed #(cv2/imwrite (format "%s/word%03d.png" outdir %1) %2)  words))
+
+
+(comment
+
+  (def words (extract-word-images "test/resources/orig.png"))
+
+  (count words)
+  ;; => 244
+
+  (save-word-images words "tmp/word-images")
+  
+  ;;
+  )

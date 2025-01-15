@@ -2,10 +2,27 @@
 
 steno is a personal project to digitize my stenographic writings.
 
+
+
 ** Description
+
+In my youth most of my notes were written in shorthand (Duployer system). This project aims to digitize old notes and integrate them into the current note system (org-roam).
+
+The method would contain 2 steps:
+1. scan the notes page by page
+2. transform each image into a text file
+
+Another goal of this project is to check the viability of basilisp (clojure on python vm). Python has many interesting libraries (especially in the science part) but has horrible syntax so basilisp could be a very good solution.
 
 *** Archtecture
 
+The application should be a simple pipe:
+- extractor :: split the page image in word images
+- image-processor :: clean and simplify the word image
+- converter :: convert the word image in a sequence of numbers
+- translator :: convert the number sequence in a string of chars
+
+  
 ** Getting Started
 
 *** Linux, MacOS, and Windows (WSL2)
@@ -69,12 +86,11 @@ The ~pre-push~ script will block the push if there are style or lint errors in c
 
 ** References
 
-1. https://opencv.org/
-2. https://theailearner.com/tag/skeletonization-opencv/
-3. https://github.com/Wesley-Li/skeleton
-4. https://web.archive.org/web/20140429184236/http://opencv-python-tutroals.readthedocs.org/en/latest/py_tutorials/py_imgproc/py_canny/py_canny.html
+1. https://en.wikipedia.org/wiki/Duployan_shorthand
+2. https://opencv.org/
+3. https://theailearner.com/tag/skeletonization-opencv/
+4. https://github.com/Wesley-Li/skeleton
 5. https://docs.opencv.org/4.x/d9/d61/tutorial_py_morphological_ops.html
-6. https://docs.opencv.org/3.4/d9/d61/tutorial_py_morphological_ops.html
 
 ** License
 
