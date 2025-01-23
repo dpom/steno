@@ -520,7 +520,6 @@ dst = cv.filter2D(img,-1,kernel)
 ;; => [2 0 0 0 4 5 0 1]
   #+end_src
   
-
 * 2025-01-14
 
 
@@ -718,3 +717,138 @@ dst = cv.filter2D(img,-1,kernel)
   ;; => [[64 128 136 9 144 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 9 144 136 136 72 132 9 144 136 136 136 136 136 136 136 136 136 136 136 136 136 72 132 136 72 132 136 136 136 136 136 136 136 136 72 132 136 136 136 9 144 136 136 136 136 72 132 136 72 68 68 68 68 36 66 132 136 136 136 136 136 136 136 136 9 144 9 144 136 9 144 9 144 136 136 136 136 9 144 136 136 9 144 136 136 136 9 144 136 136 9 144 136 136 136 9 17 17 144 136 136 9 144 136 136 9 144 9 17 18 33] [[66 34 36 66 36 68 68 68 66 34 34 34 34 34 36 66 34 34 33 18 33 17 17 17 144 136 9 144 136 136 136 136 136 136 136 136 136 72 132 136 136 136 136 136 136 72 132 72 68 68 68 68 36 34 34 34 34 66 36 18 33 34 66 36 34 34] [136 136 136 136 136 136 136 72 5 144 136 136 136 136 136 136 136 9 17 144 136 136 9 144 9]] [132 72 132 136 136 72 132 136 136 136 72 132 72 132 136 136 136 136 72 132 136 136 72 132 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 9 17 17 17 17 17 17 17 17 17 18 34 33 18 34 34 32]]
 
 #+end_src
+
+* 2025-01-19
+
+- calcul numar de biti:
+  #+begin_src clojure
+(def masks [1 2 4 8 16 32 64 128])
+
+(defn count-bits [oct]
+  (reduce (fn [acc mask]
+            (if (zero? (bit-and mask oct))
+              acc
+              (inc acc)))
+          0
+          masks))
+
+(count-bits 3)
+;; => 2
+
+(count-bits 255)
+;; => 8
+  #+end_src
+
+* 2025-01-20
+
+** #9 Build the "standard" sequences
+
+- extrag secventele standard:
+  #+begin_src clojure
+(import [cv2 :as cv2])
+
+(require
+  '[steno.utils :as utl]
+  '[steno.converter :as cnv])
+
+(def t-template (cnv/image->matrix (cv2/imread "tmp/templates/word022.png")))
+
+(utl/show-matrix t-template)
+
+(cnv/get-start-cell t-template true)
+;; => [5 5]
+
+(def t-symbol (cnv/matrix->numseq t-template))
+t-symbol
+;; => [[128 136 136 136 136 136 136 136 136 136 72 132 136 136 136 136 136 136 72 132 136 136 136 136 136 8]]
+
+(format "%x" 128)
+
+(cnv/get-next-neighbors t-template [5 5] [-1 -1])
+;; => #{[5 6]}
+
+(cnv/get-next-neighbors t-template [5 6] [-1 -1])
+;; => #{[5 7] [5 5]}
+
+
+(def d-template (cnv/image->matrix (cv2/imread "tmp/templates/word023.png")))
+
+(utl/show-matrix d-template)
+
+(cnv/ged-start-cell d-template true)
+;; => [5 5]
+
+(def d-symbol (cnv/matrix->numseq d-template))
+d-symbol
+;; => [[128 9 144 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 9 144 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 8]]
+  #+end_src 
+
+* 2025-01-22
+
+** #9 Build the "standard" sequences
+
+- extrag secventele standard:
+  #+begin_src clojure
+(import [cv2 :as cv2])
+
+(require
+  '[steno.utils :as utl]
+  '[steno.converter :as cnv])
+
+(def t-symbol (first t-symbol))
+;; => [64 128 136 136 136 136 136 136 136 136 136 72 132 136 136 136 136 136 136 72 132 136 136 136 136 136 8]
+
+(count t-symbol)
+;; => 27
+
+(def d-symbol (first d-symbol))
+;; => [128 9 144 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 9 144 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 8]
+
+(count d-symbol)
+;; => 74
+
+
+(def p-template (cnv/->matrix (cv2/imread "tmp/templates/word024.png")))
+
+(utl/show-matrix p-template)
+
+(def p-symbol (first (cnv/matrix->numseq p-template)))
+;; => [32 34 34 34 34 34 34 34 34 34 66 36 34 34 34 34 34 34 34 34 34 34 34 34 34 34 34 34 2]
+(count p-symbol)
+;; => 29
+
+
+(def b-template (cnv/image->matrix (cv2/imread "tmp/templates/word029.png")))
+
+(utl/show-matrix b-template)
+
+(def b-symbol (first (cnv/matrix->numseq b-template)))
+;; => [32 34 34 34 34 34 34 34 34 34 34 34 34 34 34 34 34 34 34 34 34 34 34 66 36 34 34 34 34 66 36 34 34 34 34 34 34 34 34 34 34 34 34 34 34 18 33 34 34 34 34 34 34 34 34 18 33 34 34 34 34 34 34 34 34 34 2]
+
+(count b-symbol)
+;; => 67
+
+(def fv-template (cnv/image->matrix (cv2/imread "tmp/templates/word031.png")))
+
+(utl/show-matrix fv-template)
+
+(def f-symbol (first (cnv/matrix->numseq fv-template)))
+f-symbol
+;; => [32 66 36 34 66 36 66 68 68 68 68 36 66 36 66 36 66 68 68 4]
+
+(count f-symbol)
+;; => 20
+
+(def pat-template (cnv/image->matrix (cv2/imread "tmp/templates/word007.png")))
+
+(utl/show-matrix pat-template)
+
+(cnv/get-start-cell pat-template true)
+;; => [41 5]
+
+
+(def pat-symbol (cnv/matrix->numseq pat-template))
+pat-symbol
+;; => [[] [[18 33 18 33 17 144 136 136 136 136 136 9] [34 34 34 66 36 34 66 68 68 68 132 136 136 136 9 18 33 17 18 34 34 34 34 34 34 34 34 33 18]] [] [[9 136 136 136 136 136 144 17 33 18 33 18 33 34 34 34 66 36 34 66 68 68 68 132 136 136 136 9 18 33 17 18 34 34 34 34 34 34 34 34 33 18] [68]] [9 144 136 136 136 136 136 136 136 136 136 136 9 144 136 136 136 136 136 136 136 136 136 136 136 136 136 8]]
+
+  #+end_src 

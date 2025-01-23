@@ -29,15 +29,21 @@
       (range 0 rows))))
 
 
+(defn get-cell-value
+  "Get cell value. If row or column index is wrong return 0."
+  [mat row column]
+  (try
+    (aget mat row column)
+    (catch Exception e
+      0)))
+
+
 (defn get-neighbor
-  "Get the neighbor cell (address and value). On error return the dummy cell and 0."
+  "Get the neighbor cell (address and value)."
   [mat [r c] [dr dc]]
   (let [nr (+ r dr)
         nc (+ c dc)]
-    (try
-      [[nr nc] (aget mat nr nc)]
-      (catch Exception e
-        [dummy-cell 0]))))
+    [[nr nc] (get-cell-value mat nr nc)]))
 
 
 (defn get-cell-number-and-neighbors
@@ -59,8 +65,9 @@
            row 0]
       (let [[neighbors _] (get-cell-number-and-neighbors mat [row column])
             n (count neighbors)] []
-           (if (or (and strict? (= 1 n))
-                 (> n 0))
+           (if (and (= (get-cell-value mat row column) 1)
+                 (or (and strict? (= 1 n))
+                   (> n 0)))
              [row column]
              (let [new-row (+ row 1)
                    new-column (if (= new-row max-row) (+ column 1) column)
