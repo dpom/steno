@@ -43,7 +43,9 @@
   [mat [r c] [dr dc]]
   (let [nr (+ r dr)
         nc (+ c dc)]
-    [[nr nc] (get-cell-value mat nr nc)]))
+    [[nr nc] (if (or (neg? nr) (neg? nc))
+               0
+               (get-cell-value mat nr nc))]))
 
 
 (defn get-cell-number-and-neighbors
@@ -56,25 +58,64 @@
     directions))
 
 
+(defn get-start-cells
+  "Find the cells where the word could start."
+  [mat]
+  (let [max-row (count mat)
+        max-col (count (first mat))]
+    (loop [acc []
+           row 0
+           col 0]
+      (let [[neighbors _] (get-cell-number-and-neighbors mat [row col])
+            new-acc (if (and (= (get-cell-value mat row col) 1)
+                          (= (count neighbors) 1))
+                      (conj acc [row col])
+                      acc)
+            new-col (inc col)
+            new-row (if (= new-col max-col) (inc row) row)
+            new-col (if (= new-row row) new-col 0)]
+        (if (= new-row max-row)
+          new-acc
+          (recur new-acc new-row new-col))))))
+
+
+(defn get-min-start-cell
+  "Return the cell that has the highest probability of being the beginning of the word."
+  [start-cells]
+  (first
+    (reduce (fn [[min-cell sum] cell]
+              (let [new-sum (apply + cell)]
+                (if (< new-sum sum)
+                  [cell new-sum]
+                  [min-cell sum])))
+      [dummy-cell (float "inf")]
+      start-cells)))
+
+
+(defn get-first-one
+  "Return the first cell with the value one."
+  [mat]
+  (let [max-row (count mat)
+        max-col (count (first mat))]
+    (loop [row 0
+           col 0]
+      (if (= (get-cell-value mat row col) 1)
+        [row col]
+        (let [new-col (inc col)
+              new-row (if (= new-col max-col) (inc row) row)
+              new-col (if (= new-row row) new-col 0)]
+          (if (= new-row max-row)
+            dummy-cell
+            (recur new-row new-col)))))))
+
+
 (defn get-start-cell
-  "Find the cell where the word starts. STRICT? enforce that the start cell has only one direction in which the word is written (not true when word start with a vowel)."
-  [mat strict?]
-  (let [max-column (count mat)
-        max-row (count (first mat))]
-    (loop [column 0
-           row 0]
-      (let [[neighbors _] (get-cell-number-and-neighbors mat [row column])
-            n (count neighbors)] []
-           (if (and (= (get-cell-value mat row column) 1)
-                 (or (and strict? (= 1 n))
-                   (> n 0)))
-             [row column]
-             (let [new-row (+ row 1)
-                   new-column (if (= new-row max-row) (+ column 1) column)
-                   new-row (if (= new-row max-row) 0 new-row)]
-               (if (= new-column max-column)
-                 dummy-cell
-                 (recur new-column new-row))))))))
+  [mat]
+  (let [cells (get-start-cells mat)]
+    (case (count cells)
+      0 (get-first-one mat)
+      1 (first cells)
+      (get-min-start-cell cells))))
 
 
 (defn get-next-neighbors
@@ -141,46 +182,43 @@
 (defn matrix->numseq
   "Convert a word matrix in a vector of numeric sequences."
   [mat]
-  (let [start-cell* (get-start-cell mat true)
-        start-cell (if (= start-cell* dummy-cell) (get-start-cell mat false) start-cell*)]
-    (loop [start start-cell
-           prev dummy-cell
-           acc []]
-      (let [[new-start new-prev seq] (get-liniar-sequence mat start prev)]
-        (if (= new-start dummy-cell)
-          (conj acc seq)
-          (let [[st pr pseqs] (get-parallel-sequence mat new-start new-prev)]
-            (recur st pr (conj acc seq pseqs))))))))
+  (loop [start (get-start-cell mat)
+         prev dummy-cell
+         acc []]
+    (let [[new-start new-prev seq] (get-liniar-sequence mat start prev)]
+      (if (= new-start dummy-cell)
+        (conj acc seq)
+        (let [[st pr pseqs] (get-parallel-sequence mat new-start new-prev)]
+          (recur st pr (conj acc seq pseqs)))))))
 
 
 (comment
 
   (import [cv2 :as cv2])
 
-  (def word010 (image->matrix (cv2/imread "test/resources/1-pixel-tickness/word010.png")))
-
   (require '[steno.utils :as utl])
 
-  (utl/show-matrix word010)
-
-  (get-start-cell word010 true)
-  ;; => [42 6]
+  (def p-template (image->matrix (cv2/imread "tmp/templates/word023.png")))
   
-  (get-liniar-sequence word010 [42 6] dummy-cell)
-  ;; => [[34 150] [35 149] [64 128 136 9 144 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 9 144 136 136 72 132 9 144 136 136 136 136 136 136 136 136 136 136 136 136 136 72 132 136 72 132 136 136 136 136 136 136 136 136 72 132 136 136 136 9 144 136 136 136 136 72 132 136 72 68 68 68 68 36 66 132 136 136 136 136 136 136 136 136 9 144 9 144 136 9 144 9 144 136 136 136 136 9 144 136 136 9 144 136 136 136 9 144 136 136 9 144 136 136 136 9 17 17 144 136 136 9 144 136 136 9 144 9 17 18 33]]
+  (def t-template (image->matrix (cv2/imread "tmp/templates/word022.png")))
+
+  (def c-template (image->matrix (cv2/imread "tmp/templates/word026.png")))
+
+  (def p-seq (matrix->numseq p-template))
+  ;; => [[16 33 18 33 34 34 34 34 18 33 34 34 34 34 34 66 36 18 33 34 34 34 34 66 36 34 34 34 34 34 34 34 34 2]]
 
   
-  (get-next-neighbors word010 [29 177] [28 177])
-  ;; => #{[30 177] [30 176]}
+  
+  (def t-seq (matrix->numseq t-template))
+  ;; => [[128 136 136 136 136 9 144 136 136 9 144 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 8]]
 
-  (get-next-neighbors word010 [30 176] [31 175])
-  ;; => #{[30 177] [29 177]}
+  (def c-seq  (matrix->numseq c-template))
+  ;; => [[16 33 18 33 18 33 18 17 33 18 33 18 17 33 18 33 18 33 18 33 18 17 33 18 17 33 18 17 17 1]]
+  
 
-  (get-cell-number-and-neighbors word010 [30 177])
-  ;; => [#{[30 176] [31 178] [29 177]} 74]
+  (utl/show-matrix c-template)
 
-  (matrix->numseq word010)
-  ;; => [[64 128 136 9 144 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 9 144 136 136 72 132 9 144 136 136 136 136 136 136 136 136 136 136 136 136 136 72 132 136 72 132 136 136 136 136 136 136 136 136 72 132 136 136 136 9 144 136 136 136 136 72 132 136 72 68 68 68 68 36 66 132 136 136 136 136 136 136 136 136 9 144 9 144 136 9 144 9 144 136 136 136 136 9 144 136 136 9 144 136 136 136 9 144 136 136 9 144 136 136 136 9 17 17 144 136 136 9 144 136 136 9 144 9 17 18 33] [[66 34 36 66 36 68 68 68 66 34 34 34 34 34 36 66 34 34 33 18 33 17 17 17 144 136 9 144 136 136 136 136 136 136 136 136 136 72 132 136 136 136 136 136 136 72 132 72 68 68 68 68 36 34 34 34 34 66 36 18 33 34 66 36 34 34] [136 136 136 136 136 136 136 72 5 144 136 136 136 136 136 136 136 9 17 144 136 136 9 144 9]] [132 72 132 136 136 72 132 136 136 136 72 132 72 132 136 136 136 136 72 132 136 136 72 132 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 9 17 17 17 17 17 17 17 17 17 18 34 33 18 34 34 32]]
+
   
   ;;
   )

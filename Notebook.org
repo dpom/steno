@@ -852,3 +852,226 @@ pat-symbol
 ;; => [[] [[18 33 18 33 17 144 136 136 136 136 136 9] [34 34 34 66 36 34 66 68 68 68 132 136 136 136 9 18 33 17 18 34 34 34 34 34 34 34 34 33 18]] [] [[9 136 136 136 136 136 144 17 33 18 33 18 33 34 34 34 66 36 34 66 68 68 68 132 136 136 136 9 18 33 17 18 34 34 34 34 34 34 34 34 33 18] [68]] [9 144 136 136 136 136 136 136 136 136 136 136 9 144 136 136 136 136 136 136 136 136 136 136 136 136 136 8]]
 
   #+end_src 
+
+* 2025-02-19
+
+** #9 Build the "standard" sequences
+
+- nu cred ca are rost sa folosesc secvente pentru litere lungi (b, d, g, si r), pot sa le echivalez cu doua litere scurte.
+  #+begin_src shell
+bb app test/resources/template.png tmp/templates/
+  #+end_src
+- extrag templates
+  #+begin_src clojure
+(import [cv2 :as cv2])
+
+(require
+  '[steno.utils :as utl]
+  '[steno.converter :as cnv])
+
+(def t-template (cnv/image->matrix (cv2/imread "tmp/templates/word022.png")))
+
+(utl/show-matrix t-template)
+
+(count t-template)
+;; => 13
+
+
+(def p-template (cnv/image->matrix (cv2/imread "tmp/templates/word023.png")))
+
+(cnv/get-start-cell p-template true)
+;; => [8 6]
+
+(cnv/get-cell-number-and-neighbors p-template [8 6])
+;; => [#{[7 7] [9 6]} 33]
+(cnv/get-cell-number-and-neighbors p-template [8 5])
+;; => [#{[9 6] [8 6]} 192]
+
+
+(utl/show-matrix p-template)
+
+(count p-template)
+;; => 44
+
+(def c-template (cnv/image->matrix (cv2/imread "tmp/templates/word026.png")))
+
+(cnv/get-start-cell c-template true)
+;; => [28 10]
+
+(utl/show-matrix c-template)
+
+(count c-template)
+;; => 44
+
+  #+end_src
+- am o eroare in converter la calculul celului de start:
+  #+begin_src clojure
+(comment
+
+  (import [cv2 :as cv2])
+
+  (require '[steno.utils :as utl])
+
+  (def p-template (image->matrix (cv2/imread "tmp/templates/word023.png")))
+  
+  (utl/show-matrix p-template)
+
+  (count p-template)
+  ;; => 44
+
+  (get-start-cell p-template true)
+  ;; => [8 6]
+  
+  (def t [[1 2 3]
+          [4 5 6]
+          [7 8 9]])
+  
+  
+  (aget t 0 2)
+  ;; => 3
+
+  (aget t 1 0)
+  ;; => 4
+
+  (get-cell-value t 0 2)
+  ;; => 3
+  
+  (get-cell-value t 1 0)
+  ;; => 4
+
+  (map #(get-neighbor t [1 1] %) directions)
+  ;; => ([[1 2] 6] [[2 2] 9] [[2 1] 8] [[2 0] 7] [[1 0] 4] [[0 0] 1] [[0 1] 2] [[0 2] 3])
+
+  (map #(get-neighbor t [0 1] %) directions)
+  ;; => ([[0 2] 3] [[1 2] 6] [[1 1] 5] [[1 0] 4] [[0 0] 1] [[-1 0] 0] [[-1 1] 0] [[-1 2] 0])
+
+  (pos? 0)
+  ;; => false
+
+  (def t1 [[1 1 1]
+           [1 1 1]
+           [1 1 1]])
+
+  (get-cell-number-and-neighbors t1 [1 1])
+  ;; => [#{[1 2] [2 2] [1 0] [0 2] [2 0] [0 1] [0 0] [2 1]} 255]
+  
+  (def t2 [[0 0 0]
+           [0 1 1]
+           [0 0 0]])
+
+  (get-cell-number-and-neighbors t2 [1 1])
+  ;; => [#{[1 2]} 128]
+
+  (class t-template)
+  (class t2)
+  ;; => <class 'basilisp.lang.vector.PersistentVector'>
+
+  (count t2)
+  ;; => 3
+
+  (count p-template)
+  ;; => 44
+
+  (count (first p-template))
+  ;; => 13
+  
+  (get-start-cell p-template true)
+  ;; => [14 5]
+
+  (utl/show-matrix p-template)
+
+  (get-start-cells p-template)
+  ;; => [[5 8] [38 6]]
+
+
+  (get-cell-number-and-neighbors p-template [6 7])
+  ;; => [#{[7 7] [5 8]} 33]
+
+  (get-cell-number-and-neighbors p-template [5 8])
+  
+  (get-start-cells t-template)
+  ;; => [[5 42] [7 6]]
+  
+  (utl/show-matrix t-template)
+
+  (defn get-min-start-cell [cells]
+    (first
+      (reduce (fn [[min-cell sum] cell]
+                (let [new-sum (apply + cell)]
+                  (if (< new-sum sum)
+                    [cell new-sum]
+                    [min-cell sum])))
+              [dummy-cell (float "inf")]
+              cells)))
+
+  (get-min-start-cell (get-start-cells t-template))
+  ;; => [7 6]
+  
+  (get-min-start-cell (get-start-cells p-template))
+  ;; => [5 8]
+
+  (defn get-first-one [mat]
+    (let [max-row (count mat)
+          max-col (count (first mat))]
+      (loop [row 0
+             col 0]
+        (if (= (get-cell-value mat row col) 1)
+          [row col]
+          (let [new-col (inc col)
+                new-row (if (= new-col max-col) (inc row) row)
+                new-col (if (= new-row row) new-col 0)]
+            (if (= new-row max-row) 
+              dummy-cell
+              (recur new-row new-col)))))))
+
+  (get-first-one t-template)
+  ;; => [5 16]
+
+  (defn get-start-cell
+    [mat]
+    (let [cells (get-start-cells mat)]
+      (case (count cells)
+        0 (get-first-one mat)
+        1 (first cells)
+        (get-min-start-cell cells))))
+
+  (get-start-cell t-template)
+  ;; => [7 6]
+
+  (get-start-cell p-template)
+  ;; => [5 8]
+  
+  
+  ;;
+  )
+  #+end_src
+- continui constructia secventelor standard
+  #+begin_src clojure
+(import [cv2 :as cv2])
+
+(require
+  '[steno.utils :as utl]
+  '[steno.converter :as cnv])
+
+  (def p-template (image->matrix (cv2/imread "tmp/templates/word023.png")))
+  
+  (def t-template (image->matrix (cv2/imread "tmp/templates/word022.png")))
+
+  (def c-template (image->matrix (cv2/imread "tmp/templates/word026.png")))
+
+  (def p-seq (matrix->numseq p-template))
+  ;; => [[16 33 18 33 34 34 34 34 18 33 34 34 34 34 34 66 36 18 33 34 34 34 34 66 36 34 34 34 34 34 34 34 34 2]]
+
+  
+  
+  (def t-seq (matrix->numseq t-template))
+  ;; => [[128 136 136 136 136 9 144 136 136 9 144 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 8]]
+
+  (def c-seq  (matrix->numseq c-template))
+  ;; => [[16 33 18 33 18 33 18 17 33 18 33 18 17 33 18 33 18 33 18 33 18 17 33 18 17 33 18 17 17 1]]
+  
+
+  (utl/show-matrix c-template)
+
+
+  #+end_src
