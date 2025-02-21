@@ -1053,25 +1053,72 @@ bb app test/resources/template.png tmp/templates/
   '[steno.utils :as utl]
   '[steno.converter :as cnv])
 
-  (def p-template (image->matrix (cv2/imread "tmp/templates/word023.png")))
+(def p-template (cnv/image->matrix (cv2/imread "tmp/templates/word023.png")))
   
-  (def t-template (image->matrix (cv2/imread "tmp/templates/word022.png")))
+(def t-template (cnv/image->matrix (cv2/imread "tmp/templates/word022.png")))
 
-  (def c-template (image->matrix (cv2/imread "tmp/templates/word026.png")))
+(def c-template (cnv/image->matrix (cv2/imread "tmp/templates/word026.png")))
 
-  (def p-seq (matrix->numseq p-template))
-  ;; => [[16 33 18 33 34 34 34 34 18 33 34 34 34 34 34 66 36 18 33 34 34 34 34 66 36 34 34 34 34 34 34 34 34 2]]
 
-  
-  
-  (def t-seq (matrix->numseq t-template))
-  ;; => [[128 136 136 136 136 9 144 136 136 9 144 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 8]]
+(def p-seq (first (cnv/matrix->numseq p-template)))
+;; => [16 33 18 33 34 34 34 34 18 33 34 34 34 34 34 66 36 18 33 34 34 34 34 66 36 34 34 34 34 34 34 34 34 2]
 
-  (def c-seq  (matrix->numseq c-template))
-  ;; => [[16 33 18 33 18 33 18 17 33 18 33 18 17 33 18 33 18 33 18 33 18 17 33 18 17 33 18 17 17 1]]
-  
+(count p-seq)
+;; => 34
 
-  (utl/show-matrix c-template)
 
+(def t-seq (first (cnv/matrix->numseq t-template)))
+;; => [128 136 136 136 136 9 144 136 136 9 144 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 8]
+
+(count t-seq)
+;; => 37
+
+(def c-seq  (first (cnv/matrix->numseq c-template)))
+;; => [16 33 18 33 18 33 18 17 33 18 33 18 17 33 18 33 18 33 18 33 18 17 33 18 17 33 18 17 17 1]
+
+(count c-seq)
+;; => 30
+
+(def pat-template (cnv/image->matrix (cv2/imread "tmp/templates/word007.png")))
+
+(cnv/get-start-cell pat-template)
+;; => [5 16]
+
+
+(utl/show-matrix pat-template)
+
+(def pat-seq (cnv/matrix->numseq pat-template))
+;; => [[32 34 34 34 34 34 34 34 34 34 34 34 66 36 34 34 34 34 34 34 34 34 18 33 34 34 34 34 34] [[9 136 136 136 136 136 144 17 33 18 33 18 33 34 34 34 66 36 34 66 68 68 68 132 136 136 136 9 18 33 17 18 34 34 34 34 34 34 34 34 33 18] [68]] [9 144 136 136 136 136 136 136 136 136 136 136 9 144 136 136 136 136 136 136 136 136 136 136 136 136 136 8]]
+
+(count (first pat-seq))
+;; => 29
+
+(count (last pat-seq))
+;; => 28
+
+(def pot-template (cnv/image->matrix (cv2/imread "tmp/templates/word008.png")))
+
+(cnv/get-start-cell pot-template)
+;; => [6 31]
+
+
+(utl/show-matrix pot-template)
+
+(def pot-seq (cnv/matrix->numseq pot-template))
+;; => [[32 34 34 34 34 34 34 34 34 34 34 34 34 34 34 34 34 34 66 36 34 34 34 34 34 34 34 34 34 34 34 34 34 34] [[] [] []] [136 136 136 136 136 136 136 136 72 132 136 136 136 136 136 136 136 136 72 132 136 136 72 132 136 136 136 136 136 136 8]]
+
+(count (first pot-seq))
+;; => 34
+
+(count (last pot-seq))
+;; => 31
+  #+end_src
+
+* 2025-02-21
+
+** #9 Build the "standard" sequences
+
+- am o eroare in converter la calculul secventelor paralele:
+  #+begin_src clojure
 
   #+end_src

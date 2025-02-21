@@ -142,6 +142,7 @@
           new-neighbors (disj neighbors prev)
           new-acc (conj acc val)
           num (count new-neighbors)]
+      (tap> {:cell start :val val :neighbors new-neighbors})
       (cond
         (zero? num) [dummy-cell start new-acc]
         (= num 1) (recur (first new-neighbors) start new-acc)
@@ -158,22 +159,24 @@
 
    Returns: [next-start-cell next-prev-cell parallel-numeric-sequences]  "
   [mat start prev]
-  (let [neighbors (get-next-neighbors mat start prev)
-        res (map (fn [cell]
-                   (get-liniar-sequence mat cell start))
-              neighbors)
-        seqs (mapv #(nth % 2) res)
-        new-prevs (set (map first res))
-        next-neighbors (->> res
-                         (map (fn [[s p _]]
-                                (get-next-neighbors mat s p)))
-                         (apply set/union)
-                         (set))
-        new-prev (first (set/difference next-neighbors new-prevs))
+  (let [neighbors         (get-next-neighbors mat start prev)
+        _                 (tap> {:cell start :prev prev :neighbors neighbors})
+        res               (map (fn [cell]
+                                 (tap> {:cell cell})
+                                 (get-liniar-sequence mat cell start))
+                            neighbors)
+        seqs              (mapv #(nth % 2) res)
+        new-prevs         (set (map first res))
+        next-neighbors    (->> res
+                            (map (fn [[s p _]]
+                                   (get-next-neighbors mat s p)))
+                            (apply set/union)
+                            (set))
+        new-prev          (first (set/difference next-neighbors new-prevs))
         [new-neighbors _] (get-cell-number-and-neighbors mat new-prev)
-        new-start (-> new-neighbors
-                    (set/difference next-neighbors)
-                    first)]
+        new-start         (-> new-neighbors
+                            (set/difference next-neighbors)
+                            first)]
     [new-start new-prev seqs]))
 
 
@@ -218,7 +221,41 @@
 
   (utl/show-matrix c-template)
 
+  (require '[basilisp-pprint.pprint :as p])
 
+
+  (def big-map (zipmap
+                 [:a :b :c :d :e]
+                 (repeat
+                   (zipmap [:a :b :c :d :e]
+                           (take 5 (range))))))
+  ;; => #'user/big-map
+
+  big-map
+  ;; => {:e {:e 4 :a 0 :c 2 :d 3 :b 1} :a {:e 4 :a 0 :c 2 :d 3 :b 1} :c {:e 4 :a 0 :c 2 :d 3 :b 1} :d {:e 4 :a 0 :c 2 :d 3 :b 1} :b {:e 4 :a 0 :c 2 :d 3 :b 1}}
+
+  (p/pprint big-map)
+
+  (p/print-table [:a] [{:a [1 2 3]} {:a 7}])
+
+  (defn print
+    [map]
+    (p/print-table (keys map) [map]))
   
+
+  (print {:a 2 :b {:a 1 :b "cucu"}})
+
+  (add-tap (bound-fn* print))
+
+  (tap> {:a 2 :b 5})
+
+  (def pat-template (image->matrix (cv2/imread "tmp/templates/word007.png")))
+
+  (utl/show-matrix pat-template)
+
+  (def pat-seq (matrix->numseq pat-template))
+  pat-seq
+  ;; => [[32 34 34 34 34 34 34 34 34 34 34 34 66 36 34 34 34 34 34 34 34 34 18 33 34 34 34 34 34] [[9 136 136 136 136 136 144 17 33 18 33 18 33 34 34 34 66 36 34 66 68 68 68 132 136 136 136 9 18 33 17 18 34 34 34 34 34 34 34 34 33 18] [68]] [9 144 136 136 136 136 136 136 136 136 136 136 9 144 136 136 136 136 136 136 136 136 136 136 136 136 136 8]]
+
   ;;
   )
