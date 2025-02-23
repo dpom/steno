@@ -1,6 +1,7 @@
 (ns steno.converter
   (:require
-    [basilisp.set :as set]))
+    [basilisp.set :as set]
+    [steno.utils :as utl]))
 
 
 (def directions
@@ -13,6 +14,16 @@
    [-1  0] ; N
    [-1  1] ; NE
    ])
+
+
+(def pos [2r10000000
+          2r01000000
+          2r00100000
+          2r00010000
+          2r00001000
+          2r00000100
+          2r00000010
+          2r00000001])
 
 
 (def dummy-cell [-1 -1])
@@ -180,7 +191,18 @@
     [new-start new-prev seqs]))
 
 
-;; module entry point
+(defn extract-neighbors
+  "Extract neighbors cells from a cell number"
+  [num [x y]]
+  (set (filter identity
+         (map (fn [[dx dy] p]
+                (if (zero? (bit-and num p))
+                  nil
+                  [(+ x dx) (+ y dy)]))
+           directions pos))))
+
+
+;; module entry points
 
 (defn matrix->numseq
   "Convert a word matrix in a vector of numeric sequences."
@@ -193,6 +215,31 @@
         (conj acc seq)
         (let [[st pr pseqs] (get-parallel-sequence mat new-start new-prev)]
           (recur st pr (conj acc seq pseqs)))))))
+
+
+(defn numseq->matrix
+  "Convert a numeric sequence in a binary matrix"
+  [numseq]
+  (let [start-cell [100 100]
+        cells* (:cells (reduce (fn [{:keys [cells start prev] :as acc} num]
+                                 (tap> acc)
+                                 (let [new-cells (-> num
+                                                   (extract-neighbors start)
+                                                   (disj prev))]
+                                   (tap> {:new-cells new-cells})
+                                   {:cells (into cells new-cells)
+                                    :start (first new-cells)
+                                    :prev start}))
+                         {:cells #{start-cell}
+                          :start start-cell
+                          :prev dummy-cell}
+                         numseq))
+        x-min (dec (apply min (map first cells*)))
+        y-min (dec (apply min (map second cells*)))
+        cells (mapv (fn [[x y]] [(- x x-min) (- y y-min)]) cells*)
+        x-max (inc (apply max (map first cells)))
+        y-max (inc (apply max (map second cells)))]
+    (utl/cells->matrix [x-max y-max] cells)))
 
 
 (comment
@@ -238,10 +285,6 @@
 
   (p/print-table [:a] [{:a [1 2 3]} {:a 7}])
 
-  (defn print
-    [map]
-    (p/print-table (keys map) [map]))
-  
 
   (print {:a 2 :b {:a 1 :b "cucu"}})
 

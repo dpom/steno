@@ -1,7 +1,9 @@
 (ns steno.utils
   (:import
+    [basilisp-pprint.pprint :as p]
     [matplotlib :as matp]
-    [matplotlib.pyplot :as plt]))
+    [matplotlib.pyplot :as plt]
+    [numpy :as np]))
 
 
 (defn show-image
@@ -16,3 +18,28 @@
   [mat]
   (plt/imshow mat ** :cmap "gray" :interpolation "nearest")
   (plt/show))
+
+
+(defn print4tap
+  "Print function for tap>, useful in REPL"
+  [map]
+  (p/print-table (keys map) [map]))
+
+
+(defn cells->matrix
+  "Transform a sequence of CELLS ([x y]) into a matrix of dimensions SIZE ([x y])"
+  [size cells]
+  (let [mat (np/zeros size ** :dtype "int")]
+    (doseq [[x y] cells]
+      (aset mat x y 1))
+    mat))
+
+
+(comment
+
+  (add-tap (bound-fn* print4tap))
+
+  (tap> {:a 2 :b 5})
+
+  ;;
+  )
