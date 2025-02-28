@@ -1290,3 +1290,805 @@ mat
 
 (utl/show-matrix p-seq*)
   #+end_src
+
+* 2025-02-24
+
+- incerc "netezirea" numseq pentru a elimina diferentele. Folosesc mediana si un factor de grupare initial 5:
+  #+begin_src clojure
+(import [cv2 :as cv2])
+
+(require
+  '[steno.utils :as utl]
+  '[steno.converter :as cnv])
+
+(def p-template* (cnv/image->matrix (cv2/imread "tmp/templates/word023.png")))
+
+(def t-template* (cnv/image->matrix (cv2/imread "tmp/templates/word022.png")))
+
+(def c-template* (cnv/image->matrix (cv2/imread "tmp/templates/word026.png")))
+
+
+(def p-seq* (first (cnv/matrix->numseq p-template*)))
+p-seq*
+;; => [16 33 18 33 34 34 34 34 18 33 34 34 34 34 34 66 36 18 33 34 34 34 34 66 36 34 34 34 34 34 34 34 34 2]
+
+
+(utl/show-matrix p-template*)
+
+(defn median
+  [coll]
+  (let [sorted (sort coll)
+        cnt (count sorted)
+        halfway (quot cnt 2)]
+    (nth sorted halfway)))
+
+(def smooth-bin-length 5)
+
+(defn smooth-numseq
+  [numseq bin-length]
+  (let [start (first numseq)
+        smooth-bins (partition-all bin-length (rest numseq))]
+    (into [start] (map median smooth-bins))))
+
+
+(def p-seq (smooth-numseq p-seq* 5))
+;; => [16 33 34 34 34 34 34 34]
+
+(def p-template (cnv/numseq->matrix p-seq))
+(def p-template (cnv/numseq->matrix [32 34 34 34 34 34 34 34]))
+
+(utl/show-matrix p-template)
+
+(add-tap (bound-fn* utl/print4tap))
+
+(def start-cell [100 100])
+
+
+
+(defn num2cells
+  [numseq ]
+  (loop [
+         acc #{start-cell}
+         todo (queue [[start-cell cnv/dummy-cell]])]
+    (tap> acc)
+    (if (and (empty? nums)(empty? todo)
+             acc
+             (let [[start prev] (peek todo)
+                   new-cells (-> num
+                                 (cnv/extract-neighbors start)
+                                 (disj prev))]
+               (tap> {:new-cells new-cells})
+               (recur (into acc new-cells)
+                      (into (pop todo) (map (fn [cell] [cell start]) new-cells))))))))
+
+(8 [start-cell cnv/dummy-cell])
+
+  (def t-seq* (first (cnv/matrix->numseq t-template*)))
+  ;; => [128 136 136 136 136 9 144 136 136 9 144 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 8]
+
+  (def t-seq (smooth-numseq t-seq* 5))
+  t-seq
+  ;; => [128 136 136 136 136 136 136 136 8]
+
+(def t-template (cnv/numseq->matrix t-seq))
+
+(utl/show-matrix t-template)
+
+(def c-seq* (first (cnv/matrix->numseq c-template*)))
+
+(def c-seq (smooth-numseq c-seq* 5))
+c-seq
+;; => [16 33 18 18 18 18 17]
+
+(def c-template (cnv/numseq->matrix c-seq))
+
+(utl/show-matrix c-template)
+
+(def f-template* (cnv/image->matrix (cv2/imread "tmp/templates/word025.png")))
+
+(utl/show-matrix f-template*)
+
+(def f-seq* (first (cnv/matrix->numseq f-template*)))
+
+(def f-seq (smooth-numseq f-seq* 5))
+f-seq
+;; => [32 68 68 36 66 66 66 36]
+
+(def f-template (cnv/numseq->matrix f-seq))
+
+(utl/show-matrix f-template)
+
+(def l-template* (cnv/image->matrix (cv2/imread "tmp/templates/word024.png")))
+
+(utl/show-matrix l-template*)
+
+(def l-seq* (first (cnv/matrix->numseq l-template*)))
+l-seq*
+;; => [128 9 144 136 9 144 136 9 144 9 17 144 136 9 144 136 9 144 9 144 9 144 9 144 9 144 136 9 144 9 144 136 9 144 9 144 9 144 136 9 144 136 9 17 144 9 16]
+
+
+(def l-seq (smooth-numseq l-seq* 5))
+l-seq
+;; => [128 136 17 136 9 144 136 136 136 17 16]
+
+(def l-template (cnv/numseq->matrix l-seq))
+
+(utl/show-matrix l-template)
+
+(defn build-model
+  [fileimage bin-length]
+  (let [template* (cnv/image->matrix (cv2/imread fileimage))
+        numseq* (first (cnv/matrix->numseq template*))
+        numseq (smooth-numseq numseq* bin-length)
+        template (cnv/numseq->matrix numseq)
+        model {:numseq* numseq*
+               :numseq numseq}]
+    (tap> model)
+    (utl/show-matrix template*)
+    (utl/show-matrix template)
+    (assoc model :template template :template* template*)))
+
+(def l-model (build-model "tmp/templates/word024.png" 5))
+(def j-model (build-model "tmp/templates/word020.png" 3))
+
+(import [matplotlib.pyplot :as plt])
+
+(defn show-templates
+  [img1 img2]
+  (let [[fig axs] (plt/subplots 1 2 ** :figsize [100 100])]
+    (.imshow (first axs) img1 ** :cmap "gray" :vmin 0 :vmax 1)
+    (.imshow (second axs) img2 ** :cmap "gray" :vmin 0 :vmax 1)
+    ;; (plt/tight_layout)
+    (plt/show)))
+
+(show-templates (:template* l-model) (:template l-model))
+
+(defn build-model
+  [fileimage bin-length]
+  (let [template* (cnv/image->matrix (cv2/imread fileimage))
+        numseq* (first (cnv/matrix->numseq template*))
+        numseq (smooth-numseq numseq* bin-length)
+        template (cnv/numseq->matrix numseq)
+        model {:numseq* numseq*
+               :numseq numseq}]
+    (tap> model)
+    (show-templates template* template)
+    (assoc model :template template :template* template*)))
+
+(def j-model (build-model "tmp/templates/word020.png" 3))
+(def n-model (build-model "tmp/templates/word018.png" 3))
+(def m-model (build-model "tmp/templates/word017.png" 3))
+
+(import
+  [cv2 :as cv2]
+  [numpy :as np])
+
+(def map (:template* m-model))
+
+(def binary-image
+  (-> [100 100]
+      (np/zeros ** :dtype np/uint8)
+      (cv2/line [10 90] [90 10] 1 2)))
+
+(utl/show-matrix binary-image)
+
+
+(def extract-contours
+  [map]
+  (let [image (.astype (* map 255) np/uint8)]) )
+  #+end_src
+
+* 2025-02-25
+
+- incerc o noua abordare pentru netezire:
+  #+begin_src clojure
+
+(import
+  [cv2 :as cv2]
+  [numpy :as np]
+  [matplotlib.pyplot :as plt]
+  [PIL.Image :as pil])
+
+
+(defn image2binary
+  [image-filename]
+  (let [selector (fn [p] (if (> p 128) 255 0))]
+    (-> image-filename
+        (pil/open)
+        (.convert "L")
+        (.point selector)
+        (np/array)
+        (/ 255)
+        (.astype "int"))))
+
+(def j-mat (image2binary "tmp/templates/word020.png"))
+
+(require
+  '[steno.utils :as utl]
+  '[steno.converter :as cnv])
+
+(defn show-templates
+  [img1 img2]
+  (let [[fig axs] (plt/subplots 1 2 ** :figsize [100 100])]
+    (.imshow (first axs) img1 ** :cmap "gray" :vmin 0 :vmax 1)
+    (.imshow (second axs) img2 ** :cmap "gray" :vmin 0 :vmax 1)
+    ;; (plt/tight_layout)
+    (plt/show)))
+
+(show-templates j-mat j-mat)
+
+
+
+(defn extract-contours
+  [mat]
+  (let [image (.astype (* mat 255) np/uint8)
+        [contours _] (cv2/findContours image cv2/RETR_EXTERNAL, cv2/CHAIN_APPROX_SIMPLE)]
+    (mapv #(.squeeze %) contours)))
+
+(extract-contours j-mat)
+  #+end_src
+- creare matrice dintr-o lista de celule:
+  #+begin_src python
+import numpy as np
+
+def create_array_from_cells(cells, array_size):
+    """
+    Create a 2D array from a sequence of cells.
+
+    Args:
+        cells (list of tuples): List of tuples where each tuple represents the coordinates (x, y)
+        array_size (tuple): Size of the output array (height, width)
+
+    Returns:
+        np.ndarray: A 2D array with 1s in the specified cells and 0s elsewhere.
+    """
+    # Create a 2D array filled with zeros
+    array = np.zeros(array_size, dtype=int)
+
+    # Set the specified cells to 1
+    for (x, y) in cells:
+        if 0 <= x < array_size[0] and 0 <= y < array_size[1]:  # Check bounds
+            array[x, y] = 1
+
+    return array
+
+# Example usage:
+if __name__ == "__main__":
+    cells = [(1, 2), (3, 4), (0, 0), (2, 1)]
+    array_size = (5, 5)  # Size of the output array (5 rows, 5 columns)
+    
+    result_array = create_array_from_cells(cells, array_size)
+    
+    print("The 2D array is:")
+    print(result_array)
+
+  #+end_src
+- afisare a 2 matrici:
+  #+begin_src python
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Create two binary matrices
+matrix1 = np.array([[1, 0, 1], [0, 1, 0], [1, 1, 1]])
+matrix2 = np.array([[0, 1, 0], [1, 0, 1], [0, 0, 0]])
+
+# Set up the figure and axes
+fig, ax = plt.subplots(1, 2, figsize=(8, 4))
+
+# Display the first binary matrix
+ax[0].imshow(matrix1, cmap='gray', vmin=0, vmax=1)
+ax[0].set_title('Matrix 1')
+ax[0].axis('off')  # Turn off the axis
+
+# Display the second binary matrix
+ax[1].imshow(matrix2, cmap='gray', vmin=0, vmax=1)
+ax[1].set_title('Matrix 2')
+ax[1].axis('off')  # Turn off the axis
+
+# Show the plot
+plt.tight_layout()
+plt.show()
+
+  #+end_src
+- algoritmul de netezire Douglas-Peucker:
+  #+begin_src python
+import numpy as np
+import cv2
+
+def douglas_peucker(points, epsilon):
+    """
+    The Douglas-Peucker algorithm implementation.
+
+    :param points: Array of points to be simplified.
+    :param epsilon: The tolerance value for simplification.
+    :return: The simplified array of points.
+    """
+    # Find the start and end points
+    start, end = points[0], points[-1]
+
+    # If there's only 2 points, return them
+    if len(points) < 3:
+        return np.array([start, end])
+
+    # Calculate the distance from the line segment to all points
+    line_vec = end - start
+    line_vec = line_vec / np.linalg.norm(line_vec)  # Normalize
+    points_vec = points - start
+    projection = np.dot(points_vec, line_vec)
+    
+    # Get the perpendicular distance to the line
+    # Distance = ||points_vec - projection * line_vec||
+    perpendicular_distances = np.linalg.norm(points_vec - np.outer(projection, line_vec), axis=1)
+
+    # Find the index of the point with the maximum distance
+    max_distance_index = np.argmax(perpendicular_distances)
+
+    # If the maximum distance is greater than epsilon, recursively simplify
+    if perpendicular_distances[max_distance_index] > epsilon:
+        # Recursively simplify
+        left_simplified = douglas_peucker(points[:max_distance_index + 1], epsilon)
+        right_simplified = douglas_peucker(points[max_distance_index:], epsilon)
+
+        # Combine results
+        return np.vstack((left_simplified[:-1], right_simplified))
+    else:
+        return np.array([start, end])
+    
+
+def extract_contours(binary_image):
+    """
+    Extract contours from a binary image.
+
+    :param binary_image: Binary image with 1s (white) and 0s (black).
+    :return: Contours found in the image.
+    """
+    # Convert the binary image to uint8
+    binary_image = (binary_image * 255).astype(np.uint8)
+    
+    # Find contours
+    contours, _ = cv2.findContours(binary_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    return [contour.squeeze() for contour in contours]
+
+def main():
+    # Create a binary image for testing
+    binary_image = np.zeros((100, 100), dtype=np.uint8)
+    cv2.line(binary_image, (10, 90), (90, 10), 1, 2)
+
+    # Extract contours
+    contours = extract_contours(binary_image)
+    
+    # Simplify each contour using Douglas-Peucker
+    epsilon = 5.0  # Tolerance for simplification
+    simplified_contours = [douglas_peucker(contour, epsilon) for contour in contours]
+    
+    # Visualize results
+    for contour in simplified_contours:
+        contour = np.int32(contour)  # Convert to int32 for drawing
+        cv2.polylines(binary_image, [contour], isClosed=False, color=2, thickness=1)
+    
+    cv2.imshow("Original Binary Image", binary_image)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+if __name__ == "__main__":
+    main()
+
+  #+end_src
+  rezultatele nu sunt grozave
+- conversie imagine la matrice binara:
+  #+begin_src python
+from PIL import Image
+import numpy as np
+
+def image_to_binary_matrix(image_path):
+    # Open the image
+    img = Image.open(image_path)
+    
+    # Convert the image to grayscale
+    gray_img = img.convert('L')
+    
+    # Convert the grayscale image to binary (0 and 255)
+    # You can adjust the threshold as needed
+    threshold = 128
+    binary_img = gray_img.point(lambda p: 255 if p > threshold else 0)
+    
+    # Convert binary image to a numpy array
+    binary_data = np.array(binary_img)
+
+    # Convert the binary data to a binary matrix (0s and 1s)
+    binary_matrix = (binary_data / 255).astype(int)
+    
+    return binary_matrix
+
+# Example usage
+image_path = 'path_to_your_image.jpg'
+binary_matrix = image_to_binary_matrix(image_path)
+
+print(binary_matrix)
+  #+end_src
+- algoritmul de netezire LOESS:
+  - prima versiune
+    #+begin_src python
+import numpy as np
+from scipy.ndimage import gaussian_filter
+
+def loess_smoothing(binary_image, bandwidth=1.0):
+    """
+    Apply LOESS smoothing to a binary image.
+    
+    Parameters:
+        binary_image (numpy.ndarray): Input binary image (2D array with values 0 and 1).
+        bandwidth (float): The bandwidth (size of neighborhood) for the LOESS fitting.
+        
+    Returns:
+        numpy.ndarray: Smoothed image.
+    """
+    # Ensure binary_image is a numpy array
+    binary_image = np.asarray(binary_image, dtype=float)
+
+    # Create a smooth representation of the binary image
+    smoothed = np.zeros_like(binary_image)
+
+    # Get the dimensions of the image
+    rows, cols = binary_image.shape
+
+    # Apply LOESS smoothing
+    for i in range(rows):
+        for j in range(cols):
+            # Define the range of the neighborhood
+            x_min = max(0, i - int(bandwidth))
+            x_max = min(rows, i + int(bandwidth) + 1)
+            y_min = max(0, j - int(bandwidth))
+            y_max = min(cols, j + int(bandwidth) + 1)
+
+            # Extract the neighborhood
+            neighborhood = binary_image[x_min:x_max, y_min:y_max]
+
+            # Generate a meshgrid for distances
+            x_indices, y_indices = np.meshgrid(np.arange(x_min, x_max), np.arange(y_min, y_max))
+            distances = np.sqrt((x_indices - i) ** 2 + (y_indices - j) ** 2)
+
+            # We use a tricube weight function
+            weights = np.clip(1 - (distances / bandwidth) ** 3, 0, 1) ** 3
+
+            # Sum the weights and the weighted values
+            weighted_sum = np.sum(weights * neighborhood)
+            weight_sum = np.sum(weights)
+
+            # Calculate the smoothed value (avoid division by zero)
+            smoothed[i, j] = weighted_sum / weight_sum if weight_sum > 0 else 0
+
+    return smoothed
+
+
+# Example usage
+if __name__ == "__main__":
+    # Create a simple binary image
+    binary_img = np.array([[0, 0, 1, 1, 0],
+                            [0, 1, 1, 1, 0],
+                            [1, 1, 1, 1, 1],
+                            [0, 1, 1, 1, 0],
+                            [0, 0, 1, 0, 0]])
+
+    # Apply LOESS smoothing
+    smoothed_image = loess_smoothing(binary_img, bandwidth=1.0)
+
+    # Print the smoothed image
+    print("Original binary image:\n", binary_img)
+    print("Smoothed image:\n", smoothed_image)
+
+  #+end_src
+  - a doua versiune:
+    #+begin_src python
+import numpy as np
+
+def tricube_weight(distance, bandwidth):
+    """ Tri-cube weight function for LOESS """
+    if abs(distance) <= bandwidth:
+        return (1 - (distance / bandwidth) ** 3) ** 3
+    else:
+        return 0
+
+def loess_smoothing(image, bandwidth):
+    """ Perform LOESS smoothing on a 2D image """
+    smoothed_image = np.zeros_like(image, dtype=float)
+    rows, cols = image.shape
+
+    for i in range(rows):
+        for j in range(cols):
+            weights = []
+            values = []
+            
+            # Gathering weights and values within bandwidth
+            for k in range(max(0, i - int(bandwidth)): min(rows, i + int(bandwidth + 1))):
+                for l in range(max(0, j - int(bandwidth)): min(cols, j + int(bandwidth + 1))):
+                    distance = np.sqrt((i - k) ** 2 + (j - l) ** 2)
+                    weight = tricube_weight(distance, bandwidth)
+                    weights.append(weight)
+                    values.append(image[k, l])
+
+            # Weighted average calculation
+            weights = np.array(weights)
+            values = np.array(values)
+            if np.sum(weights) > 0:  # Avoid division by zero
+                smoothed_image[i, j] = np.sum(weights * values) / np.sum(weights)
+            else:
+                smoothed_image[i, j] = image[i, j]  # Default to original if no weights
+
+    return smoothed_image
+
+# Example usage
+if __name__ == "__main__":
+    # Create a simple binary image
+    binary_img = np.array([[0, 0, 1, 1, 0],
+                            [0, 1, 1, 1, 0],
+                            [1, 1, 1, 1, 1],
+                            [0, 1, 1, 1, 0],
+                            [0, 0, 1, 0, 0]])
+
+    # Apply LOESS smoothing
+    smoothed_image = loess_smoothing(binary_img, bandwidth=1.0)
+
+    # Print the smoothed image
+    print("Original binary image:\n", binary_img)
+    print("Smoothed image:\n", smoothed_image)
+    #+end_src
+  nu aduce nici o imbunatatire
+- The Gaussian kernel (also known as the radial basis function or RBF kernel) is commonly used in machine learning, particularly in support vector machines and kernelized algorithms. The Gaussian kernel is defined as:
+  #+begin_example
+[ K(x, y) = e^{-\frac{|x - y|^2}{2\sigma^2}}]
+
+Where:
+
+( K(x, y) ) is the Gaussian kernel function,
+( x ) and ( y ) are input vectors,
+( |x - y| ) is the Euclidean distance between the vectors,
+( \sigma ) is a parameter that controls the width of the Gaussian kernel.
+   #+end_example
+   #+begin_src python
+import numpy as np
+
+def gaussian_kernel(x, y, sigma):
+    """
+    Compute the Gaussian kernel between two vectors.
+
+    Parameters:
+    x : array-like, shape (n_features,)
+        First input vector.
+    y : array-like, shape (n_features,)
+        Second input vector.
+    sigma : float
+        The width of the Gaussian kernel.
+
+    Returns:
+    float
+        The value of the Gaussian kernel evaluated at x and y.
+    """
+    distance = np.linalg.norm(x - y)
+    kernel_value = np.exp(- (distance ** 2) / (2 * sigma ** 2))
+    return kernel_value
+
+# Example usage
+x = np.array([1.0, 2.0])
+y = np.array([2.0, 3.0])
+sigma = 1.0
+
+kernel_value = gaussian_kernel(x, y, sigma)
+print(f"Gaussian Kernel between x and y: {kernel_value}")
+  #+end_src
+- The Savitzky-Golay filter is a popular technique used in signal processing to smooth data and to calculate the derivatives of a signal. It fits successive sub-intervals of the data with a low-degree polynomial by the method of linear least squares. Here's a simple implementation of the Savitzky-Golay filter in Python using NumPy:
+  #+begin_src python
+import numpy as np
+from scipy.signal import savgol_filter
+import matplotlib.pyplot as plt
+
+def apply_savitzky_golay_filter(data, window_size, poly_order):
+    """
+    Apply Savitzky-Golay filter to the input data.
+
+    Parameters:
+    data (array-like): Input data to be filtered.
+    window_size (int): The length of the filter window (must be a positive odd integer).
+    poly_order (int): The order of the polynomial used to fit the samples (must be less than window_size).
+
+    Returns:
+    array: Smoothed data.
+    """
+    if window_size % 2 == 0 or window_size < 1:
+        raise ValueError("window_size must be a positive odd integer.")
+    if poly_order >= window_size:
+        raise ValueError("poly_order must be less than window_size.")
+
+    # Apply the Savitzky-Golay filter
+    filtered_data = savgol_filter(data, window_size, poly_order)
+    return filtered_data
+
+# Example usage
+if __name__ == "__main__":
+    # Generating sample data
+    np.random.seed(0)
+    x = np.linspace(0, 10, 100)
+    y = np.sin(x) + np.random.normal(0, 0.1, x.shape)  # Sine wave with added noise
+
+    # Applying Savitzky-Golay filter
+    window_size = 11  # Length of the filter window
+    poly_order = 2    # Polynomial order
+    smoothed_y = apply_savitzky_golay_filter(y, window_size, poly_order)
+
+    # Plotting the results
+    plt.figure(figsize=(12, 6))
+    plt.plot(x, y, label='Noisy Signal', alpha=0.5)
+    plt.plot(x, smoothed_y, label='Savitzky-Golay Filtered Signal', color='red')
+    plt.legend()
+    plt.title('Savitzky-Golay Filter Example')
+    plt.xlabel('X-axis')
+    plt.ylabel('Y-axis')
+    plt.grid()
+    plt.show()
+#+end_src
+
+* 2025-02-26
+
+- incercarile de ieri nu au fost utile incerc din nou:
+  #+begin_src clojure
+(import
+  [cv2 :as cv2]
+  [matplotlib :as matp])
+
+(require
+  '[steno.utils :as utl]
+  '[steno.converter :as cnv])
+
+(add-tap (bound-fn* utl/print4tap))
+
+(matp/use "tkagg")
+
+(defn build-model
+  [fileimage]
+  (let [template* (cnv/image2matrix (cv2/imread fileimage))
+        numseq* (first (cnv/matrix2numseq template*))
+        model   {:numseq* numseq*}]
+    (tap> model)
+    (utl/show-matrix template*)
+    (assoc model :template* template*)))
+
+
+(defn get-liniar-contour
+  "Return a liniar contour (list of cells).
+
+   Params:
+   - mat : the word matrix
+   - start-cell : [row column]
+   - prev-cell : previous cell in sequence (dummy cell if new sequence)
+
+   Returns: [next-start-cell next-prev-cell contour]  "
+  [mat start-cell prev-cell]
+  (loop [start start-cell
+         prev prev-cell
+         acc [start-cell]]
+    (let [[neighbors val] (cnv/get-cell-number-and-neighbors mat start)
+          new-neighbors (disj neighbors prev)
+          num (count new-neighbors)
+          new-acc (if (zero? num) acc (conj acc (first new-neighbors)))]
+      (tap> {:cell start :val val :neighbors new-neighbors})
+      (tap> {:new-acc new-acc})
+      (cond
+        (zero? num) [cnv/dummy-cell start new-acc]
+        (= num 1) (recur (first new-neighbors) start new-acc)
+        :else [start prev acc]))))
+
+(defn get-contours
+  [mat]
+  (let [start (cnv/get-start-cell mat)]
+    (last (get-liniar-contour mat start cnv/dummy-cell))))
+
+(def p-model (build-model "tmp/templates/word023.png"))
+
+(def cells* (get-contours (:template* p-model)))
+
+(def mat2 (utl/cells2matrix [50 50] cells*))
+
+(utl/show-matrix mat2)
+
+(sort-by (fn [[x y]] (+ x y)) (take 5 cells))
+;; => ([5 8] [6 7] [7 7] [8 6] [9 6])
+
+(defn median
+  [cells]
+  (let [sorted (sort-by (fn [[x y]] (+ x y)) cells)
+        cnt (count sorted)
+        halfway (quot cnt 2)]
+    (nth sorted halfway)))
+
+(defn smooth-contour
+  [contour bin-size]
+  (let [start (first contour)
+        smooth-bins (partition-all bin-size (rest contour))]
+    (into [start] (map median smooth-bins))))
+
+(def cells (smooth-contour cells* 5))
+
+(def mat3 (utl/cells2matrix [50 50] cells))
+
+(utl/show-matrix mat3)
+
+
+(defn smooth-numseq
+  [numseq bin-length]
+  (let [start (first numseq)
+        smooth-bins (partition-all bin-length (rest numseq))]
+    (into [start] (map median smooth-bins))))
+
+(def bin-size 5)
+
+(defn build-model
+  [fileimage]
+  (let [template* (cnv/image2matrix (cv2/imread fileimage))
+        numseq* (first (cnv/matrix2numseq template*))
+        numseq (smooth-numseq numseq* bin-size)
+        template (cnv/numseq2matrix numseq)
+        model {:numseq* numseq*
+               :numseq numseq}]
+    (tap> model)
+    (utl/show-two-matrices template* template)
+    (assoc model :template template :template* template*)))
+
+(def p-model (build-model "tmp/templates/word023.png"))
+(def t-model (build-model "tmp/templates/word022.png"))
+(def c-model (build-model "tmp/templates/word026.png"))
+(def f-model (build-model "tmp/templates/word025.png"))
+(def l-model (build-model "tmp/templates/word024.png"))
+(def j-model (build-model "tmp/templates/word020.png"))
+(def n-model (build-model "tmp/templates/word018.png"))
+(def m-model (build-model "tmp/templates/word017.png"))
+(def s-model (build-model "tmp/templates/word016.png"))
+
+(def joc-mat* (cnv/image2matrix (cv2/imread "tmp/templates/word002.png")))
+
+(utl/show-matrix joc-mat*)
+
+(cnv/get-start-cell joc-mat*)
+;; => [38 5]
+
+
+(def joc-numseq* (cnv/matrix2numseq joc-mat*))
+joc-numseq*
+;; => Unbound(var=#'user/joc-numseq*)
+  #+end_src
+- este o eroare la functia matrix2numseq care face ca functia sa ruleze la infinit in cazul in care imaginea contine secvente paralele:
+  #+begin_src clojure
+(comment
+
+  (import [cv2 :as cv2])
+
+  (def joc-mat* (image2matrix (cv2/imread "tmp/templates/word002.png")))
+
+  (utl/show-matrix joc-mat*)
+
+  (def start-cell (get-start-cell joc-mat*))
+
+  (add-tap (bound-fn* utl/print4tap))
+
+  (def seq0 (get-liniar-sequence joc-mat* {:start-cell start-cell
+                                           :prev-cells #{}}))
+  seq0
+  {:prev-cells #{[26 7] [6 35] [11 17] [34 5] [20 59] [8 21] [22 9] [31 5] [18 58] [7 42] [28 6] [6 34] [7 25] [38 5] [11 16] [23 9] [6 37] [12 15] [10 49] [9 20] [21 9] [12 52] [6 30] [6 33] [32 5] [9 19] [22 61] [19 10] [30 5] [36 5] [6 32] [27 7] [10 18] [10 50] [13 14] [21 60] [6 38] [16 56] [25 8] [7 26] [24 63] [6 28] [8 47] [7 23] [20 10] [37 5] [6 31] [7 41] [16 12] [14 13] [8 46] [17 57] [6 40] [29 6] [7 24] [33 5] [8 45] [14 54] [24 8] [15 13] [11 51] [6 36] [19 59] [9 48] [15 55] [6 39] [8 44] [17 11] [23 62] [35 5] [6 29] [8 22] [13 53] [7 27] [18 11] [8 43]}
+   :start-cells #{[24 64] [25 64]}
+   :numseq [2 34 34 34 34 34 34 34 33 18 33 18 33 18 33 18 34 33 18 33 18 33 17 18 33 17 17 144 9 17 144 9 144 9 144 136 136 136 9 144 136 136 136 136 136 136 136 136 136 136 136 72 132 72 132 136 136 136 72 68 132 72 68 68 68 68 68 68 68 68 36 66 68 68 68 196]}
+
+
+  (def seq1 (get-parallel-sequence joc-mat* seq0))
+  seq1
+  {:prev-cells #{[26 7] [6 35] [11 17] [34 5] [20 59] [8 21] [22 9] [31 5] [18 58] [7 42] [28 6] [27 64] [6 34] [7 25] [38 5] [11 16] [23 9] [6 37] [12 15] [10 49] [9 20] [21 9] [12 52] [6 30] [6 33] [29 65] [32 5] [9 19] [22 61] [19 10] [30 5] [36 5] [6 32] [27 7] [10 18] [10 50] [24 64] [13 14] [21 60] [6 38] [16 56] [25 8] [7 26] [30 65] [24 63] [6 28] [8 47] [7 23] [20 10] [37 5] [6 31] [7 41] [16 12] [14 13] [8 46] [17 57] [6 40] [29 6] [7 24] [33 5] [8 45] [14 54] [24 8] [15 13] [25 64] [11 51] [6 36] [19 59] [9 48] [15 55] [26 64] [6 39] [8 44] [28 64] [17 11] [23 62] [35 5] [6 29] [8 22] [13 53] [7 27] [18 11] [8 43]} :start-cells #{[31 66] [31 64] [23 65] [25 64]} :numseq [[41] [38 34 34 66 36 82]]}
+
+  (def seq3 (get-parallel-sequence joc-mat* seq1))
+  seq3
+  {:prev-cells #{[26 7] [6 35] [46 52] [18 96] [11 17] [34 5] [20 59] [8 21] [14 78] [43 54] [27 97] [36 75] [22 9] [31 5] [18 58] [31 66] [52 49] [7 42] [37 86] [28 6] [60 44] [42 55] [14 84] [53 48] [27 64] [14 87] [37 85] [14 90] [56 46] [6 34] [7 25] [38 5] [11 16] [39 57] [23 9] [37 79] [6 37] [12 15] [26 97] [44 53] [47 52] [17 73] [10 49] [19 71] [37 58] [49 51] [9 20] [34 72] [35 91] [31 64] [21 9] [14 83] [12 52] [15 93] [21 68] [34 61] [37 84] [6 30] [14 89] [6 33] [50 50] [29 65] [32 5] [29 97] [37 78] [51 49] [15 92] [9 19] [32 94] [48 51] [34 92] [24 97] [37 77] [55 46] [14 79] [32 62] [22 61] [35 90] [14 82] [32 68] [19 10] [30 5] [23 97] [23 65] [14 85] [31 67] [36 5] [6 32] [14 88] [27 7] [33 93] [33 61] [10 18] [37 81] [10 50] [24 64] [13 14] [21 60] [36 59] [6 38] [16 56] [14 81] [25 8] [7 26] [30 65] [59 44] [24 63] [6 28] [8 47] [38 83] [31 63] [22 67] [31 95] [7 23] [20 10] [37 5] [6 31] [37 80] [36 87] [58 44] [7 41] [34 73] [16 12] [21 96] [54 47] [14 77] [14 13] [38 82] [20 96] [16 75] [8 46] [30 96] [17 57] [15 91] [33 70] [14 80] [6 40] [25 97] [18 72] [28 97] [29 6] [7 24] [20 70] [33 69] [57 45] [33 5] [23 66] [14 86] [17 95] [8 45] [14 54] [24 8] [15 13] [36 76] [25 64] [11 51] [41 55] [40 56] [35 60] [6 36] [36 89] [16 74] [19 59] [9 48] [15 55] [26 64] [34 71] [6 39] [15 76] [8 44] [22 96] [45 53] [19 96] [28 64] [35 74] [17 11] [23 62] [36 88] [35 5] [6 29] [38 58] [8 22] [13 53] [7 27] [20 69] [18 11] [16 94] [8 43]}
+   :start-cells #{}
+   :numseq [[132 72 68 132 72 132 136 72 68 132 72 132 136 136 136 72 132 9 144 136 9 144 136 9 144 9 17 17 17 17 17 18 34 34 34 34 34 36 66 34 34 34 36 68 68 72 136 132 72 136 136 136 136 136 136 136 136 136 136 136 136 144 17 9 144 17 17 17 9 144 17 17 9 144] [9 144 17 33 18 17 17 33 18 17 17 33 18 17 33 18 33 18 33 18 17 33 18 17 17 33 18 17 33 34 2]]}
+
+  (matrix2numseq joc-mat*)
+  ;; => [[2 34 34 34 34 34 34 34 33 18 33 18 33 18 33 18 34 33 18 33 18 33 17 18 33 17 17 144 9 17 144 9 144 9 144 136 136 136 9 144 136 136 136 136 136 136 136 136 136 136 136 72 132 72 132 136 136 136 72 68 132 72 68 68 68 68 68 68 68 68 36 66 68 68 68 196] [[41] [38 34 34 66 36 82]] [[132 72 68 132 72 132 136 72 68 132 72 132 136 136 136 72 132 9 144 136 9 144 136 9 144 9 17 17 17 17 17 18 34 34 34 34 34 36 66 34 34 34 36 68 68 72 136 132 72 136 136 136 136 136 136 136 136 136 136 136 136 144 17 9 144 17 17 17 9 144 17 17 9 144] [9 144 17 33 18 17 17 33 18 17 17 33 18 17 33 18 33 18 33 18 17 33 18 17 17 33 18 17 33 34 2]]]
+  ;;
+  )
+  #+end_src
