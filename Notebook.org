@@ -2092,3 +2092,500 @@ joc-numseq*
   ;;
   )
   #+end_src
+
+* 2025-02-28
+
+- am refactorizat converter si am trecut de la numseq la lineseq
+  #+begin_src clojure
+(comment
+
+  (import [cv2 :as cv2])
+
+  (add-tap (bound-fn* utl/print4tap))
+
+  (matrix2lineseq joc-mat*)
+  [
+   [[38 5 2] [37 5 34] [36 5 34] [35 5 34] [34 5 34] [33 5 34] [32 5 34] [31 5 34] [30 5 33] [29 6 18] [28 6 33] [27 7 18] [26 7 33] [25 8 18] [24 8 33] [23 9 18] [22 9 34] [21 9 33] [20 10 18] [19 10 33] [18 11 18] [17 11 33] [16 12 17] [15 13 18] [14 13 33] [13 14 17] [12 15 17] [11 16 144] [11 17 9] [10 18 17] [9 19 144] [9 20 9] [8 21 144] [8 22 9] [7 23 144] [7 24 136] [7 25 136] [7 26 136] [7 27 9] [6 28 144] [6 29 136] [6 30 136] [6 31 136] [6 32 136] [6 33 136] [6 34 136] [6 35 136] [6 36 136] [6 37 136] [6 38 136] [6 39 136] [6 40 72] [7 41 132] [7 42 72] [8 43 132] [8 44 136] [8 45 136] [8 46 136] [8 47 72] [9 48 68] [10 49 132] [10 50 72] [11 51 68] [12 52 68] [13 53 68] [14 54 68] [15 55 68] [16 56 68] [17 57 68] [18 58 68] [19 59 36] [20 59 66] [21 60 68] [22 61 68] [23 62 68] [24 63 196]]
+   [[[24 64 41]]
+    [[25 64 38] [26 64 34] [27 64 34] [28 64 66] [29 65 36] [30 65 82]]]
+   [[[31 66 132] [31 67 72] [32 68 68] [33 69 132] [33 70 72] [34 71 132] [34 72 136] [34 73 72] [35 74 68] [36 75 132] [36 76 72] [37 77 132] [37 78 136] [37 79 136] [37 80 136] [37 81 72] [38 82 132] [38 83 9] [37 84 144] [37 85 136] [37 86 9] [36 87 144] [36 88 136] [36 89 9] [35 90 144] [35 91 9] [34 92 17] [33 93 17] [32 94 17] [31 95 17] [30 96 17] [29 97 18] [28 97 34] [27 97 34] [26 97 34] [25 97 34] [24 97 34] [23 97 36] [22 96 66] [21 96 34] [20 96 34] [19 96 34] [18 96 36] [17 95 68] [16 94 68] [15 93 72] [15 92 136] [15 91 132] [14 90 72] [14 89 136] [14 88 136] [14 87 136] [14 86 136] [14 85 136] [14 84 136] [14 83 136] [14 82 136] [14 81 136] [14 80 136] [14 79 136] [14 78 136] [14 77 144] [15 76 17] [16 75 9] [16 74 144] [17 73 17] [18 72 17] [19 71 17] [20 70 9] [20 69 144] [21 68 17] [22 67 17] [23 66 9] [23 65 144]]
+    [[31 64 9] [31 63 144] [32 62 17] [33 61 33] [34 61 18] [35 60 17] [36 59 17] [37 58 33] [38 58 18] [39 57 17] [40 56 17] [41 55 33] [42 55 18] [43 54 17] [44 53 33] [45 53 18] [46 52 33] [47 52 18] [48 51 33] [49 51 18] [50 50 17] [51 49 33] [52 49 18] [53 48 17] [54 47 17] [55 46 33] [56 46 18] [57 45 17] [58 44 33] [59 44 34] [60 44 2]]]]
+
+  (defn build-model
+    [fileimage]
+    (let [mat* (image2matrix (cv2/imread fileimage))
+          lineseq* (matrix2lineseq mat*)]
+      {:mat* mat*
+       :lineseq* lineseq*}))
+  
+  (def o-model (build-model "tmp/templates/word021.png"))
+  
+  (:lineseq* o-model)
+  [[[6 20 144]]
+   [[[7 19 17] [8 18 17] [9 17 9] [9 16 144] [10 15 9] [10 14 144] [11 13 9] [11 12 144] [12 11 17] [13 10 17] [14 9 17] [15 8 17] [16 7 17] [17 6 33] [18 6 18] [19 5 33] [20 5 34] [21 5 34] [22 5 34] [23 5 34] [24 5 34] [25 5 66] [26 6 36] [27 6 34] [28 6 34] [29 6 34] [30 6 66] [31 7 68] [32 8 68] [33 9 68] [34 10 68] [35 11 68] [36 12 132] [36 13 72] [37 14 132] [37 15 72] [38 16 5] [37 17 144] [37 18 136] [37 19 136] [37 20 9] [36 21 144] [36 22 136] [36 23 136] [36 24 9] [35 25 144] [35 26 136] [35 27 9] [34 28 144] [34 29 9] [33 30 17] [32 31 144] [32 32 9] [31 33 17] [30 34 17] [29 35 17] [28 36 17] [27 37 18] [26 37 33] [25 38 18] [24 38 34] [23 38 34] [22 38 33] [21 39 18] [20 39 34] [19 39 34] [18 39 34] [17 39 33] [16 40 18] [15 40 34] [14 40 34] [13 40 34] [12 40 34] [11 40 34] [10 40 34] [9 40 36] [8 39 68] [7 38 68] [6 37 72] [6 36 136] [6 35 136] [6 34 136] [6 33 136] [6 32 136] [6 31 136] [6 30 136] [6 29 136] [6 28 136] [6 27 136] [6 26 136] [6 25 136] [6 24 136] [6 23 136] [6 22 136] [6 21 136]]]]
+  
+  (def a-model (build-model "tmp/templates/word015.png"))
+
+  (:lineseq* a-model)
+  [[[6 16 144]]
+   [[[6 17 136] [6 18 136] [6 19 136] [6 20 136] [6 21 136] [6 22 72] [7 23 68] [8 24 36] [9 24 34] [10 24 66] [11 25 36] [12 25 34] [13 25 34] [14 25 18] [15 24 33] [16 24 34] [17 24 18] [18 23 33] [19 23 18] [20 22 17] [21 21 17] [22 20 9] [22 19 144] [23 18 9] [23 17 136] [23 16 136] [23 15 136] [23 14 144] [24 13 9] [24 12 132] [23 11 72] [23 10 132] [22 9 68] [21 8 68] [20 7 66] [19 7 36] [18 6 68] [17 5 66] [16 5 34] [15 5 34] [14 5 34] [13 5 33] [12 6 17] [11 7 17] [10 8 17] [9 9 17] [8 10 144] [8 11 9] [7 12 144] [7 13 136] [7 14 136] [7 15 9]]]]
+
+  (def joc-model (build-model "tmp/templates/word002.png"))
+
+  (:lineseq* joc-model)
+  [[[38 5 2] [37 5 34] [36 5 34] [35 5 34] [34 5 34] [33 5 34] [32 5 34] [31 5 34] [30 5 33] [29 6 18] [28 6 33] [27 7 18] [26 7 33] [25 8 18] [24 8 33] [23 9 18] [22 9 34] [21 9 33] [20 10 18] [19 10 33] [18 11 18] [17 11 33] [16 12 17] [15 13 18] [14 13 33] [13 14 17] [12 15 17] [11 16 144] [11 17 9] [10 18 17] [9 19 144] [9 20 9] [8 21 144] [8 22 9] [7 23 144] [7 24 136] [7 25 136] [7 26 136] [7 27 9] [6 28 144] [6 29 136] [6 30 136] [6 31 136] [6 32 136] [6 33 136] [6 34 136] [6 35 136] [6 36 136] [6 37 136] [6 38 136] [6 39 136] [6 40 72] [7 41 132] [7 42 72] [8 43 132] [8 44 136] [8 45 136] [8 46 136] [8 47 72] [9 48 68] [10 49 132] [10 50 72] [11 51 68] [12 52 68] [13 53 68] [14 54 68] [15 55 68] [16 56 68] [17 57 68] [18 58 68] [19 59 36] [20 59 66] [21 60 68] [22 61 68] [23 62 68] [24 63 196]]
+   [[[24 64 41]]
+    [[25 64 38] [26 64 34] [27 64 34] [28 64 66] [29 65 36] [30 65 82]]]
+   [[[31 66 132] [31 67 72] [32 68 68] [33 69 132] [33 70 72] [34 71 132] [34 72 136] [34 73 72] [35 74 68] [36 75 132] [36 76 72] [37 77 132] [37 78 136] [37 79 136] [37 80 136] [37 81 72] [38 82 132] [38 83 9] [37 84 144] [37 85 136] [37 86 9] [36 87 144] [36 88 136] [36 89 9] [35 90 144] [35 91 9] [34 92 17] [33 93 17] [32 94 17] [31 95 17] [30 96 17] [29 97 18] [28 97 34] [27 97 34] [26 97 34] [25 97 34] [24 97 34] [23 97 36] [22 96 66] [21 96 34] [20 96 34] [19 96 34] [18 96 36] [17 95 68] [16 94 68] [15 93 72] [15 92 136] [15 91 132] [14 90 72] [14 89 136] [14 88 136] [14 87 136] [14 86 136] [14 85 136] [14 84 136] [14 83 136] [14 82 136] [14 81 136] [14 80 136] [14 79 136] [14 78 136] [14 77 144] [15 76 17] [16 75 9] [16 74 144] [17 73 17] [18 72 17] [19 71 17] [20 70 9] [20 69 144] [21 68 17] [22 67 17] [23 66 9] [23 65 144]]
+    [[31 64 9] [31 63 144] [32 62 17] [33 61 33] [34 61 18] [35 60 17] [36 59 17] [37 58 33] [38 58 18] [39 57 17] [40 56 17] [41 55 33] [42 55 18] [43 54 17] [44 53 33] [45 53 18] [46 52 33] [47 52 18] [48 51 33] [49 51 18] [50 50 17] [51 49 33] [52 49 18] [53 48 17] [54 47 17] [55 46 33] [56 46 18] [57 45 17] [58 44 33] [59 44 34] [60 44 2]]]]
+  
+  (def ale-model (build-model "tmp/templates/word000.png"))
+
+  (:lineseq* ale-model)
+  [[[8 73 1] [7 74 17] [6 75 144] [6 76 136] [6 77 136] [6 78 136] [6 79 136] [6 80 136] [6 81 72] [7 82 132] [7 83 136] [7 84 72] [8 85 68] [9 86 68] [10 87 36] [11 87 66] [12 88 68] [13 89 36] [14 89 34] [15 89 34] [16 89 34] [17 89 18] [18 88 33] [19 88 18] [20 87 9] [20 86 144] [21 85 17] [22 84 9] [22 83 136] [22 82 136] [22 81 144] [23 80 17] [24 79 9] [24 78 136] [24 77 144] [25 76 9] [25 75 136] [25 74 144] [26 73 9] [26 72 136] [26 71 136] [26 70 144] [27 69 9] [27 68 136] [27 67 136] [27 66 136] [27 65 144] [28 64 9] [28 63 144] [29 62 9] [29 61 144] [30 60 9] [30 59 136] [30 58 144] [31 57 9] [31 56 136] [31 55 136] [31 54 144] [32 53 9] [32 52 144] [33 51 9] [33 50 136] [33 49 136] [33 48 144] [34 47 9] [34 46 136] [34 45 136] [34 44 144] [35 43 17] [36 42 9] [36 41 136] [36 40 136] [36 39 144] [37 38 9] [37 37 136] [37 36 144] [38 35 9] [38 34 144] [39 33 9] [39 32 144] [40 31 9] [40 30 136] [40 29 144] [41 28 9] [41 27 144] [42 26 9] [42 25 136] [42 24 132] [41 23 84]]
+   [[[42 22 17] [43 21 9] [43 20 144] [44 19 17] [45 18 9] [45 17 136] [45 16 144] [46 15 9] [46 14 136] [46 13 136] [46 12 144] [47 11 5] [46 10 72] [46 9 132] [45 8 68] [44 7 66] [43 7 36] [42 6 66] [41 6 34] [40 6 34] [39 6 34] [38 6 34] [37 6 33] [36 7 17] [35 8 17] [34 9 17] [33 10 144] [33 11 136] [33 12 9] [32 13 144] [32 14 136] [32 15 136] [32 16 72] [33 17 132] [33 18 72] [34 19 68] [35 20 68] [36 21 36] [37 21 34] [38 21 66] [39 22 36] [40 22 66]]]]
+  
+  (def pi-model (build-model "tmp/templates/word001.png"))
+
+  (def sat-model (build-model "tmp/templates/word005.png"))
+
+  (def om-model (build-model "tmp/templates/word006.png"))
+
+  (def am-model (build-model "tmp/templates/word004.png"))
+
+  (def pat-model (build-model "tmp/templates/word007.png"))
+
+  (def pot-model (build-model "tmp/templates/word008.png"))
+
+  (def por-model (build-model "tmp/templates/word009.png"))
+  (def tata-model (build-model "tmp/templates/word010.png"))
+  (def ta-model (build-model "tmp/templates/word011.png"))
+  (def ap-model (build-model "tmp/templates/word012.png"))
+  (def j-model (build-model "tmp/templates/word013.png"))
+  (def s-model (build-model "tmp/templates/word014.png"))
+  (def o-model (build-model "tmp/templates/word021.png"))
+  (def a-model (build-model "tmp/templates/word015.png"))
+  (def i-model (build-model "tmp/templates/word016.png"))
+  (def m-model (build-model "tmp/templates/word017.png"))
+  (def n-model (build-model "tmp/templates/word018.png"))
+  (def tz-model (build-model "tmp/templates/word019.png"))
+  (def e-model (build-model "tmp/templates/word020.png"))
+  (def t-model (build-model "tmp/templates/word022.png"))
+  (def p-model (build-model "tmp/templates/word023.png"))
+  (def l-model (build-model "tmp/templates/word024.png"))
+  (def f-model (build-model "tmp/templates/word025.png"))
+  (def c-model (build-model "tmp/templates/word026.png"))
+  ;;
+  )
+
+      
+
+  #+end_src
+
+* 2025-03-01
+
+- reguli de procesare linseq:
+  1. celula finala este vecina cu celula initiala => ltype = 0
+  2. secventa paralela: celula finala din s1 este vecina cu celula initiala  din s2 si s1 este ltype 1 => s = s1 + s2
+  3. secvente paralela: celula initiala din s1 este vecina cu celula initiala din s2 si celula finala din s1 este vecina cu celula finala din s2 => s = s1 + (invers s2) si ltype = 0
+  #+begin_src clojure
+  (defn neighbors?
+    [[x1 y1 _] [x2 y2 _]]
+    (<= (+ (abs (- x1 x2))  (abs (- y1 y2))) 2))
+  
+
+  (neighbors? [41 23 84] [42 22 17])
+  ;; => true
+
+  ;; rules
+  (defn get-ltype
+    [lseq]
+    (if (neighbors? (first lseq) (last lseq)) 0 1))
+
+  (defn continuation?
+    [lseq1 lseq2]
+    (and (= (get-ltype lseq1) 1)
+         (neighbors? (last lseq1) (first lseq2))))
+  
+  (defn loop?
+    [lseq1 lseq2]
+    (and (= (get-ltype lseq1) 1)
+         (= (get-ltype lseq2) 1)
+         (neighbors? (first lseq1) (first lseq2))
+         (neighbors? (last lseq1) (last lseq2))))
+  #+end_src
+
+* 2025-03-03
+
+- implementez un proces de "curatare" a lineseq
+  #+begin_src clojure
+(comment
+
+  (import [cv2 :as cv2])
+
+  (add-tap (bound-fn* utl/print4tap))
+
+  
+  (def o-model (build-model "tmp/templates/word021.png"))
+  
+  (def a-model (build-model "tmp/templates/word015.png"))
+
+  (def joc-model (build-model "tmp/templates/word002.png"))
+
+  (def ale-model (build-model "tmp/templates/word000.png"))
+
+  (def pi-model (build-model "tmp/templates/word001.png"))
+
+  (def sat-model (build-model "tmp/templates/word005.png"))
+
+  (def om-model (build-model "tmp/templates/word006.png"))
+
+  (def am-model (build-model "tmp/templates/word004.png"))
+
+  (def pat-model (build-model "tmp/templates/word007.png"))
+
+  (def pot-model (build-model "tmp/templates/word008.png"))
+
+  (def por-model (build-model "tmp/templates/word009.png"))
+  (def tata-model (build-model "tmp/templates/word010.png"))
+  (def ta-model (build-model "tmp/templates/word011.png"))
+  (def ap-model (build-model "tmp/templates/word012.png"))
+  (def j-model (build-model "tmp/templates/word013.png"))
+  (def s-model (build-model "tmp/templates/word014.png"))
+  (def o-model (build-model "tmp/templates/word021.png"))
+  (def a-model (build-model "tmp/templates/word015.png"))
+  (def i-model (build-model "tmp/templates/word016.png"))
+  (def m-model (build-model "tmp/templates/word017.png"))
+  (def n-model (build-model "tmp/templates/word018.png"))
+  (def tz-model (build-model "tmp/templates/word019.png"))
+  (def e-model (build-model "tmp/templates/word020.png"))
+  (def t-model (build-model "tmp/templates/word022.png"))
+  (def p-model (build-model "tmp/templates/word023.png"))
+  (def l-model (build-model "tmp/templates/word024.png"))
+  (def f-model (build-model "tmp/templates/word025.png"))
+  (def c-model (build-model "tmp/templates/word026.png"))
+
+
+  (defn neighbors?
+    [[x1 y1 _] [x2 y2 _]]
+    (<= (+ (abs (- x1 x2))  (abs (- y1 y2))) 2))
+  
+
+  (neighbors? [41 23 84] [42 22 17])
+  ;; => true
+
+  ;; rules
+  (defn get-ltype
+    [lseq]
+    (if (neighbors? (first lseq) (last lseq)) 0 1))
+
+  (defn continuation?
+    [lseq1 lseq2]
+    (neighbors? (last lseq1) (first lseq2)))
+  
+  (defn loop?
+    [lseq1 lseq2]
+    (and (neighbors? (first lseq1) (first lseq2))
+         (neighbors? (last lseq1) (last lseq2))))
+
+
+  (def lineseqs (:lineseq* joc-model))
+  (count lineseqs)
+  ;; => 3
+
+  (count (first lineseqs))
+  ;; => 76
+  
+  (count (second lineseqs))
+  ;; => 2
+  
+  (defn nested-levels [v]
+    (if (vector? v)
+      (if (empty? v)
+        1
+        (let [max-nested (apply max (map nested-levels v))]
+          (inc max-nested)))
+      0))
+
+  ;; Usage examples
+  (nested-levels [1 2 3])               ; => 1
+  (nested-levels [[1 2] [3 [4 5]]])     ; => 2
+  (nested-levels [[[1]] [[2]]])         ; => 3
+  (nested-levels "not a vector")        ; => 0
+
+  (nested-levels lineseqs)
+  ;; => 4
+
+  (nested-levels (first lineseqs))
+  ;; => 2
+
+  (nested-levels (second lineseqs))
+  ;; => 3
+
+  (nested-levels (last lineseqs))
+  ;; => 3
+
+  (into [[1 2 3] [4 5 6]])
+
+  (filter identity [1 nil 2 3 4 nil])
+  ;; => (1 2 3 4)
+
+  (defn parallel-lineseq?
+    [lseq]
+    (= (nested-levels lseq) 3))
+
+  (defn process-lineseq
+    [{:keys [prev res modifs-count]} lseq]
+    (if-not (parallel-lineseq? lseq)
+      (cond
+        (= (get-ltype lseq) 0)
+        {:prev nil
+         :res (filterv identity  (conj res prev lseq))
+         :modifs-count modifs-count}
+        (and prev (continuation? prev lseq))
+        {:prev (into prev lseq)
+         :res res
+         :modifs-count (inc modifs-count)}
+        :else
+        {:prev lseq
+         :res (filterv identity (conj res prev))
+         :modifs-count modifs-count})
+      (let [[lseq1 lseq2] lseq]
+        (cond
+          (= (or (get-ltype lseq1) 0) (= (get-ltype lseq2) 0))
+          {:prev nil
+           :res (filterv identity  (conj res prev lseq1 lseq2))
+           :modifs-count modifs-count}
+          (and prev (continuation? prev lseq1))
+          {:prev lseq2
+           :res (filterv identity  (conj res (into prev lseq1)))
+           :modifs-count (inc modifs-count)}
+          (loop? lseq1 lseq2)
+          {:prev nil
+           :res (filterv identity  (conj res prev (into lseq1 (rseq lseq2))))
+           :modifs-count modifs-count}
+          :else
+          {:prev lseq2
+           :res (filterv identity  (conj res prev lseq1))
+           :modifs-count modifs-count}))))
+
+  (defn format-lineseq
+    [lineseq]
+    (let [{:keys [prev res modifs-count] :as acc} (reduce process-lineseq
+                                                          {:prev nil
+                                                           :res []
+                                                           :modifs-count 0}
+                                                          lineseq)
+          new-lineseq (filterv identity (conj res prev))]
+      (tap> acc)
+      (if (zero? modifs-count)
+        (mapv (fn [ls] {:ltype (get-ltype ls) :line (mapv #(subvec % 0 2) ls) :numseq (mapv last ls)}) new-lineseq)
+        (format-lineseq new-lineseq))))
+
+  (def lseqs2  (format-lineseq lineseqs))
+  lseqs2
+
+  (utl/show-matrix (utl/cells2matrix [100 100] (-> lseqs2
+                                                   second
+                                                   :line)))
+
+  (defn build-model
+    [fileimage]
+    (let [mat* (image2matrix (cv2/imread fileimage))
+          lineseq* (matrix2lineseq mat*)
+          lineseq (format-lineseq lineseq*)
+          model {:lineseq* lineseq*
+                 :lineseq lineseq}]
+      (tap> model)
+      (doseq [ls lineseq]
+        (utl/show-matrix (utl/cells2matrix [100 100] (:line ls))))
+      (assoc model :mat* mat*)))
+  
+
+  (def o-model (build-model "tmp/templates/word021.png"))
+  
+
+  
+  
+
+  ;;
+  )
+  #+end_src
+
+* 2025-03-04
+
+- bug secventa paralela cu o singura ramura (converter.lpy):
+  #+begin_src clojure
+(comment
+
+  (import [cv2 :as cv2])
+
+  (add-tap (bound-fn* utl/print4tap))
+
+  
+
+  (defn neighbors?
+    [[x1 y1 _] [x2 y2 _]]
+    (<= (+ (abs (- x1 x2))  (abs (- y1 y2))) 2))
+  
+
+  (neighbors? [41 23 84] [42 22 17])
+  ;; => true
+
+  ;; rules
+  (defn get-ltype
+    [lseq]
+    (if (and (> (count lseq) 1) (neighbors? (first lseq) (last lseq))) 0 1))
+
+  (defn continuation?
+    [lseq1 lseq2]
+    (neighbors? (last lseq1) (first lseq2)))
+  
+  (defn loop?
+    [lseq1 lseq2]
+    (and (neighbors? (first lseq1) (first lseq2))
+      (neighbors? (last lseq1) (last lseq2))))
+
+
+  (defn nested-levels [v]
+    (if (vector? v)
+      (if (empty? v)
+        1
+        (let [max-nested (apply max (map nested-levels v))]
+          (inc max-nested)))
+      0))
+
+  ;; Usage examples
+  (nested-levels [1 2 3])               ; => 1
+  (nested-levels [[1 2] [3 [4 5]]])     ; => 2
+  (nested-levels [[[1]] [[2]]])         ; => 3
+  (nested-levels "not a vector")        ; => 0
+
+  (nested-levels [[6 16 144]])
+  ;; => 2
+
+  (parallel-lineseq? [[6 16 144]])
+  
+  (get-ltype [[6 16 144]])
+  ;; => 1
+
+  (count [[6 16 144]])
+  ;; => 1
+  
+  
+  (defn parallel-lineseq?
+    [lseq]
+    (= (nested-levels lseq) 3))
+
+  (defn parallel2liniar
+    "Transform a one line parallel sequence into a liniar sequence"
+    [lseq]
+    (if (and (parallel-lineseq? lseq) (= (count lseq) 1))
+      (first lseq)
+      lseq))
+  
+
+
+
+
+  
+  (defn process-lineseq
+    [{:keys [prev res modifs-count] :as state} line-seq]
+    (tap> (-> state
+            (dissoc :res)
+            (assoc :lseq line-seq)))
+    (let [lseq (parallel2liniar line-seq)]
+      (if (parallel-lineseq? lseq)
+        (let [[lseq1 lseq2] lseq]
+          (cond
+            (= (or (get-ltype lseq1) 0) (= (get-ltype lseq2) 0))
+            {:prev nil
+             :res (filterv identity  (conj res prev lseq1 lseq2))
+             :modifs-count modifs-count}
+            (loop? lseq1 lseq2)
+            {:prev nil
+             :res (filterv identity  (conj res prev (into lseq1 (rseq lseq2))))
+             :modifs-count modifs-count}
+            :else
+            {:prev lseq2
+             :res (filterv identity  (conj res prev lseq1))
+             :modifs-count modifs-count}))
+        (cond
+        (= (get-ltype lseq) 0)
+        {:prev nil
+         :res (filterv identity  (conj res prev lseq))
+         :modifs-count modifs-count}
+        (= (count prev) 1) ; single cell prev, add it to the lseq
+        {:prev (into prev lseq)
+         :res res
+         :modifs-count (inc modifs-count)}
+        (and prev (loop? prev lseq))
+        {:prev nil
+         :res (filterv identity  (conj res (into prev (rseq lseq))))
+         :modifs-count (inc modifs-count)}
+        :else
+        {:prev lseq
+         :res (filterv identity (conj res prev))
+         :modifs-count modifs-count}))))
+
+  (defn format-lineseq
+    [lineseq]
+    (let [{:keys [prev res modifs-count] :as acc} (reduce process-lineseq
+                                                    {:prev nil
+                                                     :res []
+                                                     :modifs-count 0}
+                                                    lineseq)
+          new-lineseq (filterv identity (conj res prev))]
+      (tap> acc)
+      (if (zero? modifs-count)
+        (mapv (fn [ls] {:ltype (get-ltype ls) :line (mapv #(subvec % 0 2) ls) :numseq (mapv last ls)}) new-lineseq)
+        (format-lineseq new-lineseq))))
+
+
+  (defn build-model
+    [fileimage]
+    (let [mat* (image2matrix (cv2/imread fileimage))
+          lineseq* (matrix2lineseq mat*)
+          _ (tap> {:lineseq* lineseq*})
+          lineseq (format-lineseq lineseq*)
+          model {:lineseq lineseq}]
+      (tap> model)
+      (doseq [ls lineseq]
+        (utl/show-matrix (utl/cells2matrix [100 100] (:line ls))))
+      (assoc model
+        :mat* mat*
+        :lineseq* lineseq*)))
+
+  
+
+  (def a-model (build-model "tmp/templates/word015.png"))
+  (def ale-model (build-model "tmp/templates/word000.png"))
+  (def am-model (build-model "tmp/templates/word004.png"))
+  (def ap-model (build-model "tmp/templates/word012.png"))
+  (def c-model (build-model "tmp/templates/word026.png"))
+  (def e-model (build-model "tmp/templates/word020.png"))
+  (def f-model (build-model "tmp/templates/word025.png"))
+  (def i-model (build-model "tmp/templates/word016.png"))
+  (def j-model (build-model "tmp/templates/word013.png"))
+  (def joc-model (build-model "tmp/templates/word002.png"))
+  (def l-model (build-model "tmp/templates/word024.png"))
+  (def m-model (build-model "tmp/templates/word017.png"))
+  (def mos-model (build-model "tmp/templates/word003.png"))
+  (def n-model (build-model "tmp/templates/word018.png"))
+  (def o-model (build-model "tmp/templates/word021.png"))
+  (def om-model (build-model "tmp/templates/word006.png"))
+  (def p-model (build-model "tmp/templates/word023.png"))
+  (def pat-model (build-model "tmp/templates/word007.png"))
+  (def pi-model (build-model "tmp/templates/word001.png"))
+  (def por-model (build-model "tmp/templates/word009.png"))
+  (def pot-model (build-model "tmp/templates/word008.png"))
+  (def s-model (build-model "tmp/templates/word014.png"))
+  (def sat-model (build-model "tmp/templates/word005.png"))
+  (def t-model (build-model "tmp/templates/word022.png"))
+  (def ta-model (build-model "tmp/templates/word011.png"))
+  (def tata-model (build-model "tmp/templates/word010.png"))
+  (def tz-model (build-model "tmp/templates/word019.png"))
+
+  ;;
+  )
+  #+end_src

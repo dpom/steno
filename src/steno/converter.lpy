@@ -149,17 +149,17 @@
   [mat {:keys [start-cell prev-cells]}]
   (loop [start start-cell
          prev prev-cells
-         numseq []]
+         line []]
     (let [[neighbors val] (get-cell-number-and-neighbors mat start)
           new-neighbors (set/difference neighbors prev)
-          new-numseq (conj numseq val)
+          new-line (conj line (conj start val))
           new-prev (conj prev start)]
-      (tap> {:cell start :val val :neighbors new-neighbors})
+      ;; (tap> {:cell start :val val :neighbors new-neighbors})
       (if-not (= (count new-neighbors) 1)
         {:start-cells new-neighbors
          :prev-cells new-prev
-         :numseq new-numseq}
-        (recur (first new-neighbors) new-prev new-numseq)))))
+         :line new-line}
+        (recur (first new-neighbors) new-prev new-line)))))
 
 
 (defn get-parallel-sequence
@@ -171,7 +171,7 @@
       - start-cells : (set) cells to process
       - prev-cells : (set) previous cells with value 1
   
-   Returns: status map updated + numseq  "
+   Returns: status map updated + lineseq  "
   [mat {:keys [start-cells prev-cells] :as state}]
   (tap> state)
   (reduce (fn [acc cell]
@@ -183,12 +183,12 @@
                               (assoc acc
                                 :start-cell cell))
                     new-acc  {:prev-cells (:prev-cells new-seq)
-                              :numseq (conj (:numseq acc) (:numseq new-seq))
+                              :line (conj (:line acc) (:line new-seq))
                               :start-cells (into (:start-cells acc) (:start-cells new-seq))}]
                 (tap> new-acc)
                 new-acc)))
     {:prev-cells prev-cells
-     :numseq []
+     :line []
      :start-cells #{}}
     start-cells))
 
@@ -204,20 +204,59 @@
            directions pos))))
 
 
+(defn neighbors?
+  "True if the cells are adiacent"
+  [[x1 y1 _] [x2 y2 _]]
+  (<= (+ (abs (- x1 x2))  (abs (- y1 y2))) 2))
+
+
+(defn get-ltype
+  "Returns the line sequence type: loop (0) or liniar (1)"
+  [lseq]
+  (if (and (> (count lseq) 1) (neighbors? (first lseq) (last lseq))) 0 1))
+
+
+(defn continuation?
+  "True if the 2 line sequences are adiacent"
+  [lseq1 lseq2]
+  (neighbors? (last lseq1) (first lseq2)))
+
+
+(defn loop?
+  "True if the 2 line sequences build a loop"
+  [lseq1 lseq2]
+  (and (neighbors? (first lseq1) (first lseq2))
+    (neighbors? (last lseq1) (last lseq2))))
+
+
+(defn parallel-lineseq?
+  "True if line sequence is a loop"
+  [lseq]
+  (= (utl/nested-levels lseq) 3))
+
+
+(defn parallel2liniar
+  "Transform a one line parallel sequence into a liniar sequence"
+  [lseq]
+  (if (and (parallel-lineseq? lseq) (= (count lseq) 1))
+    (first lseq)
+    lseq))
+
+
 ;; module entry points
 
-(defn matrix2numseq
-  "Convert a word matrix in a vector of numeric sequences."
+(defn matrix2lineseq
+  "Convert a word matrix in a vector of line sequences."
   [mat]
   (loop [state {:start-cells #{(get-start-cell mat)}
                 :prev-cells #{}
-                :numseq []}
+                :line []}
          acc []]
     (tap> state)
     (let [new-state (if (= (count (:start-cells state)) 1)
                       (get-liniar-sequence mat (assoc state :start-cell (first (:start-cells state))))
                       (get-parallel-sequence mat state))
-          new-acc (conj acc (:numseq new-state))]
+          new-acc (conj acc (:line new-state))]
       (if (empty? (:start-cells new-state))
         new-acc
         (recur new-state new-acc)))))
@@ -228,11 +267,11 @@
   [numseq]
   (let [start-cell [100 100]
         cells* (:cells (reduce (fn [{:keys [cells start prev] :as acc} num]
-                                 (tap> acc)
+                                 ;; (tap> acc)
                                  (let [new-cells (-> num
                                                    (extract-neighbors start)
                                                    (disj prev))]
-                                   (tap> {:new-cells new-cells})
+                                   ;; (tap> {:new-cells new-cells})
                                    {:cells (into cells new-cells)
                                     :start (first new-cells)
                                     :prev start}))
@@ -252,33 +291,111 @@
 
   (import [cv2 :as cv2])
 
-  (def joc-mat* (image2matrix (cv2/imread "tmp/templates/word002.png")))
-
-  (utl/show-matrix joc-mat*)
-
-  (def start-cell (get-start-cell joc-mat*))
-
   (add-tap (bound-fn* utl/print4tap))
 
-  (def seq0 (get-liniar-sequence joc-mat* {:start-cell start-cell
-                                           :prev-cells #{}}))
-  seq0
-  {:prev-cells #{[26 7] [6 35] [11 17] [34 5] [20 59] [8 21] [22 9] [31 5] [18 58] [7 42] [28 6] [6 34] [7 25] [38 5] [11 16] [23 9] [6 37] [12 15] [10 49] [9 20] [21 9] [12 52] [6 30] [6 33] [32 5] [9 19] [22 61] [19 10] [30 5] [36 5] [6 32] [27 7] [10 18] [10 50] [13 14] [21 60] [6 38] [16 56] [25 8] [7 26] [24 63] [6 28] [8 47] [7 23] [20 10] [37 5] [6 31] [7 41] [16 12] [14 13] [8 46] [17 57] [6 40] [29 6] [7 24] [33 5] [8 45] [14 54] [24 8] [15 13] [11 51] [6 36] [19 59] [9 48] [15 55] [6 39] [8 44] [17 11] [23 62] [35 5] [6 29] [8 22] [13 53] [7 27] [18 11] [8 43]}
-   :start-cells #{[24 64] [25 64]}
-   :numseq [2 34 34 34 34 34 34 34 33 18 33 18 33 18 33 18 34 33 18 33 18 33 17 18 33 17 17 144 9 17 144 9 144 9 144 136 136 136 9 144 136 136 136 136 136 136 136 136 136 136 136 72 132 72 132 136 136 136 72 68 132 72 68 68 68 68 68 68 68 68 36 66 68 68 68 196]}
+  (defn process-lineseq
+    [{:keys [prev res modifs-count] :as state} line-seq]
+    (tap> (-> state
+            (dissoc :res)
+            (assoc :lseq line-seq)))
+    (let [lseq (parallel2liniar line-seq)]
+      (if (parallel-lineseq? lseq)
+        (let [[lseq1 lseq2] lseq]
+          (cond
+            (= (or (get-ltype lseq1) 0) (= (get-ltype lseq2) 0))
+            {:prev nil
+             :res (filterv identity  (conj res prev lseq1 lseq2))
+             :modifs-count modifs-count}
+            (loop? lseq1 lseq2)
+            {:prev nil
+             :res (filterv identity  (conj res prev (into lseq1 (rseq lseq2))))
+             :modifs-count modifs-count}
+            :else
+            {:prev lseq2
+             :res (filterv identity  (conj res prev lseq1))
+             :modifs-count modifs-count}))
+        (cond
+        (= (get-ltype lseq) 0)
+        {:prev nil
+         :res (filterv identity  (conj res prev lseq))
+         :modifs-count modifs-count}
+        (= (count prev) 1) ; single cell prev, add it to the lseq
+        {:prev (into prev lseq)
+         :res res
+         :modifs-count (inc modifs-count)}
+        (and prev (loop? prev lseq))
+        {:prev nil
+         :res (filterv identity  (conj res (into prev (rseq lseq))))
+         :modifs-count (inc modifs-count)}
+        :else
+        {:prev lseq
+         :res (filterv identity (conj res prev))
+         :modifs-count modifs-count}))))
+
+  (defn format-lineseq
+    [lineseq]
+    (let [{:keys [prev res modifs-count] :as acc} (reduce process-lineseq
+                                                    {:prev nil
+                                                     :res []
+                                                     :modifs-count 0}
+                                                    lineseq)
+          new-lineseq (filterv identity (conj res prev))]
+      (tap> acc)
+      (if (zero? modifs-count)
+        (mapv (fn [ls] {:ltype (get-ltype ls) :line (mapv #(subvec % 0 2) ls) :numseq (mapv last ls)}) new-lineseq)
+        (format-lineseq new-lineseq))))
 
 
-  (def seq1 (get-parallel-sequence joc-mat* seq0))
-  seq1
-  {:prev-cells #{[26 7] [6 35] [11 17] [34 5] [20 59] [8 21] [22 9] [31 5] [18 58] [7 42] [28 6] [27 64] [6 34] [7 25] [38 5] [11 16] [23 9] [6 37] [12 15] [10 49] [9 20] [21 9] [12 52] [6 30] [6 33] [29 65] [32 5] [9 19] [22 61] [19 10] [30 5] [36 5] [6 32] [27 7] [10 18] [10 50] [24 64] [13 14] [21 60] [6 38] [16 56] [25 8] [7 26] [30 65] [24 63] [6 28] [8 47] [7 23] [20 10] [37 5] [6 31] [7 41] [16 12] [14 13] [8 46] [17 57] [6 40] [29 6] [7 24] [33 5] [8 45] [14 54] [24 8] [15 13] [25 64] [11 51] [6 36] [19 59] [9 48] [15 55] [26 64] [6 39] [8 44] [28 64] [17 11] [23 62] [35 5] [6 29] [8 22] [13 53] [7 27] [18 11] [8 43]} :start-cells #{[31 66] [31 64] [23 65] [25 64]} :numseq [[41] [38 34 34 66 36 82]]}
+  (defn build-model
+    [fileimage]
+    (let [mat* (image2matrix (cv2/imread fileimage))
+          lineseq* (matrix2lineseq mat*)
+          _ (tap> {:lineseq* lineseq*})
+          lineseq (format-lineseq lineseq*)
+          model {:lineseq lineseq}]
+      (tap> model)
+      (doseq [ls lineseq]
+        (utl/show-matrix (utl/cells2matrix [100 100] (:line ls))))
+      (assoc model
+        :mat* mat*
+        :lineseq* lineseq*)))
 
-  (def seq3 (get-parallel-sequence joc-mat* seq1))
-  seq3
-  {:prev-cells #{[26 7] [6 35] [46 52] [18 96] [11 17] [34 5] [20 59] [8 21] [14 78] [43 54] [27 97] [36 75] [22 9] [31 5] [18 58] [31 66] [52 49] [7 42] [37 86] [28 6] [60 44] [42 55] [14 84] [53 48] [27 64] [14 87] [37 85] [14 90] [56 46] [6 34] [7 25] [38 5] [11 16] [39 57] [23 9] [37 79] [6 37] [12 15] [26 97] [44 53] [47 52] [17 73] [10 49] [19 71] [37 58] [49 51] [9 20] [34 72] [35 91] [31 64] [21 9] [14 83] [12 52] [15 93] [21 68] [34 61] [37 84] [6 30] [14 89] [6 33] [50 50] [29 65] [32 5] [29 97] [37 78] [51 49] [15 92] [9 19] [32 94] [48 51] [34 92] [24 97] [37 77] [55 46] [14 79] [32 62] [22 61] [35 90] [14 82] [32 68] [19 10] [30 5] [23 97] [23 65] [14 85] [31 67] [36 5] [6 32] [14 88] [27 7] [33 93] [33 61] [10 18] [37 81] [10 50] [24 64] [13 14] [21 60] [36 59] [6 38] [16 56] [14 81] [25 8] [7 26] [30 65] [59 44] [24 63] [6 28] [8 47] [38 83] [31 63] [22 67] [31 95] [7 23] [20 10] [37 5] [6 31] [37 80] [36 87] [58 44] [7 41] [34 73] [16 12] [21 96] [54 47] [14 77] [14 13] [38 82] [20 96] [16 75] [8 46] [30 96] [17 57] [15 91] [33 70] [14 80] [6 40] [25 97] [18 72] [28 97] [29 6] [7 24] [20 70] [33 69] [57 45] [33 5] [23 66] [14 86] [17 95] [8 45] [14 54] [24 8] [15 13] [36 76] [25 64] [11 51] [41 55] [40 56] [35 60] [6 36] [36 89] [16 74] [19 59] [9 48] [15 55] [26 64] [34 71] [6 39] [15 76] [8 44] [22 96] [45 53] [19 96] [28 64] [35 74] [17 11] [23 62] [36 88] [35 5] [6 29] [38 58] [8 22] [13 53] [7 27] [20 69] [18 11] [16 94] [8 43]}
-   :start-cells #{}
-   :numseq [[132 72 68 132 72 132 136 72 68 132 72 132 136 136 136 72 132 9 144 136 9 144 136 9 144 9 17 17 17 17 17 18 34 34 34 34 34 36 66 34 34 34 36 68 68 72 136 132 72 136 136 136 136 136 136 136 136 136 136 136 136 144 17 9 144 17 17 17 9 144 17 17 9 144] [9 144 17 33 18 17 17 33 18 17 17 33 18 17 33 18 33 18 33 18 17 33 18 17 17 33 18 17 33 34 2]]}
+  
 
-  (matrix2numseq joc-mat*)
-  ;; => [[2 34 34 34 34 34 34 34 33 18 33 18 33 18 33 18 34 33 18 33 18 33 17 18 33 17 17 144 9 17 144 9 144 9 144 136 136 136 9 144 136 136 136 136 136 136 136 136 136 136 136 72 132 72 132 136 136 136 72 68 132 72 68 68 68 68 68 68 68 68 36 66 68 68 68 196] [[41] [38 34 34 66 36 82]] [[132 72 68 132 72 132 136 72 68 132 72 132 136 136 136 72 132 9 144 136 9 144 136 9 144 9 17 17 17 17 17 18 34 34 34 34 34 36 66 34 34 34 36 68 68 72 136 132 72 136 136 136 136 136 136 136 136 136 136 136 136 144 17 9 144 17 17 17 9 144 17 17 9 144] [9 144 17 33 18 17 17 33 18 17 17 33 18 17 33 18 33 18 33 18 17 33 18 17 17 33 18 17 33 34 2]]]
+  (def a-model (build-model "tmp/templates/word015.png"))
+
+
+
+  (def ale-model (build-model "tmp/templates/word000.png"))
+  (def am-model (build-model "tmp/templates/word004.png"))
+  (def ap-model (build-model "tmp/templates/word012.png"))
+  (def c-model (build-model "tmp/templates/word026.png"))
+  (def e-model (build-model "tmp/templates/word020.png"))
+  (def f-model (build-model "tmp/templates/word025.png"))
+  (def i-model (build-model "tmp/templates/word016.png"))
+  (def j-model (build-model "tmp/templates/word013.png"))
+  (def joc-model (build-model "tmp/templates/word002.png"))
+  (def l-model (build-model "tmp/templates/word024.png"))
+  (def m-model (build-model "tmp/templates/word017.png"))
+  (def mos-model (build-model "tmp/templates/word003.png"))
+  (def n-model (build-model "tmp/templates/word018.png"))
+  (def o-model (build-model "tmp/templates/word021.png"))
+  (def om-model (build-model "tmp/templates/word006.png"))
+  (def p-model (build-model "tmp/templates/word023.png"))
+  (def pat-model (build-model "tmp/templates/word007.png"))
+  (def pi-model (build-model "tmp/templates/word001.png"))
+  (def por-model (build-model "tmp/templates/word009.png"))
+  (def pot-model (build-model "tmp/templates/word008.png"))
+  (def s-model (build-model "tmp/templates/word014.png"))
+  (def sat-model (build-model "tmp/templates/word005.png"))
+  (def t-model (build-model "tmp/templates/word022.png"))
+  (def ta-model (build-model "tmp/templates/word011.png"))
+  (def tata-model (build-model "tmp/templates/word010.png"))
+  (def tz-model (build-model "tmp/templates/word019.png"))
+
+
+  
+  
+
   ;;
   )
