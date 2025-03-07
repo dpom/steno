@@ -2589,3 +2589,140 @@ joc-numseq*
   ;;
   )
   #+end_src
+
+* 2025-03-05
+   #+begin_src clojure
+(comment
+
+  (import [cv2 :as cv2])
+
+  (add-tap (bound-fn* utl/print4tap))
+
+  (defn reverse-loop?
+    "True if the 2 line sequences build a loop, second lseq is reversed"
+    [lseq1 lseq2]
+    (and (neighbors? (first lseq1) (last lseq2))
+      (neighbors? (last lseq1) (first lseq2))))
+
+
+  
+  (defn process-lineseq
+    [{:keys [prev res modifs-count]} line-seq]
+    (tap> {:lseq line-seq})
+    (tap> {:modifs-count modifs-count})
+    (tap> {:prev prev})
+    (tap> {:res res})
+    (let [lseq (parallel2liniar line-seq)]
+      (if (parallel-lineseq? lseq)
+        (let [[lseq1 lseq2] lseq]
+          (cond
+            (= (or (get-ltype lseq1) 0) (= (get-ltype lseq2) 0))
+            {:prev nil
+             :res (filterv identity  (conj res prev lseq1 lseq2))
+             :modifs-count (inc modifs-count)}
+            (loop? lseq1 lseq2)
+            {:prev nil
+             :res (filterv identity  (conj res prev (into lseq1 (rseq lseq2))))
+             :modifs-count (inc modifs-count)}
+            :else
+            {:prev lseq2
+             :res (filterv identity  (conj res prev lseq1))
+             :modifs-count (inc modifs-count)}))
+        (cond
+          (= (get-ltype lseq) 0)
+          {:prev nil
+           :res (filterv identity  (conj res prev lseq))
+           :modifs-count modifs-count}
+          (small-lineseq? prev) ; small  prev, add it to the lseq
+          {:prev (into prev lseq)
+           :res res
+           :modifs-count (inc modifs-count)}
+          (and prev (loop? prev lseq))
+          {:prev nil
+           :res (filterv identity  (conj res (into prev (rseq lseq))))
+           :modifs-count (inc modifs-count)}
+          (and prev (reverse-loop? prev lseq))
+          {:prev nil
+           :res (filterv identity  (conj res (into prev lseq)))
+           :modifs-count (inc modifs-count)}
+          :else
+          {:prev lseq
+           :res (filterv identity (conj res prev))
+           :modifs-count modifs-count}))))
+
+  (defn format-lineseq
+    [lineseq]
+    (let [{:keys [prev res modifs-count]} (reduce process-lineseq
+                                            {:prev nil
+                                             :res []
+                                             :modifs-count 0}
+                                            lineseq)
+          new-lineseq (filterv identity (conj res prev))]
+      (tap> {:modifs modifs-count
+             :lineseq new-lineseq})
+      (if (zero? modifs-count)
+        (mapv (fn [ls] {:ltype (get-ltype ls) :line (mapv #(subvec % 0 2) ls) :numseq (mapv last ls)}) new-lineseq)
+        (format-lineseq new-lineseq))))
+
+  
+  (defn build-model
+    [fileimage]
+    (let [mat* (image2matrix (cv2/imread fileimage))
+          lineseq* (matrix2lineseq mat*)
+          _ (tap> {:lineseq* lineseq*})
+          lineseq (format-lineseq lineseq*)
+          model {:lineseq lineseq}]
+      (tap> model)
+      (doseq [ls lineseq]
+        (utl/show-matrix (utl/cells2matrix [100 100] (:line ls))))
+      (assoc model
+        :mat* mat*
+        :lineseq* lineseq*)))
+
+  (small-lineseq? [])
+  (small-lineseq? nil)
+  
+
+  (def a-model (build-model "tmp/templates/word015.png"))
+  (def ale-model (build-model "tmp/templates/word000.png"))
+  (def am-model (build-model "tmp/templates/word004.png"))
+  (def ap-model (build-model "tmp/templates/word012.png"))
+  (def c-model (build-model "tmp/templates/word026.png"))
+  (def e-model (build-model "tmp/templates/word020.png"))
+  (def f-model (build-model "tmp/templates/word025.png"))
+  (def i-model (build-model "tmp/templates/word016.png"))
+  (def j-model (build-model "tmp/templates/word013.png"))
+  (def joc-model (build-model "tmp/templates/word002.png"))
+  (def l-model (build-model "tmp/templates/word024.png"))
+  (def m-model (build-model "tmp/templates/word017.png"))
+  (def mos-model (build-model "tmp/templates/word003.png"))
+  (def n-model (build-model "tmp/templates/word018.png"))
+  (def o-model (build-model "tmp/templates/word021.png"))
+  (def om-model (build-model "tmp/templates/word006.png"))
+  
+  (def p-model (build-model "tmp/templates/word023.png"))
+  (def pat-model (build-model "tmp/templates/word007.png"))
+  (def pi-model (build-model "tmp/templates/word001.png"))
+  (def por-model (build-model "tmp/templates/word009.png"))
+  (def pot-model (build-model "tmp/templates/word008.png"))
+  (def s-model (build-model "tmp/templates/word014.png"))
+  (def sat-model (build-model "tmp/templates/word005.png"))
+  (def t-model (build-model "tmp/templates/word022.png"))
+  (def ta-model (build-model "tmp/templates/word011.png"))
+  (def tata-model (build-model "tmp/templates/word010.png"))
+  (def tz-model (build-model "tmp/templates/word019.png"))
+
+  (def lseq
+    [[[62 29 8] [62 28 136] [62 27 136] [62 26 136] [62 25 136] [62 24 132] [61 23 72] [61 22 136] [61 21 136] [61 20 136] [61 19 136] [61 18 132] [60 17 72] [60 16 136] [60 15 132] [59 14 68] [58 13 68] [57 12 68] [56 11 68] [55 10 66] [54 10 36] [53 9 68] [52 8 66] [51 8 34] [50 8 34] [49 8 36] [48 7 66] [47 7 34] [46 7 34] [45 7 34] [44 7 34] [43 7 34] [42 7 36] [41 6 66] [40 6 34] [39 6 34] [38 6 34] [37 6 34] [36 6 34] [35 6 34] [34 6 34] [33 6 34] [32 6 34] [31 6 33] [30 7 18] [29 7 34] [28 7 33] [27 8 18] [26 8 33] [25 9 18] [24 9 33] [23 10 17] [22 11 17] [21 12 17] [20 13 144] [20 14 9] [19 15 145]]
+     [[[19 16 74]] [[18 16 50] [17 16 34] [16 16 34] [15 16 34] [14 16 33] [13 17 18] [12 17 33] [11 18 17] [10 19 17] [9 20 144] [9 21 9] [8 22 17] [7 23 17] [6 24 144] [6 25 136] [6 26 136] [6 27 136] [6 28 136] [6 29 136] [6 30 136] [6 31 136] [6 32 136] [6 33 136] [6 34 136] [6 35 72] [7 36 132] [7 37 136] [7 38 136] [7 39 72] [8 40 68] [9 41 68] [10 42 68] [11 43 68] [12 44 68] [13 45 68] [14 46 36] [15 46 66] [16 47 36] [17 47 34] [18 47 34] [19 47 34] [20 47 34] [21 47 18] [22 46 17] [23 45 17] [24 44 33] [25 44 18] [26 43 9] [26 42 144] [27 41 17] [28 40 9] [28 39 144] [29 38 9] [29 37 144] [30 36 9] [30 35 136] [30 34 144] [31 33 9] [31 32 136] [31 31 136] [31 30 136] [31 29 136] [31 28 132] [30 27 72] [30 26 136] [30 25 132] [29 24 68] [28 23 68] [27 22 66] [26 22 34] [25 22 36] [24 21 66] [23 21 36] [22 20 68] [21 19 68] [20 18 72] [20 17 132]]]
+     []]
+
+    )
+  
+  (filterv seq [[1 2 3] []])
+  ;; => [[1 2 3]]
+  
+
+  ;;
+  )
+   #+end_src
