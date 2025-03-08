@@ -301,6 +301,47 @@
        :res (filterv identity (conj res prev))
        :modifs-count modifs-count})))
 
+(defn median
+  [coll]
+  (let [sorted (sort coll)
+        cnt (count sorted)
+        halfway (quot cnt 2)]
+    (nth sorted halfway)))
+
+(def normalize-bin-size 5)
+
+(defn normalize-numseq
+  [numseq bin-size]
+  (mapv median (partition-all bin-size numseq)))
+
+(defn get-loop-start
+  [line]
+  (reduce (fn [{:keys [min-x min-y] :as res} [pos [x y _]]]
+            (if (or (< x min-x) (and (= x min-x) (< y min-y)))
+              {:min-x x :min-y y :min-pos pos}
+              res))
+    {:min-x (first (first line))
+     :min-y (second (first line))
+     :min-pos 0}
+    (map-indexed list (rest line))))
+
+(defn normalize-loop
+  [line]
+  (let [pos (:min-pos (get-loop-start line))]
+    (into (subvec line pos) (subvec line 0 pos))))
+
+
+(defn make-lineseq-item
+  [item]
+  (let [ltype (get-ltype item)
+        ls (if (zero? ltype) (normalize-loop item) item)
+        nseq (mapv last ls)]
+    {:ltype ltype
+     :line (mapv #(subvec % 0 2) ls)
+     :numseq nseq
+     :normalized-numseq (normalize-numseq nseq normalize-bin-size)}))
+
+
 
 (defn format-lineseq
   [lineseq]
@@ -313,7 +354,7 @@
     (tap> {:modifs modifs-count
            :lineseq new-lineseq})
     (if (zero? modifs-count)
-      (mapv (fn [ls] {:ltype (get-ltype ls) :line (mapv #(subvec % 0 2) ls) :numseq (mapv last ls)}) new-lineseq)
+      (mapv make-lineseq-item new-lineseq)
       (format-lineseq new-lineseq))))
 
 
@@ -367,47 +408,5 @@
 
   (add-tap (bound-fn* utl/print4tap))
   
-  (defn build-model
-    [fileimage]
-    (let [mat* (image2matrix (cv2/imread fileimage))
-          lineseq* (matrix2lineseq mat*)
-          _ (tap> {:lseq* lineseq*})
-          lineseq (format-lineseq lineseq*)]
-      (tap> {:lseq lineseq})
-      (doseq [ls lineseq]
-        (utl/show-matrix (utl/cells2matrix [100 100] (:line ls))))
-      {:mat* mat*
-       :lseq lineseq
-       :lseq* lineseq*}))
-
-
-  (def a-model (build-model "tmp/templates/word015.png"))
-  (def ale-model (build-model "tmp/templates/word000.png"))
-  (def am-model (build-model "tmp/templates/word004.png"))
-  (def ap-model (build-model "tmp/templates/word012.png"))
-  (def c-model (build-model "tmp/templates/word026.png"))
-  (def e-model (build-model "tmp/templates/word020.png"))
-  (def f-model (build-model "tmp/templates/word025.png"))
-  (def i-model (build-model "tmp/templates/word016.png"))
-  (def j-model (build-model "tmp/templates/word013.png"))
-  (def joc-model (build-model "tmp/templates/word002.png"))
-  (def l-model (build-model "tmp/templates/word024.png"))
-  (def m-model (build-model "tmp/templates/word017.png"))
-  (def mos-model (build-model "tmp/templates/word003.png"))
-  (def n-model (build-model "tmp/templates/word018.png"))
-  (def o-model (build-model "tmp/templates/word021.png"))
-  (def om-model (build-model "tmp/templates/word006.png"))
-  (def p-model (build-model "tmp/templates/word023.png"))
-  (def pat-model (build-model "tmp/templates/word007.png"))
-  (def pi-model (build-model "tmp/templates/word001.png"))
-  (def por-model (build-model "tmp/templates/word009.png"))
-  (def pot-model (build-model "tmp/templates/word008.png"))
-  (def s-model (build-model "tmp/templates/word014.png"))
-  (def sat-model (build-model "tmp/templates/word005.png"))
-  (def t-model (build-model "tmp/templates/word022.png"))
-  (def ta-model (build-model "tmp/templates/word011.png"))
-  (def tata-model (build-model "tmp/templates/word010.png"))
-  (def tz-model (build-model "tmp/templates/word019.png"))
-
   ;;
   )
