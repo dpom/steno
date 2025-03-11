@@ -16,17 +16,23 @@
    ])
 
 
-(def pos [2r10000000
-          2r01000000
-          2r00100000
-          2r00010000
-          2r00001000
-          2r00000100
-          2r00000010
-          2r00000001])
+(def ^{:doc "Direction position in the cell number"} pos
+  [2r10000000 ; E  
+   2r01000000 ; SE 
+   2r00100000 ; S  
+   2r00010000 ; SV 
+   2r00001000 ; V  
+   2r00000100  ; NV
+   2r00000010  ; N 
+   2r00000001] ; NE
+  )
 
 
 (def dummy-cell [-1 -1])
+
+(def ^{:doc "Factor that determines how close two cells must be to be neighbors (sum of dx and dy)"} neighbor-factor 10)
+
+(def lineseq-min-size 10)
 
 
 (defn image2matrix
@@ -222,7 +228,7 @@
 (defn neighbors?
   "True if the cells are adiacent"
   [[x1 y1 _] [x2 y2 _]]
-  (<= (+ (abs (- x1 x2))  (abs (- y1 y2))) 2))
+  (<= (+ (abs (- x1 x2))  (abs (- y1 y2))) neighbor-factor))
 
 
 (defn small-lineseq?
@@ -301,6 +307,7 @@
        :res (filterv identity (conj res prev))
        :modifs-count modifs-count})))
 
+
 (defn median
   [coll]
   (let [sorted (sort coll)
@@ -308,11 +315,14 @@
         halfway (quot cnt 2)]
     (nth sorted halfway)))
 
+
 (def normalize-bin-size 5)
+
 
 (defn normalize-numseq
   [numseq bin-size]
   (mapv median (partition-all bin-size numseq)))
+
 
 (defn get-loop-start
   [line]
@@ -325,6 +335,7 @@
      :min-pos 0}
     (map-indexed list (rest line))))
 
+
 (defn normalize-loop
   [line]
   (let [pos (:min-pos (get-loop-start line))]
@@ -335,12 +346,14 @@
   [item]
   (let [ltype (get-ltype item)
         ls (if (zero? ltype) (normalize-loop item) item)
-        nseq (mapv last ls)]
+        nseq (mapv last ls)
+        nnseq (normalize-numseq nseq normalize-bin-size)]
     {:ltype ltype
      :line (mapv #(subvec % 0 2) ls)
      :numseq nseq
-     :normalized-numseq (normalize-numseq nseq normalize-bin-size)}))
-
+     :normalized-numseq nnseq
+     :len (count nnseq)
+     :freq (frequencies nnseq)}))
 
 
 (defn format-lineseq
