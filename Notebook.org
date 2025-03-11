@@ -904,7 +904,7 @@ bb app test/resources/template.png tmp/templates/
 ;; => 44
 
   #+end_src
-- am o eroare in converter la calculul celului de start:
+- am o eroare in converter la calculul celulei de start:
   #+begin_src clojure
 (comment
 
@@ -1290,3 +1290,3011 @@ mat
 
 (utl/show-matrix p-seq*)
   #+end_src
+
+* 2025-02-24
+
+- incerc "netezirea" numseq pentru a elimina diferentele. Folosesc mediana si un factor de grupare initial 5:
+  #+begin_src clojure
+(import [cv2 :as cv2])
+
+(require
+  '[steno.utils :as utl]
+  '[steno.converter :as cnv])
+
+(def p-template* (cnv/image->matrix (cv2/imread "tmp/templates/word023.png")))
+
+(def t-template* (cnv/image->matrix (cv2/imread "tmp/templates/word022.png")))
+
+(def c-template* (cnv/image->matrix (cv2/imread "tmp/templates/word026.png")))
+
+
+(def p-seq* (first (cnv/matrix->numseq p-template*)))
+p-seq*
+;; => [16 33 18 33 34 34 34 34 18 33 34 34 34 34 34 66 36 18 33 34 34 34 34 66 36 34 34 34 34 34 34 34 34 2]
+
+
+(utl/show-matrix p-template*)
+
+(defn median
+  [coll]
+  (let [sorted (sort coll)
+        cnt (count sorted)
+        halfway (quot cnt 2)]
+    (nth sorted halfway)))
+
+(def smooth-bin-length 5)
+
+(defn smooth-numseq
+  [numseq bin-length]
+  (let [start (first numseq)
+        smooth-bins (partition-all bin-length (rest numseq))]
+    (into [start] (map median smooth-bins))))
+
+
+(def p-seq (smooth-numseq p-seq* 5))
+;; => [16 33 34 34 34 34 34 34]
+
+(def p-template (cnv/numseq->matrix p-seq))
+(def p-template (cnv/numseq->matrix [32 34 34 34 34 34 34 34]))
+
+(utl/show-matrix p-template)
+
+(add-tap (bound-fn* utl/print4tap))
+
+(def start-cell [100 100])
+
+
+
+(defn num2cells
+  [numseq ]
+  (loop [
+         acc #{start-cell}
+         todo (queue [[start-cell cnv/dummy-cell]])]
+    (tap> acc)
+    (if (and (empty? nums)(empty? todo)
+             acc
+             (let [[start prev] (peek todo)
+                   new-cells (-> num
+                                 (cnv/extract-neighbors start)
+                                 (disj prev))]
+               (tap> {:new-cells new-cells})
+               (recur (into acc new-cells)
+                      (into (pop todo) (map (fn [cell] [cell start]) new-cells))))))))
+
+(8 [start-cell cnv/dummy-cell])
+
+  (def t-seq* (first (cnv/matrix->numseq t-template*)))
+  ;; => [128 136 136 136 136 9 144 136 136 9 144 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 8]
+
+  (def t-seq (smooth-numseq t-seq* 5))
+  t-seq
+  ;; => [128 136 136 136 136 136 136 136 8]
+
+(def t-template (cnv/numseq->matrix t-seq))
+
+(utl/show-matrix t-template)
+
+(def c-seq* (first (cnv/matrix->numseq c-template*)))
+
+(def c-seq (smooth-numseq c-seq* 5))
+c-seq
+;; => [16 33 18 18 18 18 17]
+
+(def c-template (cnv/numseq->matrix c-seq))
+
+(utl/show-matrix c-template)
+
+(def f-template* (cnv/image->matrix (cv2/imread "tmp/templates/word025.png")))
+
+(utl/show-matrix f-template*)
+
+(def f-seq* (first (cnv/matrix->numseq f-template*)))
+
+(def f-seq (smooth-numseq f-seq* 5))
+f-seq
+;; => [32 68 68 36 66 66 66 36]
+
+(def f-template (cnv/numseq->matrix f-seq))
+
+(utl/show-matrix f-template)
+
+(def l-template* (cnv/image->matrix (cv2/imread "tmp/templates/word024.png")))
+
+(utl/show-matrix l-template*)
+
+(def l-seq* (first (cnv/matrix->numseq l-template*)))
+l-seq*
+;; => [128 9 144 136 9 144 136 9 144 9 17 144 136 9 144 136 9 144 9 144 9 144 9 144 9 144 136 9 144 9 144 136 9 144 9 144 9 144 136 9 144 136 9 17 144 9 16]
+
+
+(def l-seq (smooth-numseq l-seq* 5))
+l-seq
+;; => [128 136 17 136 9 144 136 136 136 17 16]
+
+(def l-template (cnv/numseq->matrix l-seq))
+
+(utl/show-matrix l-template)
+
+(defn build-model
+  [fileimage bin-length]
+  (let [template* (cnv/image->matrix (cv2/imread fileimage))
+        numseq* (first (cnv/matrix->numseq template*))
+        numseq (smooth-numseq numseq* bin-length)
+        template (cnv/numseq->matrix numseq)
+        model {:numseq* numseq*
+               :numseq numseq}]
+    (tap> model)
+    (utl/show-matrix template*)
+    (utl/show-matrix template)
+    (assoc model :template template :template* template*)))
+
+(def l-model (build-model "tmp/templates/word024.png" 5))
+(def j-model (build-model "tmp/templates/word020.png" 3))
+
+(import [matplotlib.pyplot :as plt])
+
+(defn show-templates
+  [img1 img2]
+  (let [[fig axs] (plt/subplots 1 2 ** :figsize [100 100])]
+    (.imshow (first axs) img1 ** :cmap "gray" :vmin 0 :vmax 1)
+    (.imshow (second axs) img2 ** :cmap "gray" :vmin 0 :vmax 1)
+    ;; (plt/tight_layout)
+    (plt/show)))
+
+(show-templates (:template* l-model) (:template l-model))
+
+(defn build-model
+  [fileimage bin-length]
+  (let [template* (cnv/image->matrix (cv2/imread fileimage))
+        numseq* (first (cnv/matrix->numseq template*))
+        numseq (smooth-numseq numseq* bin-length)
+        template (cnv/numseq->matrix numseq)
+        model {:numseq* numseq*
+               :numseq numseq}]
+    (tap> model)
+    (show-templates template* template)
+    (assoc model :template template :template* template*)))
+
+(def j-model (build-model "tmp/templates/word020.png" 3))
+(def n-model (build-model "tmp/templates/word018.png" 3))
+(def m-model (build-model "tmp/templates/word017.png" 3))
+
+(import
+  [cv2 :as cv2]
+  [numpy :as np])
+
+(def map (:template* m-model))
+
+(def binary-image
+  (-> [100 100]
+      (np/zeros ** :dtype np/uint8)
+      (cv2/line [10 90] [90 10] 1 2)))
+
+(utl/show-matrix binary-image)
+
+
+(def extract-contours
+  [map]
+  (let [image (.astype (* map 255) np/uint8)]) )
+  #+end_src
+
+* 2025-02-25
+
+- incerc o noua abordare pentru netezire:
+  #+begin_src clojure
+
+(import
+  [cv2 :as cv2]
+  [numpy :as np]
+  [matplotlib.pyplot :as plt]
+  [PIL.Image :as pil])
+
+
+(defn image2binary
+  [image-filename]
+  (let [selector (fn [p] (if (> p 128) 255 0))]
+    (-> image-filename
+        (pil/open)
+        (.convert "L")
+        (.point selector)
+        (np/array)
+        (/ 255)
+        (.astype "int"))))
+
+(def j-mat (image2binary "tmp/templates/word020.png"))
+
+(require
+  '[steno.utils :as utl]
+  '[steno.converter :as cnv])
+
+(defn show-templates
+  [img1 img2]
+  (let [[fig axs] (plt/subplots 1 2 ** :figsize [100 100])]
+    (.imshow (first axs) img1 ** :cmap "gray" :vmin 0 :vmax 1)
+    (.imshow (second axs) img2 ** :cmap "gray" :vmin 0 :vmax 1)
+    ;; (plt/tight_layout)
+    (plt/show)))
+
+(show-templates j-mat j-mat)
+
+
+
+(defn extract-contours
+  [mat]
+  (let [image (.astype (* mat 255) np/uint8)
+        [contours _] (cv2/findContours image cv2/RETR_EXTERNAL, cv2/CHAIN_APPROX_SIMPLE)]
+    (mapv #(.squeeze %) contours)))
+
+(extract-contours j-mat)
+  #+end_src
+- creare matrice dintr-o lista de celule:
+  #+begin_src python
+import numpy as np
+
+def create_array_from_cells(cells, array_size):
+    """
+    Create a 2D array from a sequence of cells.
+
+    Args:
+        cells (list of tuples): List of tuples where each tuple represents the coordinates (x, y)
+        array_size (tuple): Size of the output array (height, width)
+
+    Returns:
+        np.ndarray: A 2D array with 1s in the specified cells and 0s elsewhere.
+    """
+    # Create a 2D array filled with zeros
+    array = np.zeros(array_size, dtype=int)
+
+    # Set the specified cells to 1
+    for (x, y) in cells:
+        if 0 <= x < array_size[0] and 0 <= y < array_size[1]:  # Check bounds
+            array[x, y] = 1
+
+    return array
+
+# Example usage:
+if __name__ == "__main__":
+    cells = [(1, 2), (3, 4), (0, 0), (2, 1)]
+    array_size = (5, 5)  # Size of the output array (5 rows, 5 columns)
+    
+    result_array = create_array_from_cells(cells, array_size)
+    
+    print("The 2D array is:")
+    print(result_array)
+
+  #+end_src
+- afisare a 2 matrici:
+  #+begin_src python
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Create two binary matrices
+matrix1 = np.array([[1, 0, 1], [0, 1, 0], [1, 1, 1]])
+matrix2 = np.array([[0, 1, 0], [1, 0, 1], [0, 0, 0]])
+
+# Set up the figure and axes
+fig, ax = plt.subplots(1, 2, figsize=(8, 4))
+
+# Display the first binary matrix
+ax[0].imshow(matrix1, cmap='gray', vmin=0, vmax=1)
+ax[0].set_title('Matrix 1')
+ax[0].axis('off')  # Turn off the axis
+
+# Display the second binary matrix
+ax[1].imshow(matrix2, cmap='gray', vmin=0, vmax=1)
+ax[1].set_title('Matrix 2')
+ax[1].axis('off')  # Turn off the axis
+
+# Show the plot
+plt.tight_layout()
+plt.show()
+
+  #+end_src
+- algoritmul de netezire Douglas-Peucker:
+  #+begin_src python
+import numpy as np
+import cv2
+
+def douglas_peucker(points, epsilon):
+    """
+    The Douglas-Peucker algorithm implementation.
+
+    :param points: Array of points to be simplified.
+    :param epsilon: The tolerance value for simplification.
+    :return: The simplified array of points.
+    """
+    # Find the start and end points
+    start, end = points[0], points[-1]
+
+    # If there's only 2 points, return them
+    if len(points) < 3:
+        return np.array([start, end])
+
+    # Calculate the distance from the line segment to all points
+    line_vec = end - start
+    line_vec = line_vec / np.linalg.norm(line_vec)  # Normalize
+    points_vec = points - start
+    projection = np.dot(points_vec, line_vec)
+    
+    # Get the perpendicular distance to the line
+    # Distance = ||points_vec - projection * line_vec||
+    perpendicular_distances = np.linalg.norm(points_vec - np.outer(projection, line_vec), axis=1)
+
+    # Find the index of the point with the maximum distance
+    max_distance_index = np.argmax(perpendicular_distances)
+
+    # If the maximum distance is greater than epsilon, recursively simplify
+    if perpendicular_distances[max_distance_index] > epsilon:
+        # Recursively simplify
+        left_simplified = douglas_peucker(points[:max_distance_index + 1], epsilon)
+        right_simplified = douglas_peucker(points[max_distance_index:], epsilon)
+
+        # Combine results
+        return np.vstack((left_simplified[:-1], right_simplified))
+    else:
+        return np.array([start, end])
+    
+
+def extract_contours(binary_image):
+    """
+    Extract contours from a binary image.
+
+    :param binary_image: Binary image with 1s (white) and 0s (black).
+    :return: Contours found in the image.
+    """
+    # Convert the binary image to uint8
+    binary_image = (binary_image * 255).astype(np.uint8)
+    
+    # Find contours
+    contours, _ = cv2.findContours(binary_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    return [contour.squeeze() for contour in contours]
+
+def main():
+    # Create a binary image for testing
+    binary_image = np.zeros((100, 100), dtype=np.uint8)
+    cv2.line(binary_image, (10, 90), (90, 10), 1, 2)
+
+    # Extract contours
+    contours = extract_contours(binary_image)
+    
+    # Simplify each contour using Douglas-Peucker
+    epsilon = 5.0  # Tolerance for simplification
+    simplified_contours = [douglas_peucker(contour, epsilon) for contour in contours]
+    
+    # Visualize results
+    for contour in simplified_contours:
+        contour = np.int32(contour)  # Convert to int32 for drawing
+        cv2.polylines(binary_image, [contour], isClosed=False, color=2, thickness=1)
+    
+    cv2.imshow("Original Binary Image", binary_image)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+if __name__ == "__main__":
+    main()
+
+  #+end_src
+  rezultatele nu sunt grozave
+- conversie imagine la matrice binara:
+  #+begin_src python
+from PIL import Image
+import numpy as np
+
+def image_to_binary_matrix(image_path):
+    # Open the image
+    img = Image.open(image_path)
+    
+    # Convert the image to grayscale
+    gray_img = img.convert('L')
+    
+    # Convert the grayscale image to binary (0 and 255)
+    # You can adjust the threshold as needed
+    threshold = 128
+    binary_img = gray_img.point(lambda p: 255 if p > threshold else 0)
+    
+    # Convert binary image to a numpy array
+    binary_data = np.array(binary_img)
+
+    # Convert the binary data to a binary matrix (0s and 1s)
+    binary_matrix = (binary_data / 255).astype(int)
+    
+    return binary_matrix
+
+# Example usage
+image_path = 'path_to_your_image.jpg'
+binary_matrix = image_to_binary_matrix(image_path)
+
+print(binary_matrix)
+  #+end_src
+- algoritmul de netezire LOESS:
+  - prima versiune
+    #+begin_src python
+import numpy as np
+from scipy.ndimage import gaussian_filter
+
+def loess_smoothing(binary_image, bandwidth=1.0):
+    """
+    Apply LOESS smoothing to a binary image.
+    
+    Parameters:
+        binary_image (numpy.ndarray): Input binary image (2D array with values 0 and 1).
+        bandwidth (float): The bandwidth (size of neighborhood) for the LOESS fitting.
+        
+    Returns:
+        numpy.ndarray: Smoothed image.
+    """
+    # Ensure binary_image is a numpy array
+    binary_image = np.asarray(binary_image, dtype=float)
+
+    # Create a smooth representation of the binary image
+    smoothed = np.zeros_like(binary_image)
+
+    # Get the dimensions of the image
+    rows, cols = binary_image.shape
+
+    # Apply LOESS smoothing
+    for i in range(rows):
+        for j in range(cols):
+            # Define the range of the neighborhood
+            x_min = max(0, i - int(bandwidth))
+            x_max = min(rows, i + int(bandwidth) + 1)
+            y_min = max(0, j - int(bandwidth))
+            y_max = min(cols, j + int(bandwidth) + 1)
+
+            # Extract the neighborhood
+            neighborhood = binary_image[x_min:x_max, y_min:y_max]
+
+            # Generate a meshgrid for distances
+            x_indices, y_indices = np.meshgrid(np.arange(x_min, x_max), np.arange(y_min, y_max))
+            distances = np.sqrt((x_indices - i) ** 2 + (y_indices - j) ** 2)
+
+            # We use a tricube weight function
+            weights = np.clip(1 - (distances / bandwidth) ** 3, 0, 1) ** 3
+
+            # Sum the weights and the weighted values
+            weighted_sum = np.sum(weights * neighborhood)
+            weight_sum = np.sum(weights)
+
+            # Calculate the smoothed value (avoid division by zero)
+            smoothed[i, j] = weighted_sum / weight_sum if weight_sum > 0 else 0
+
+    return smoothed
+
+
+# Example usage
+if __name__ == "__main__":
+    # Create a simple binary image
+    binary_img = np.array([[0, 0, 1, 1, 0],
+                            [0, 1, 1, 1, 0],
+                            [1, 1, 1, 1, 1],
+                            [0, 1, 1, 1, 0],
+                            [0, 0, 1, 0, 0]])
+
+    # Apply LOESS smoothing
+    smoothed_image = loess_smoothing(binary_img, bandwidth=1.0)
+
+    # Print the smoothed image
+    print("Original binary image:\n", binary_img)
+    print("Smoothed image:\n", smoothed_image)
+
+  #+end_src
+  - a doua versiune:
+    #+begin_src python
+import numpy as np
+
+def tricube_weight(distance, bandwidth):
+    """ Tri-cube weight function for LOESS """
+    if abs(distance) <= bandwidth:
+        return (1 - (distance / bandwidth) ** 3) ** 3
+    else:
+        return 0
+
+def loess_smoothing(image, bandwidth):
+    """ Perform LOESS smoothing on a 2D image """
+    smoothed_image = np.zeros_like(image, dtype=float)
+    rows, cols = image.shape
+
+    for i in range(rows):
+        for j in range(cols):
+            weights = []
+            values = []
+            
+            # Gathering weights and values within bandwidth
+            for k in range(max(0, i - int(bandwidth)): min(rows, i + int(bandwidth + 1))):
+                for l in range(max(0, j - int(bandwidth)): min(cols, j + int(bandwidth + 1))):
+                    distance = np.sqrt((i - k) ** 2 + (j - l) ** 2)
+                    weight = tricube_weight(distance, bandwidth)
+                    weights.append(weight)
+                    values.append(image[k, l])
+
+            # Weighted average calculation
+            weights = np.array(weights)
+            values = np.array(values)
+            if np.sum(weights) > 0:  # Avoid division by zero
+                smoothed_image[i, j] = np.sum(weights * values) / np.sum(weights)
+            else:
+                smoothed_image[i, j] = image[i, j]  # Default to original if no weights
+
+    return smoothed_image
+
+# Example usage
+if __name__ == "__main__":
+    # Create a simple binary image
+    binary_img = np.array([[0, 0, 1, 1, 0],
+                            [0, 1, 1, 1, 0],
+                            [1, 1, 1, 1, 1],
+                            [0, 1, 1, 1, 0],
+                            [0, 0, 1, 0, 0]])
+
+    # Apply LOESS smoothing
+    smoothed_image = loess_smoothing(binary_img, bandwidth=1.0)
+
+    # Print the smoothed image
+    print("Original binary image:\n", binary_img)
+    print("Smoothed image:\n", smoothed_image)
+    #+end_src
+  nu aduce nici o imbunatatire
+- The Gaussian kernel (also known as the radial basis function or RBF kernel) is commonly used in machine learning, particularly in support vector machines and kernelized algorithms. The Gaussian kernel is defined as:
+  #+begin_example
+[ K(x, y) = e^{-\frac{|x - y|^2}{2\sigma^2}}]
+
+Where:
+
+( K(x, y) ) is the Gaussian kernel function,
+( x ) and ( y ) are input vectors,
+( |x - y| ) is the Euclidean distance between the vectors,
+( \sigma ) is a parameter that controls the width of the Gaussian kernel.
+   #+end_example
+   #+begin_src python
+import numpy as np
+
+def gaussian_kernel(x, y, sigma):
+    """
+    Compute the Gaussian kernel between two vectors.
+
+    Parameters:
+    x : array-like, shape (n_features,)
+        First input vector.
+    y : array-like, shape (n_features,)
+        Second input vector.
+    sigma : float
+        The width of the Gaussian kernel.
+
+    Returns:
+    float
+        The value of the Gaussian kernel evaluated at x and y.
+    """
+    distance = np.linalg.norm(x - y)
+    kernel_value = np.exp(- (distance ** 2) / (2 * sigma ** 2))
+    return kernel_value
+
+# Example usage
+x = np.array([1.0, 2.0])
+y = np.array([2.0, 3.0])
+sigma = 1.0
+
+kernel_value = gaussian_kernel(x, y, sigma)
+print(f"Gaussian Kernel between x and y: {kernel_value}")
+  #+end_src
+- The Savitzky-Golay filter is a popular technique used in signal processing to smooth data and to calculate the derivatives of a signal. It fits successive sub-intervals of the data with a low-degree polynomial by the method of linear least squares. Here's a simple implementation of the Savitzky-Golay filter in Python using NumPy:
+  #+begin_src python
+import numpy as np
+from scipy.signal import savgol_filter
+import matplotlib.pyplot as plt
+
+def apply_savitzky_golay_filter(data, window_size, poly_order):
+    """
+    Apply Savitzky-Golay filter to the input data.
+
+    Parameters:
+    data (array-like): Input data to be filtered.
+    window_size (int): The length of the filter window (must be a positive odd integer).
+    poly_order (int): The order of the polynomial used to fit the samples (must be less than window_size).
+
+    Returns:
+    array: Smoothed data.
+    """
+    if window_size % 2 == 0 or window_size < 1:
+        raise ValueError("window_size must be a positive odd integer.")
+    if poly_order >= window_size:
+        raise ValueError("poly_order must be less than window_size.")
+
+    # Apply the Savitzky-Golay filter
+    filtered_data = savgol_filter(data, window_size, poly_order)
+    return filtered_data
+
+# Example usage
+if __name__ == "__main__":
+    # Generating sample data
+    np.random.seed(0)
+    x = np.linspace(0, 10, 100)
+    y = np.sin(x) + np.random.normal(0, 0.1, x.shape)  # Sine wave with added noise
+
+    # Applying Savitzky-Golay filter
+    window_size = 11  # Length of the filter window
+    poly_order = 2    # Polynomial order
+    smoothed_y = apply_savitzky_golay_filter(y, window_size, poly_order)
+
+    # Plotting the results
+    plt.figure(figsize=(12, 6))
+    plt.plot(x, y, label='Noisy Signal', alpha=0.5)
+    plt.plot(x, smoothed_y, label='Savitzky-Golay Filtered Signal', color='red')
+    plt.legend()
+    plt.title('Savitzky-Golay Filter Example')
+    plt.xlabel('X-axis')
+    plt.ylabel('Y-axis')
+    plt.grid()
+    plt.show()
+#+end_src
+
+* 2025-02-26
+
+- incercarile de ieri nu au fost utile incerc din nou:
+  #+begin_src clojure
+(import
+  [cv2 :as cv2]
+  [matplotlib :as matp])
+
+(require
+  '[steno.utils :as utl]
+  '[steno.converter :as cnv])
+
+(add-tap (bound-fn* utl/print4tap))
+
+(matp/use "tkagg")
+
+(defn build-model
+  [fileimage]
+  (let [template* (cnv/image2matrix (cv2/imread fileimage))
+        numseq* (first (cnv/matrix2numseq template*))
+        model   {:numseq* numseq*}]
+    (tap> model)
+    (utl/show-matrix template*)
+    (assoc model :template* template*)))
+
+
+(defn get-liniar-contour
+  "Return a liniar contour (list of cells).
+
+   Params:
+   - mat : the word matrix
+   - start-cell : [row column]
+   - prev-cell : previous cell in sequence (dummy cell if new sequence)
+
+   Returns: [next-start-cell next-prev-cell contour]  "
+  [mat start-cell prev-cell]
+  (loop [start start-cell
+         prev prev-cell
+         acc [start-cell]]
+    (let [[neighbors val] (cnv/get-cell-number-and-neighbors mat start)
+          new-neighbors (disj neighbors prev)
+          num (count new-neighbors)
+          new-acc (if (zero? num) acc (conj acc (first new-neighbors)))]
+      (tap> {:cell start :val val :neighbors new-neighbors})
+      (tap> {:new-acc new-acc})
+      (cond
+        (zero? num) [cnv/dummy-cell start new-acc]
+        (= num 1) (recur (first new-neighbors) start new-acc)
+        :else [start prev acc]))))
+
+(defn get-contours
+  [mat]
+  (let [start (cnv/get-start-cell mat)]
+    (last (get-liniar-contour mat start cnv/dummy-cell))))
+
+(def p-model (build-model "tmp/templates/word023.png"))
+
+(def cells* (get-contours (:template* p-model)))
+
+(def mat2 (utl/cells2matrix [50 50] cells*))
+
+(utl/show-matrix mat2)
+
+(sort-by (fn [[x y]] (+ x y)) (take 5 cells))
+;; => ([5 8] [6 7] [7 7] [8 6] [9 6])
+
+(defn median
+  [cells]
+  (let [sorted (sort-by (fn [[x y]] (+ x y)) cells)
+        cnt (count sorted)
+        halfway (quot cnt 2)]
+    (nth sorted halfway)))
+
+(defn smooth-contour
+  [contour bin-size]
+  (let [start (first contour)
+        smooth-bins (partition-all bin-size (rest contour))]
+    (into [start] (map median smooth-bins))))
+
+(def cells (smooth-contour cells* 5))
+
+(def mat3 (utl/cells2matrix [50 50] cells))
+
+(utl/show-matrix mat3)
+
+
+(defn smooth-numseq
+  [numseq bin-length]
+  (let [start (first numseq)
+        smooth-bins (partition-all bin-length (rest numseq))]
+    (into [start] (map median smooth-bins))))
+
+(def bin-size 5)
+
+(defn build-model
+  [fileimage]
+  (let [template* (cnv/image2matrix (cv2/imread fileimage))
+        numseq* (first (cnv/matrix2numseq template*))
+        numseq (smooth-numseq numseq* bin-size)
+        template (cnv/numseq2matrix numseq)
+        model {:numseq* numseq*
+               :numseq numseq}]
+    (tap> model)
+    (utl/show-two-matrices template* template)
+    (assoc model :template template :template* template*)))
+
+(def p-model (build-model "tmp/templates/word023.png"))
+(def t-model (build-model "tmp/templates/word022.png"))
+(def c-model (build-model "tmp/templates/word026.png"))
+(def f-model (build-model "tmp/templates/word025.png"))
+(def l-model (build-model "tmp/templates/word024.png"))
+(def j-model (build-model "tmp/templates/word020.png"))
+(def n-model (build-model "tmp/templates/word018.png"))
+(def m-model (build-model "tmp/templates/word017.png"))
+(def s-model (build-model "tmp/templates/word016.png"))
+
+(def joc-mat* (cnv/image2matrix (cv2/imread "tmp/templates/word002.png")))
+
+(utl/show-matrix joc-mat*)
+
+(cnv/get-start-cell joc-mat*)
+;; => [38 5]
+
+
+(def joc-numseq* (cnv/matrix2numseq joc-mat*))
+joc-numseq*
+;; => Unbound(var=#'user/joc-numseq*)
+  #+end_src
+- este o eroare la functia matrix2numseq care face ca functia sa ruleze la infinit in cazul in care imaginea contine secvente paralele:
+  #+begin_src clojure
+(comment
+
+  (import [cv2 :as cv2])
+
+  (def joc-mat* (image2matrix (cv2/imread "tmp/templates/word002.png")))
+
+  (utl/show-matrix joc-mat*)
+
+  (def start-cell (get-start-cell joc-mat*))
+
+  (add-tap (bound-fn* utl/print4tap))
+
+  (def seq0 (get-liniar-sequence joc-mat* {:start-cell start-cell
+                                           :prev-cells #{}}))
+  seq0
+  {:prev-cells #{[26 7] [6 35] [11 17] [34 5] [20 59] [8 21] [22 9] [31 5] [18 58] [7 42] [28 6] [6 34] [7 25] [38 5] [11 16] [23 9] [6 37] [12 15] [10 49] [9 20] [21 9] [12 52] [6 30] [6 33] [32 5] [9 19] [22 61] [19 10] [30 5] [36 5] [6 32] [27 7] [10 18] [10 50] [13 14] [21 60] [6 38] [16 56] [25 8] [7 26] [24 63] [6 28] [8 47] [7 23] [20 10] [37 5] [6 31] [7 41] [16 12] [14 13] [8 46] [17 57] [6 40] [29 6] [7 24] [33 5] [8 45] [14 54] [24 8] [15 13] [11 51] [6 36] [19 59] [9 48] [15 55] [6 39] [8 44] [17 11] [23 62] [35 5] [6 29] [8 22] [13 53] [7 27] [18 11] [8 43]}
+   :start-cells #{[24 64] [25 64]}
+   :numseq [2 34 34 34 34 34 34 34 33 18 33 18 33 18 33 18 34 33 18 33 18 33 17 18 33 17 17 144 9 17 144 9 144 9 144 136 136 136 9 144 136 136 136 136 136 136 136 136 136 136 136 72 132 72 132 136 136 136 72 68 132 72 68 68 68 68 68 68 68 68 36 66 68 68 68 196]}
+
+
+  (def seq1 (get-parallel-sequence joc-mat* seq0))
+  seq1
+  {:prev-cells #{[26 7] [6 35] [11 17] [34 5] [20 59] [8 21] [22 9] [31 5] [18 58] [7 42] [28 6] [27 64] [6 34] [7 25] [38 5] [11 16] [23 9] [6 37] [12 15] [10 49] [9 20] [21 9] [12 52] [6 30] [6 33] [29 65] [32 5] [9 19] [22 61] [19 10] [30 5] [36 5] [6 32] [27 7] [10 18] [10 50] [24 64] [13 14] [21 60] [6 38] [16 56] [25 8] [7 26] [30 65] [24 63] [6 28] [8 47] [7 23] [20 10] [37 5] [6 31] [7 41] [16 12] [14 13] [8 46] [17 57] [6 40] [29 6] [7 24] [33 5] [8 45] [14 54] [24 8] [15 13] [25 64] [11 51] [6 36] [19 59] [9 48] [15 55] [26 64] [6 39] [8 44] [28 64] [17 11] [23 62] [35 5] [6 29] [8 22] [13 53] [7 27] [18 11] [8 43]} :start-cells #{[31 66] [31 64] [23 65] [25 64]} :numseq [[41] [38 34 34 66 36 82]]}
+
+  (def seq3 (get-parallel-sequence joc-mat* seq1))
+  seq3
+  {:prev-cells #{[26 7] [6 35] [46 52] [18 96] [11 17] [34 5] [20 59] [8 21] [14 78] [43 54] [27 97] [36 75] [22 9] [31 5] [18 58] [31 66] [52 49] [7 42] [37 86] [28 6] [60 44] [42 55] [14 84] [53 48] [27 64] [14 87] [37 85] [14 90] [56 46] [6 34] [7 25] [38 5] [11 16] [39 57] [23 9] [37 79] [6 37] [12 15] [26 97] [44 53] [47 52] [17 73] [10 49] [19 71] [37 58] [49 51] [9 20] [34 72] [35 91] [31 64] [21 9] [14 83] [12 52] [15 93] [21 68] [34 61] [37 84] [6 30] [14 89] [6 33] [50 50] [29 65] [32 5] [29 97] [37 78] [51 49] [15 92] [9 19] [32 94] [48 51] [34 92] [24 97] [37 77] [55 46] [14 79] [32 62] [22 61] [35 90] [14 82] [32 68] [19 10] [30 5] [23 97] [23 65] [14 85] [31 67] [36 5] [6 32] [14 88] [27 7] [33 93] [33 61] [10 18] [37 81] [10 50] [24 64] [13 14] [21 60] [36 59] [6 38] [16 56] [14 81] [25 8] [7 26] [30 65] [59 44] [24 63] [6 28] [8 47] [38 83] [31 63] [22 67] [31 95] [7 23] [20 10] [37 5] [6 31] [37 80] [36 87] [58 44] [7 41] [34 73] [16 12] [21 96] [54 47] [14 77] [14 13] [38 82] [20 96] [16 75] [8 46] [30 96] [17 57] [15 91] [33 70] [14 80] [6 40] [25 97] [18 72] [28 97] [29 6] [7 24] [20 70] [33 69] [57 45] [33 5] [23 66] [14 86] [17 95] [8 45] [14 54] [24 8] [15 13] [36 76] [25 64] [11 51] [41 55] [40 56] [35 60] [6 36] [36 89] [16 74] [19 59] [9 48] [15 55] [26 64] [34 71] [6 39] [15 76] [8 44] [22 96] [45 53] [19 96] [28 64] [35 74] [17 11] [23 62] [36 88] [35 5] [6 29] [38 58] [8 22] [13 53] [7 27] [20 69] [18 11] [16 94] [8 43]}
+   :start-cells #{}
+   :numseq [[132 72 68 132 72 132 136 72 68 132 72 132 136 136 136 72 132 9 144 136 9 144 136 9 144 9 17 17 17 17 17 18 34 34 34 34 34 36 66 34 34 34 36 68 68 72 136 132 72 136 136 136 136 136 136 136 136 136 136 136 136 144 17 9 144 17 17 17 9 144 17 17 9 144] [9 144 17 33 18 17 17 33 18 17 17 33 18 17 33 18 33 18 33 18 17 33 18 17 17 33 18 17 33 34 2]]}
+
+  (matrix2numseq joc-mat*)
+  ;; => [[2 34 34 34 34 34 34 34 33 18 33 18 33 18 33 18 34 33 18 33 18 33 17 18 33 17 17 144 9 17 144 9 144 9 144 136 136 136 9 144 136 136 136 136 136 136 136 136 136 136 136 72 132 72 132 136 136 136 72 68 132 72 68 68 68 68 68 68 68 68 36 66 68 68 68 196] [[41] [38 34 34 66 36 82]] [[132 72 68 132 72 132 136 72 68 132 72 132 136 136 136 72 132 9 144 136 9 144 136 9 144 9 17 17 17 17 17 18 34 34 34 34 34 36 66 34 34 34 36 68 68 72 136 132 72 136 136 136 136 136 136 136 136 136 136 136 136 144 17 9 144 17 17 17 9 144 17 17 9 144] [9 144 17 33 18 17 17 33 18 17 17 33 18 17 33 18 33 18 33 18 17 33 18 17 17 33 18 17 33 34 2]]]
+  ;;
+  )
+  #+end_src
+
+* 2025-02-28
+
+- am refactorizat converter si am trecut de la numseq la lineseq
+  #+begin_src clojure
+(comment
+
+  (import [cv2 :as cv2])
+
+  (add-tap (bound-fn* utl/print4tap))
+
+  (matrix2lineseq joc-mat*)
+  [
+   [[38 5 2] [37 5 34] [36 5 34] [35 5 34] [34 5 34] [33 5 34] [32 5 34] [31 5 34] [30 5 33] [29 6 18] [28 6 33] [27 7 18] [26 7 33] [25 8 18] [24 8 33] [23 9 18] [22 9 34] [21 9 33] [20 10 18] [19 10 33] [18 11 18] [17 11 33] [16 12 17] [15 13 18] [14 13 33] [13 14 17] [12 15 17] [11 16 144] [11 17 9] [10 18 17] [9 19 144] [9 20 9] [8 21 144] [8 22 9] [7 23 144] [7 24 136] [7 25 136] [7 26 136] [7 27 9] [6 28 144] [6 29 136] [6 30 136] [6 31 136] [6 32 136] [6 33 136] [6 34 136] [6 35 136] [6 36 136] [6 37 136] [6 38 136] [6 39 136] [6 40 72] [7 41 132] [7 42 72] [8 43 132] [8 44 136] [8 45 136] [8 46 136] [8 47 72] [9 48 68] [10 49 132] [10 50 72] [11 51 68] [12 52 68] [13 53 68] [14 54 68] [15 55 68] [16 56 68] [17 57 68] [18 58 68] [19 59 36] [20 59 66] [21 60 68] [22 61 68] [23 62 68] [24 63 196]]
+   [[[24 64 41]]
+    [[25 64 38] [26 64 34] [27 64 34] [28 64 66] [29 65 36] [30 65 82]]]
+   [[[31 66 132] [31 67 72] [32 68 68] [33 69 132] [33 70 72] [34 71 132] [34 72 136] [34 73 72] [35 74 68] [36 75 132] [36 76 72] [37 77 132] [37 78 136] [37 79 136] [37 80 136] [37 81 72] [38 82 132] [38 83 9] [37 84 144] [37 85 136] [37 86 9] [36 87 144] [36 88 136] [36 89 9] [35 90 144] [35 91 9] [34 92 17] [33 93 17] [32 94 17] [31 95 17] [30 96 17] [29 97 18] [28 97 34] [27 97 34] [26 97 34] [25 97 34] [24 97 34] [23 97 36] [22 96 66] [21 96 34] [20 96 34] [19 96 34] [18 96 36] [17 95 68] [16 94 68] [15 93 72] [15 92 136] [15 91 132] [14 90 72] [14 89 136] [14 88 136] [14 87 136] [14 86 136] [14 85 136] [14 84 136] [14 83 136] [14 82 136] [14 81 136] [14 80 136] [14 79 136] [14 78 136] [14 77 144] [15 76 17] [16 75 9] [16 74 144] [17 73 17] [18 72 17] [19 71 17] [20 70 9] [20 69 144] [21 68 17] [22 67 17] [23 66 9] [23 65 144]]
+    [[31 64 9] [31 63 144] [32 62 17] [33 61 33] [34 61 18] [35 60 17] [36 59 17] [37 58 33] [38 58 18] [39 57 17] [40 56 17] [41 55 33] [42 55 18] [43 54 17] [44 53 33] [45 53 18] [46 52 33] [47 52 18] [48 51 33] [49 51 18] [50 50 17] [51 49 33] [52 49 18] [53 48 17] [54 47 17] [55 46 33] [56 46 18] [57 45 17] [58 44 33] [59 44 34] [60 44 2]]]]
+
+  (defn build-model
+    [fileimage]
+    (let [mat* (image2matrix (cv2/imread fileimage))
+          lineseq* (matrix2lineseq mat*)]
+      {:mat* mat*
+       :lineseq* lineseq*}))
+  
+  (def o-model (build-model "tmp/templates/word021.png"))
+  
+  (:lineseq* o-model)
+  [[[6 20 144]]
+   [[[7 19 17] [8 18 17] [9 17 9] [9 16 144] [10 15 9] [10 14 144] [11 13 9] [11 12 144] [12 11 17] [13 10 17] [14 9 17] [15 8 17] [16 7 17] [17 6 33] [18 6 18] [19 5 33] [20 5 34] [21 5 34] [22 5 34] [23 5 34] [24 5 34] [25 5 66] [26 6 36] [27 6 34] [28 6 34] [29 6 34] [30 6 66] [31 7 68] [32 8 68] [33 9 68] [34 10 68] [35 11 68] [36 12 132] [36 13 72] [37 14 132] [37 15 72] [38 16 5] [37 17 144] [37 18 136] [37 19 136] [37 20 9] [36 21 144] [36 22 136] [36 23 136] [36 24 9] [35 25 144] [35 26 136] [35 27 9] [34 28 144] [34 29 9] [33 30 17] [32 31 144] [32 32 9] [31 33 17] [30 34 17] [29 35 17] [28 36 17] [27 37 18] [26 37 33] [25 38 18] [24 38 34] [23 38 34] [22 38 33] [21 39 18] [20 39 34] [19 39 34] [18 39 34] [17 39 33] [16 40 18] [15 40 34] [14 40 34] [13 40 34] [12 40 34] [11 40 34] [10 40 34] [9 40 36] [8 39 68] [7 38 68] [6 37 72] [6 36 136] [6 35 136] [6 34 136] [6 33 136] [6 32 136] [6 31 136] [6 30 136] [6 29 136] [6 28 136] [6 27 136] [6 26 136] [6 25 136] [6 24 136] [6 23 136] [6 22 136] [6 21 136]]]]
+  
+  (def a-model (build-model "tmp/templates/word015.png"))
+
+  (:lineseq* a-model)
+  [[[6 16 144]]
+   [[[6 17 136] [6 18 136] [6 19 136] [6 20 136] [6 21 136] [6 22 72] [7 23 68] [8 24 36] [9 24 34] [10 24 66] [11 25 36] [12 25 34] [13 25 34] [14 25 18] [15 24 33] [16 24 34] [17 24 18] [18 23 33] [19 23 18] [20 22 17] [21 21 17] [22 20 9] [22 19 144] [23 18 9] [23 17 136] [23 16 136] [23 15 136] [23 14 144] [24 13 9] [24 12 132] [23 11 72] [23 10 132] [22 9 68] [21 8 68] [20 7 66] [19 7 36] [18 6 68] [17 5 66] [16 5 34] [15 5 34] [14 5 34] [13 5 33] [12 6 17] [11 7 17] [10 8 17] [9 9 17] [8 10 144] [8 11 9] [7 12 144] [7 13 136] [7 14 136] [7 15 9]]]]
+
+  (def joc-model (build-model "tmp/templates/word002.png"))
+
+  (:lineseq* joc-model)
+  [[[38 5 2] [37 5 34] [36 5 34] [35 5 34] [34 5 34] [33 5 34] [32 5 34] [31 5 34] [30 5 33] [29 6 18] [28 6 33] [27 7 18] [26 7 33] [25 8 18] [24 8 33] [23 9 18] [22 9 34] [21 9 33] [20 10 18] [19 10 33] [18 11 18] [17 11 33] [16 12 17] [15 13 18] [14 13 33] [13 14 17] [12 15 17] [11 16 144] [11 17 9] [10 18 17] [9 19 144] [9 20 9] [8 21 144] [8 22 9] [7 23 144] [7 24 136] [7 25 136] [7 26 136] [7 27 9] [6 28 144] [6 29 136] [6 30 136] [6 31 136] [6 32 136] [6 33 136] [6 34 136] [6 35 136] [6 36 136] [6 37 136] [6 38 136] [6 39 136] [6 40 72] [7 41 132] [7 42 72] [8 43 132] [8 44 136] [8 45 136] [8 46 136] [8 47 72] [9 48 68] [10 49 132] [10 50 72] [11 51 68] [12 52 68] [13 53 68] [14 54 68] [15 55 68] [16 56 68] [17 57 68] [18 58 68] [19 59 36] [20 59 66] [21 60 68] [22 61 68] [23 62 68] [24 63 196]]
+   [[[24 64 41]]
+    [[25 64 38] [26 64 34] [27 64 34] [28 64 66] [29 65 36] [30 65 82]]]
+   [[[31 66 132] [31 67 72] [32 68 68] [33 69 132] [33 70 72] [34 71 132] [34 72 136] [34 73 72] [35 74 68] [36 75 132] [36 76 72] [37 77 132] [37 78 136] [37 79 136] [37 80 136] [37 81 72] [38 82 132] [38 83 9] [37 84 144] [37 85 136] [37 86 9] [36 87 144] [36 88 136] [36 89 9] [35 90 144] [35 91 9] [34 92 17] [33 93 17] [32 94 17] [31 95 17] [30 96 17] [29 97 18] [28 97 34] [27 97 34] [26 97 34] [25 97 34] [24 97 34] [23 97 36] [22 96 66] [21 96 34] [20 96 34] [19 96 34] [18 96 36] [17 95 68] [16 94 68] [15 93 72] [15 92 136] [15 91 132] [14 90 72] [14 89 136] [14 88 136] [14 87 136] [14 86 136] [14 85 136] [14 84 136] [14 83 136] [14 82 136] [14 81 136] [14 80 136] [14 79 136] [14 78 136] [14 77 144] [15 76 17] [16 75 9] [16 74 144] [17 73 17] [18 72 17] [19 71 17] [20 70 9] [20 69 144] [21 68 17] [22 67 17] [23 66 9] [23 65 144]]
+    [[31 64 9] [31 63 144] [32 62 17] [33 61 33] [34 61 18] [35 60 17] [36 59 17] [37 58 33] [38 58 18] [39 57 17] [40 56 17] [41 55 33] [42 55 18] [43 54 17] [44 53 33] [45 53 18] [46 52 33] [47 52 18] [48 51 33] [49 51 18] [50 50 17] [51 49 33] [52 49 18] [53 48 17] [54 47 17] [55 46 33] [56 46 18] [57 45 17] [58 44 33] [59 44 34] [60 44 2]]]]
+  
+  (def ale-model (build-model "tmp/templates/word000.png"))
+
+  (:lineseq* ale-model)
+  [[[8 73 1] [7 74 17] [6 75 144] [6 76 136] [6 77 136] [6 78 136] [6 79 136] [6 80 136] [6 81 72] [7 82 132] [7 83 136] [7 84 72] [8 85 68] [9 86 68] [10 87 36] [11 87 66] [12 88 68] [13 89 36] [14 89 34] [15 89 34] [16 89 34] [17 89 18] [18 88 33] [19 88 18] [20 87 9] [20 86 144] [21 85 17] [22 84 9] [22 83 136] [22 82 136] [22 81 144] [23 80 17] [24 79 9] [24 78 136] [24 77 144] [25 76 9] [25 75 136] [25 74 144] [26 73 9] [26 72 136] [26 71 136] [26 70 144] [27 69 9] [27 68 136] [27 67 136] [27 66 136] [27 65 144] [28 64 9] [28 63 144] [29 62 9] [29 61 144] [30 60 9] [30 59 136] [30 58 144] [31 57 9] [31 56 136] [31 55 136] [31 54 144] [32 53 9] [32 52 144] [33 51 9] [33 50 136] [33 49 136] [33 48 144] [34 47 9] [34 46 136] [34 45 136] [34 44 144] [35 43 17] [36 42 9] [36 41 136] [36 40 136] [36 39 144] [37 38 9] [37 37 136] [37 36 144] [38 35 9] [38 34 144] [39 33 9] [39 32 144] [40 31 9] [40 30 136] [40 29 144] [41 28 9] [41 27 144] [42 26 9] [42 25 136] [42 24 132] [41 23 84]]
+   [[[42 22 17] [43 21 9] [43 20 144] [44 19 17] [45 18 9] [45 17 136] [45 16 144] [46 15 9] [46 14 136] [46 13 136] [46 12 144] [47 11 5] [46 10 72] [46 9 132] [45 8 68] [44 7 66] [43 7 36] [42 6 66] [41 6 34] [40 6 34] [39 6 34] [38 6 34] [37 6 33] [36 7 17] [35 8 17] [34 9 17] [33 10 144] [33 11 136] [33 12 9] [32 13 144] [32 14 136] [32 15 136] [32 16 72] [33 17 132] [33 18 72] [34 19 68] [35 20 68] [36 21 36] [37 21 34] [38 21 66] [39 22 36] [40 22 66]]]]
+  
+  (def pi-model (build-model "tmp/templates/word001.png"))
+
+  (def sat-model (build-model "tmp/templates/word005.png"))
+
+  (def om-model (build-model "tmp/templates/word006.png"))
+
+  (def am-model (build-model "tmp/templates/word004.png"))
+
+  (def pat-model (build-model "tmp/templates/word007.png"))
+
+  (def pot-model (build-model "tmp/templates/word008.png"))
+
+  (def por-model (build-model "tmp/templates/word009.png"))
+  (def tata-model (build-model "tmp/templates/word010.png"))
+  (def ta-model (build-model "tmp/templates/word011.png"))
+  (def ap-model (build-model "tmp/templates/word012.png"))
+  (def j-model (build-model "tmp/templates/word013.png"))
+  (def s-model (build-model "tmp/templates/word014.png"))
+  (def o-model (build-model "tmp/templates/word021.png"))
+  (def a-model (build-model "tmp/templates/word015.png"))
+  (def i-model (build-model "tmp/templates/word016.png"))
+  (def m-model (build-model "tmp/templates/word017.png"))
+  (def n-model (build-model "tmp/templates/word018.png"))
+  (def tz-model (build-model "tmp/templates/word019.png"))
+  (def e-model (build-model "tmp/templates/word020.png"))
+  (def t-model (build-model "tmp/templates/word022.png"))
+  (def p-model (build-model "tmp/templates/word023.png"))
+  (def l-model (build-model "tmp/templates/word024.png"))
+  (def f-model (build-model "tmp/templates/word025.png"))
+  (def c-model (build-model "tmp/templates/word026.png"))
+  ;;
+  )
+
+      
+
+  #+end_src
+
+* 2025-03-01
+
+- reguli de procesare linseq:
+  1. celula finala este vecina cu celula initiala => ltype = 0
+  2. secventa paralela: celula finala din s1 este vecina cu celula initiala  din s2 si s1 este ltype 1 => s = s1 + s2
+  3. secvente paralela: celula initiala din s1 este vecina cu celula initiala din s2 si celula finala din s1 este vecina cu celula finala din s2 => s = s1 + (invers s2) si ltype = 0
+  #+begin_src clojure
+  (defn neighbors?
+    [[x1 y1 _] [x2 y2 _]]
+    (<= (+ (abs (- x1 x2))  (abs (- y1 y2))) 2))
+  
+
+  (neighbors? [41 23 84] [42 22 17])
+  ;; => true
+
+  ;; rules
+  (defn get-ltype
+    [lseq]
+    (if (neighbors? (first lseq) (last lseq)) 0 1))
+
+  (defn continuation?
+    [lseq1 lseq2]
+    (and (= (get-ltype lseq1) 1)
+         (neighbors? (last lseq1) (first lseq2))))
+  
+  (defn loop?
+    [lseq1 lseq2]
+    (and (= (get-ltype lseq1) 1)
+         (= (get-ltype lseq2) 1)
+         (neighbors? (first lseq1) (first lseq2))
+         (neighbors? (last lseq1) (last lseq2))))
+  #+end_src
+
+* 2025-03-03
+
+- implementez un proces de "curatare" a lineseq
+  #+begin_src clojure
+(comment
+
+  (import [cv2 :as cv2])
+
+  (add-tap (bound-fn* utl/print4tap))
+
+  
+  (def o-model (build-model "tmp/templates/word021.png"))
+  
+  (def a-model (build-model "tmp/templates/word015.png"))
+
+  (def joc-model (build-model "tmp/templates/word002.png"))
+
+  (def ale-model (build-model "tmp/templates/word000.png"))
+
+  (def pi-model (build-model "tmp/templates/word001.png"))
+
+  (def sat-model (build-model "tmp/templates/word005.png"))
+
+  (def om-model (build-model "tmp/templates/word006.png"))
+
+  (def am-model (build-model "tmp/templates/word004.png"))
+
+  (def pat-model (build-model "tmp/templates/word007.png"))
+
+  (def pot-model (build-model "tmp/templates/word008.png"))
+
+  (def por-model (build-model "tmp/templates/word009.png"))
+  (def tata-model (build-model "tmp/templates/word010.png"))
+  (def ta-model (build-model "tmp/templates/word011.png"))
+  (def ap-model (build-model "tmp/templates/word012.png"))
+  (def j-model (build-model "tmp/templates/word013.png"))
+  (def s-model (build-model "tmp/templates/word014.png"))
+  (def o-model (build-model "tmp/templates/word021.png"))
+  (def a-model (build-model "tmp/templates/word015.png"))
+  (def i-model (build-model "tmp/templates/word016.png"))
+  (def m-model (build-model "tmp/templates/word017.png"))
+  (def n-model (build-model "tmp/templates/word018.png"))
+  (def tz-model (build-model "tmp/templates/word019.png"))
+  (def e-model (build-model "tmp/templates/word020.png"))
+  (def t-model (build-model "tmp/templates/word022.png"))
+  (def p-model (build-model "tmp/templates/word023.png"))
+  (def l-model (build-model "tmp/templates/word024.png"))
+  (def f-model (build-model "tmp/templates/word025.png"))
+  (def c-model (build-model "tmp/templates/word026.png"))
+
+
+  (defn neighbors?
+    [[x1 y1 _] [x2 y2 _]]
+    (<= (+ (abs (- x1 x2))  (abs (- y1 y2))) 2))
+  
+
+  (neighbors? [41 23 84] [42 22 17])
+  ;; => true
+
+  ;; rules
+  (defn get-ltype
+    [lseq]
+    (if (neighbors? (first lseq) (last lseq)) 0 1))
+
+  (defn continuation?
+    [lseq1 lseq2]
+    (neighbors? (last lseq1) (first lseq2)))
+  
+  (defn loop?
+    [lseq1 lseq2]
+    (and (neighbors? (first lseq1) (first lseq2))
+         (neighbors? (last lseq1) (last lseq2))))
+
+
+  (def lineseqs (:lineseq* joc-model))
+  (count lineseqs)
+  ;; => 3
+
+  (count (first lineseqs))
+  ;; => 76
+  
+  (count (second lineseqs))
+  ;; => 2
+  
+  (defn nested-levels [v]
+    (if (vector? v)
+      (if (empty? v)
+        1
+        (let [max-nested (apply max (map nested-levels v))]
+          (inc max-nested)))
+      0))
+
+  ;; Usage examples
+  (nested-levels [1 2 3])               ; => 1
+  (nested-levels [[1 2] [3 [4 5]]])     ; => 2
+  (nested-levels [[[1]] [[2]]])         ; => 3
+  (nested-levels "not a vector")        ; => 0
+
+  (nested-levels lineseqs)
+  ;; => 4
+
+  (nested-levels (first lineseqs))
+  ;; => 2
+
+  (nested-levels (second lineseqs))
+  ;; => 3
+
+  (nested-levels (last lineseqs))
+  ;; => 3
+
+  (into [[1 2 3] [4 5 6]])
+
+  (filter identity [1 nil 2 3 4 nil])
+  ;; => (1 2 3 4)
+
+  (defn parallel-lineseq?
+    [lseq]
+    (= (nested-levels lseq) 3))
+
+  (defn process-lineseq
+    [{:keys [prev res modifs-count]} lseq]
+    (if-not (parallel-lineseq? lseq)
+      (cond
+        (= (get-ltype lseq) 0)
+        {:prev nil
+         :res (filterv identity  (conj res prev lseq))
+         :modifs-count modifs-count}
+        (and prev (continuation? prev lseq))
+        {:prev (into prev lseq)
+         :res res
+         :modifs-count (inc modifs-count)}
+        :else
+        {:prev lseq
+         :res (filterv identity (conj res prev))
+         :modifs-count modifs-count})
+      (let [[lseq1 lseq2] lseq]
+        (cond
+          (= (or (get-ltype lseq1) 0) (= (get-ltype lseq2) 0))
+          {:prev nil
+           :res (filterv identity  (conj res prev lseq1 lseq2))
+           :modifs-count modifs-count}
+          (and prev (continuation? prev lseq1))
+          {:prev lseq2
+           :res (filterv identity  (conj res (into prev lseq1)))
+           :modifs-count (inc modifs-count)}
+          (loop? lseq1 lseq2)
+          {:prev nil
+           :res (filterv identity  (conj res prev (into lseq1 (rseq lseq2))))
+           :modifs-count modifs-count}
+          :else
+          {:prev lseq2
+           :res (filterv identity  (conj res prev lseq1))
+           :modifs-count modifs-count}))))
+
+  (defn format-lineseq
+    [lineseq]
+    (let [{:keys [prev res modifs-count] :as acc} (reduce process-lineseq
+                                                          {:prev nil
+                                                           :res []
+                                                           :modifs-count 0}
+                                                          lineseq)
+          new-lineseq (filterv identity (conj res prev))]
+      (tap> acc)
+      (if (zero? modifs-count)
+        (mapv (fn [ls] {:ltype (get-ltype ls) :line (mapv #(subvec % 0 2) ls) :numseq (mapv last ls)}) new-lineseq)
+        (format-lineseq new-lineseq))))
+
+  (def lseqs2  (format-lineseq lineseqs))
+  lseqs2
+
+  (utl/show-matrix (utl/cells2matrix [100 100] (-> lseqs2
+                                                   second
+                                                   :line)))
+
+  (defn build-model
+    [fileimage]
+    (let [mat* (image2matrix (cv2/imread fileimage))
+          lineseq* (matrix2lineseq mat*)
+          lineseq (format-lineseq lineseq*)
+          model {:lineseq* lineseq*
+                 :lineseq lineseq}]
+      (tap> model)
+      (doseq [ls lineseq]
+        (utl/show-matrix (utl/cells2matrix [100 100] (:line ls))))
+      (assoc model :mat* mat*)))
+  
+
+  (def o-model (build-model "tmp/templates/word021.png"))
+  
+
+  
+  
+
+  ;;
+  )
+  #+end_src
+
+* 2025-03-04
+
+- bug secventa paralela cu o singura ramura (converter.lpy):
+  #+begin_src clojure
+(comment
+
+  (import [cv2 :as cv2])
+
+  (add-tap (bound-fn* utl/print4tap))
+
+  
+
+  (defn neighbors?
+    [[x1 y1 _] [x2 y2 _]]
+    (<= (+ (abs (- x1 x2))  (abs (- y1 y2))) 2))
+  
+
+  (neighbors? [41 23 84] [42 22 17])
+  ;; => true
+
+  ;; rules
+  (defn get-ltype
+    [lseq]
+    (if (and (> (count lseq) 1) (neighbors? (first lseq) (last lseq))) 0 1))
+
+  (defn continuation?
+    [lseq1 lseq2]
+    (neighbors? (last lseq1) (first lseq2)))
+  
+  (defn loop?
+    [lseq1 lseq2]
+    (and (neighbors? (first lseq1) (first lseq2))
+      (neighbors? (last lseq1) (last lseq2))))
+
+
+  (defn nested-levels [v]
+    (if (vector? v)
+      (if (empty? v)
+        1
+        (let [max-nested (apply max (map nested-levels v))]
+          (inc max-nested)))
+      0))
+
+  ;; Usage examples
+  (nested-levels [1 2 3])               ; => 1
+  (nested-levels [[1 2] [3 [4 5]]])     ; => 2
+  (nested-levels [[[1]] [[2]]])         ; => 3
+  (nested-levels "not a vector")        ; => 0
+
+  (nested-levels [[6 16 144]])
+  ;; => 2
+
+  (parallel-lineseq? [[6 16 144]])
+  
+  (get-ltype [[6 16 144]])
+  ;; => 1
+
+  (count [[6 16 144]])
+  ;; => 1
+  
+  
+  (defn parallel-lineseq?
+    [lseq]
+    (= (nested-levels lseq) 3))
+
+  (defn parallel2liniar
+    "Transform a one line parallel sequence into a liniar sequence"
+    [lseq]
+    (if (and (parallel-lineseq? lseq) (= (count lseq) 1))
+      (first lseq)
+      lseq))
+  
+
+
+
+
+  
+  (defn process-lineseq
+    [{:keys [prev res modifs-count] :as state} line-seq]
+    (tap> (-> state
+            (dissoc :res)
+            (assoc :lseq line-seq)))
+    (let [lseq (parallel2liniar line-seq)]
+      (if (parallel-lineseq? lseq)
+        (let [[lseq1 lseq2] lseq]
+          (cond
+            (= (or (get-ltype lseq1) 0) (= (get-ltype lseq2) 0))
+            {:prev nil
+             :res (filterv identity  (conj res prev lseq1 lseq2))
+             :modifs-count modifs-count}
+            (loop? lseq1 lseq2)
+            {:prev nil
+             :res (filterv identity  (conj res prev (into lseq1 (rseq lseq2))))
+             :modifs-count modifs-count}
+            :else
+            {:prev lseq2
+             :res (filterv identity  (conj res prev lseq1))
+             :modifs-count modifs-count}))
+        (cond
+        (= (get-ltype lseq) 0)
+        {:prev nil
+         :res (filterv identity  (conj res prev lseq))
+         :modifs-count modifs-count}
+        (= (count prev) 1) ; single cell prev, add it to the lseq
+        {:prev (into prev lseq)
+         :res res
+         :modifs-count (inc modifs-count)}
+        (and prev (loop? prev lseq))
+        {:prev nil
+         :res (filterv identity  (conj res (into prev (rseq lseq))))
+         :modifs-count (inc modifs-count)}
+        :else
+        {:prev lseq
+         :res (filterv identity (conj res prev))
+         :modifs-count modifs-count}))))
+
+  (defn format-lineseq
+    [lineseq]
+    (let [{:keys [prev res modifs-count] :as acc} (reduce process-lineseq
+                                                    {:prev nil
+                                                     :res []
+                                                     :modifs-count 0}
+                                                    lineseq)
+          new-lineseq (filterv identity (conj res prev))]
+      (tap> acc)
+      (if (zero? modifs-count)
+        (mapv (fn [ls] {:ltype (get-ltype ls) :line (mapv #(subvec % 0 2) ls) :numseq (mapv last ls)}) new-lineseq)
+        (format-lineseq new-lineseq))))
+
+
+  (defn build-model
+    [fileimage]
+    (let [mat* (image2matrix (cv2/imread fileimage))
+          lineseq* (matrix2lineseq mat*)
+          _ (tap> {:lineseq* lineseq*})
+          lineseq (format-lineseq lineseq*)
+          model {:lineseq lineseq}]
+      (tap> model)
+      (doseq [ls lineseq]
+        (utl/show-matrix (utl/cells2matrix [100 100] (:line ls))))
+      (assoc model
+        :mat* mat*
+        :lineseq* lineseq*)))
+
+  
+
+  (def a-model (build-model "tmp/templates/word015.png"))
+  (def ale-model (build-model "tmp/templates/word000.png"))
+  (def am-model (build-model "tmp/templates/word004.png"))
+  (def ap-model (build-model "tmp/templates/word012.png"))
+  (def c-model (build-model "tmp/templates/word026.png"))
+  (def e-model (build-model "tmp/templates/word020.png"))
+  (def f-model (build-model "tmp/templates/word025.png"))
+  (def i-model (build-model "tmp/templates/word016.png"))
+  (def j-model (build-model "tmp/templates/word013.png"))
+  (def joc-model (build-model "tmp/templates/word002.png"))
+  (def l-model (build-model "tmp/templates/word024.png"))
+  (def m-model (build-model "tmp/templates/word017.png"))
+  (def mos-model (build-model "tmp/templates/word003.png"))
+  (def n-model (build-model "tmp/templates/word018.png"))
+  (def o-model (build-model "tmp/templates/word021.png"))
+  (def om-model (build-model "tmp/templates/word006.png"))
+  (def p-model (build-model "tmp/templates/word023.png"))
+  (def pat-model (build-model "tmp/templates/word007.png"))
+  (def pi-model (build-model "tmp/templates/word001.png"))
+  (def por-model (build-model "tmp/templates/word009.png"))
+  (def pot-model (build-model "tmp/templates/word008.png"))
+  (def s-model (build-model "tmp/templates/word014.png"))
+  (def sat-model (build-model "tmp/templates/word005.png"))
+  (def t-model (build-model "tmp/templates/word022.png"))
+  (def ta-model (build-model "tmp/templates/word011.png"))
+  (def tata-model (build-model "tmp/templates/word010.png"))
+  (def tz-model (build-model "tmp/templates/word019.png"))
+
+  ;;
+  )
+  #+end_src
+
+* 2025-03-05
+   #+begin_src clojure
+(comment
+
+  (import [cv2 :as cv2])
+
+  (add-tap (bound-fn* utl/print4tap))
+
+  (defn reverse-loop?
+    "True if the 2 line sequences build a loop, second lseq is reversed"
+    [lseq1 lseq2]
+    (and (neighbors? (first lseq1) (last lseq2))
+      (neighbors? (last lseq1) (first lseq2))))
+
+
+  
+  (defn process-lineseq
+    [{:keys [prev res modifs-count]} line-seq]
+    (tap> {:lseq line-seq})
+    (tap> {:modifs-count modifs-count})
+    (tap> {:prev prev})
+    (tap> {:res res})
+    (let [lseq (parallel2liniar line-seq)]
+      (if (parallel-lineseq? lseq)
+        (let [[lseq1 lseq2] lseq]
+          (cond
+            (= (or (get-ltype lseq1) 0) (= (get-ltype lseq2) 0))
+            {:prev nil
+             :res (filterv identity  (conj res prev lseq1 lseq2))
+             :modifs-count (inc modifs-count)}
+            (loop? lseq1 lseq2)
+            {:prev nil
+             :res (filterv identity  (conj res prev (into lseq1 (rseq lseq2))))
+             :modifs-count (inc modifs-count)}
+            :else
+            {:prev lseq2
+             :res (filterv identity  (conj res prev lseq1))
+             :modifs-count (inc modifs-count)}))
+        (cond
+          (= (get-ltype lseq) 0)
+          {:prev nil
+           :res (filterv identity  (conj res prev lseq))
+           :modifs-count modifs-count}
+          (small-lineseq? prev) ; small  prev, add it to the lseq
+          {:prev (into prev lseq)
+           :res res
+           :modifs-count (inc modifs-count)}
+          (and prev (loop? prev lseq))
+          {:prev nil
+           :res (filterv identity  (conj res (into prev (rseq lseq))))
+           :modifs-count (inc modifs-count)}
+          (and prev (reverse-loop? prev lseq))
+          {:prev nil
+           :res (filterv identity  (conj res (into prev lseq)))
+           :modifs-count (inc modifs-count)}
+          :else
+          {:prev lseq
+           :res (filterv identity (conj res prev))
+           :modifs-count modifs-count}))))
+
+  (defn format-lineseq
+    [lineseq]
+    (let [{:keys [prev res modifs-count]} (reduce process-lineseq
+                                            {:prev nil
+                                             :res []
+                                             :modifs-count 0}
+                                            lineseq)
+          new-lineseq (filterv identity (conj res prev))]
+      (tap> {:modifs modifs-count
+             :lineseq new-lineseq})
+      (if (zero? modifs-count)
+        (mapv (fn [ls] {:ltype (get-ltype ls) :line (mapv #(subvec % 0 2) ls) :numseq (mapv last ls)}) new-lineseq)
+        (format-lineseq new-lineseq))))
+
+  
+  (defn build-model
+    [fileimage]
+    (let [mat* (image2matrix (cv2/imread fileimage))
+          lineseq* (matrix2lineseq mat*)
+          _ (tap> {:lineseq* lineseq*})
+          lineseq (format-lineseq lineseq*)
+          model {:lineseq lineseq}]
+      (tap> model)
+      (doseq [ls lineseq]
+        (utl/show-matrix (utl/cells2matrix [100 100] (:line ls))))
+      (assoc model
+        :mat* mat*
+        :lineseq* lineseq*)))
+
+  (small-lineseq? [])
+  (small-lineseq? nil)
+  
+
+  (def a-model (build-model "tmp/templates/word015.png"))
+  (def ale-model (build-model "tmp/templates/word000.png"))
+  (def am-model (build-model "tmp/templates/word004.png"))
+  (def ap-model (build-model "tmp/templates/word012.png"))
+  (def c-model (build-model "tmp/templates/word026.png"))
+  (def e-model (build-model "tmp/templates/word020.png"))
+  (def f-model (build-model "tmp/templates/word025.png"))
+  (def i-model (build-model "tmp/templates/word016.png"))
+  (def j-model (build-model "tmp/templates/word013.png"))
+  (def joc-model (build-model "tmp/templates/word002.png"))
+  (def l-model (build-model "tmp/templates/word024.png"))
+  (def m-model (build-model "tmp/templates/word017.png"))
+  (def mos-model (build-model "tmp/templates/word003.png"))
+  (def n-model (build-model "tmp/templates/word018.png"))
+  (def o-model (build-model "tmp/templates/word021.png"))
+  (def om-model (build-model "tmp/templates/word006.png"))
+  
+  (def p-model (build-model "tmp/templates/word023.png"))
+  (def pat-model (build-model "tmp/templates/word007.png"))
+  (def pi-model (build-model "tmp/templates/word001.png"))
+  (def por-model (build-model "tmp/templates/word009.png"))
+  (def pot-model (build-model "tmp/templates/word008.png"))
+  (def s-model (build-model "tmp/templates/word014.png"))
+  (def sat-model (build-model "tmp/templates/word005.png"))
+  (def t-model (build-model "tmp/templates/word022.png"))
+  (def ta-model (build-model "tmp/templates/word011.png"))
+  (def tata-model (build-model "tmp/templates/word010.png"))
+  (def tz-model (build-model "tmp/templates/word019.png"))
+
+  (def lseq
+    [[[62 29 8] [62 28 136] [62 27 136] [62 26 136] [62 25 136] [62 24 132] [61 23 72] [61 22 136] [61 21 136] [61 20 136] [61 19 136] [61 18 132] [60 17 72] [60 16 136] [60 15 132] [59 14 68] [58 13 68] [57 12 68] [56 11 68] [55 10 66] [54 10 36] [53 9 68] [52 8 66] [51 8 34] [50 8 34] [49 8 36] [48 7 66] [47 7 34] [46 7 34] [45 7 34] [44 7 34] [43 7 34] [42 7 36] [41 6 66] [40 6 34] [39 6 34] [38 6 34] [37 6 34] [36 6 34] [35 6 34] [34 6 34] [33 6 34] [32 6 34] [31 6 33] [30 7 18] [29 7 34] [28 7 33] [27 8 18] [26 8 33] [25 9 18] [24 9 33] [23 10 17] [22 11 17] [21 12 17] [20 13 144] [20 14 9] [19 15 145]]
+     [[[19 16 74]] [[18 16 50] [17 16 34] [16 16 34] [15 16 34] [14 16 33] [13 17 18] [12 17 33] [11 18 17] [10 19 17] [9 20 144] [9 21 9] [8 22 17] [7 23 17] [6 24 144] [6 25 136] [6 26 136] [6 27 136] [6 28 136] [6 29 136] [6 30 136] [6 31 136] [6 32 136] [6 33 136] [6 34 136] [6 35 72] [7 36 132] [7 37 136] [7 38 136] [7 39 72] [8 40 68] [9 41 68] [10 42 68] [11 43 68] [12 44 68] [13 45 68] [14 46 36] [15 46 66] [16 47 36] [17 47 34] [18 47 34] [19 47 34] [20 47 34] [21 47 18] [22 46 17] [23 45 17] [24 44 33] [25 44 18] [26 43 9] [26 42 144] [27 41 17] [28 40 9] [28 39 144] [29 38 9] [29 37 144] [30 36 9] [30 35 136] [30 34 144] [31 33 9] [31 32 136] [31 31 136] [31 30 136] [31 29 136] [31 28 132] [30 27 72] [30 26 136] [30 25 132] [29 24 68] [28 23 68] [27 22 66] [26 22 34] [25 22 36] [24 21 66] [23 21 36] [22 20 68] [21 19 68] [20 18 72] [20 17 132]]]
+     []]
+
+    )
+  
+  (filterv seq [[1 2 3] []])
+  ;; => [[1 2 3]]
+  
+
+  ;;
+  )
+   #+end_src
+
+* 2025-03-07
+
+- incerc sa stabilesc standard numseq normalizate pentru fiecare litera:
+  #+begin_src clojure
+(import [cv2 :as cv2])
+
+(require
+  '[steno.converter :as cnv]
+  '[steno.utils :as utl])
+
+(add-tap (bound-fn* utl/print4tap))
+
+(defn build-model
+  [fileimage]
+  (let [mat* (cnv/image2matrix (cv2/imread fileimage))
+        lineseq* (cnv/matrix2lineseq mat*)
+        _ (tap> {:lseq* lineseq*})
+        lineseq (cnv/format-lineseq lineseq*)]
+    (tap> {:lseq lineseq})
+    (doseq [ls lineseq]
+      (utl/show-matrix (utl/cells2matrix [100 100] (:line ls))))
+    {:mat* mat*
+     :lseq lineseq
+     :lseq* lineseq*}))
+
+
+(def a-model (build-model "tmp/templates/word015.png"))
+(def ale-model (build-model "tmp/templates/word000.png"))
+(def am-model (build-model "tmp/templates/word004.png"))
+(def ap-model (build-model "tmp/templates/word012.png"))
+(def c-model (build-model "tmp/templates/word026.png"))
+(def e-model (build-model "tmp/templates/word020.png"))
+(def f-model (build-model "tmp/templates/word025.png"))
+(def i-model (build-model "tmp/templates/word016.png"))
+(def j-model (build-model "tmp/templates/word013.png"))
+(def joc-model (build-model "tmp/templates/word002.png"))
+(def l-model (build-model "tmp/templates/word024.png"))
+(def m-model (build-model "tmp/templates/word017.png"))
+(def mos-model (build-model "tmp/templates/word003.png"))
+(def n-model (build-model "tmp/templates/word018.png"))
+(def o-model (build-model "tmp/templates/word021.png"))
+(def om-model (build-model "tmp/templates/word006.png"))
+(def p-model (build-model "tmp/templates/word023.png"))
+(def pat-model (build-model "tmp/templates/word007.png"))
+(def pi-model (build-model "tmp/templates/word001.png"))
+(def por-model (build-model "tmp/templates/word009.png"))
+(def pot-model (build-model "tmp/templates/word008.png"))
+(def s-model (build-model "tmp/templates/word014.png"))
+(def sat-model (build-model "tmp/templates/word005.png"))
+(def t-model (build-model "tmp/templates/word022.png"))
+(def ta-model (build-model "tmp/templates/word011.png"))
+
+(def tata-model (build-model "tmp/templates/word010.png"))
+(def tz-model (build-model "tmp/templates/word019.png"))
+
+
+(defn get-loop-start
+  [line]
+  (reduce (fn [{:keys [min-x min-y min-pos] :as res} [pos [x y]]]
+            (if (or (< x min-x) (and (= x min-x) (< y min-y)))
+              {:min-x x :min-y y :min-pos pos}
+              res))
+          {:min-x (first (first line))
+           :min-y (second (first line))
+           :min-pos 0}
+          (map-indexed list (rest line))))
+
+;; a
+
+(def a-00
+  (-> a-model
+      :lseq
+      first))
+{:line [[6 16] [6 17] [6 18] [6 19] [6 20] [6 21] [6 22] [7 23] [8 24] [9 24] [10 24] [11 25] [12 25] [13 25] [14 25] [15 24] [16 24] [17 24] [18 23] [19 23] [20 22] [21 21] [22 20] [22 19] [23 18] [23 17] [23 16] [23 15] [23 14] [24 13] [24 12] [23 11] [23 10] [22 9] [21 8] [20 7] [19 7] [18 6] [17 5] [16 5] [15 5] [14 5] [13 5] [12 6] [11 7] [10 8] [9 9] [8 10] [8 11] [7 12] [7 13] [7 14] [7 15]]
+:numseq [144 136 136 136 136 136 72 68 36 34 66 36 34 34 18 33 34 18 33 18 17 17 9 144 9 136 136 136 144 9 132 72 132 68 68 66 36 68 66 34 34 34 33 17 17 17 17 144 9 144 136 136 9]
+:normalized-numseq [136 68 34 33 17 136 72 66 33 17 136]
+:ltype 0}
+
+(get-freq a-00)
+{:freq {34 1 66 1 36 1 68 1 136 4 144 1 17 2 18 1} :len 12}
+
+
+(def a-01
+(-> ale-model
+    :lseq
+    second))
+{:line [[33 12] [32 13] [32 14] [32 15] [32 16] [33 17] [33 18] [34 19] [35 20] [36 21] [37 21] [38 21] [39 22] [40 22] [42 22] [43 21] [43 20] [44 19] [45 18] [45 17] [45 16] [46 15] [46 14] [46 13] [46 12] [47 11] [46 10] [46 9] [45 8] [44 7] [43 7] [42 6] [41 6] [40 6] [39 6] [38 6] [37 6] [36 7] [35 8] [34 9] [33 10] [33 11]]
+:numseq [9 144 136 136 72 132 72 68 68 36 34 66 36 66 17 9 144 17 9 136 144 9 136 136 144 5 72 132 68 66 36 66 34 34 34 34 33 17 17 17 144 136]
+:normalized-numseq [136 68 36 17 136 68 34 17 144]
+:ltype 0}
+
+(get-freq a-01)
+;; => {:freq {34 1 66 1 36 1 68 1 72 1 136 2 17 3} :len 10}
+
+
+(def a-02
+(-> am-model
+    :lseq
+    second))
+{:line [[5 32] [5 31] [6 30] [6 29] [6 28] [6 27] [7 26] [8 25] [9 24] [11 24] [12 24] [13 25] [14 26] [15 26] [16 26] [17 26] [18 27] [19 27] [20 28] [21 29] [22 29] [23 30] [23 31] [24 32] [24 33] [24 34] [24 35] [24 36] [24 37] [23 38] [23 39] [22 40] [21 41] [21 42] [20 43] [19 44] [18 45] [17 46] [16 46] [15 46] [14 45] [13 45] [12 45] [11 45] [10 44] [9 44] [8 43] [7 42] [6 41] [5 40] [5 39] [5 38] [5 37] [5 36] [5 35] [5 34] [5 33]]
+:numseq [136 144 9 136 136 144 17 17 17 36 66 68 36 34 34 66 36 66 68 36 66 132 72 132 136 136 136 136 9 144 9 17 144 9 17 17 17 18 34 36 66 34 34 36 66 36 68 68 68 72 136 136 136 136 136 136 136]
+:normalized-numseq [136 17 36 66 132 136 17 18 36 68 136 136]
+:ltype 0}
+
+(get-freq a-02)
+;; => {:freq {66 1 36 2 68 1 132 1 136 4 17 2 18 1} :len 12}
+
+(def a-03
+(-> ap-model
+    :lseq
+    second))
+{:line [[7 9] [6 10] [6 11] [6 12] [6 13] [6 14] [6 15] [6 16] [6 17] [7 18] [8 19] [9 20] [10 21] [11 22] [12 22] [13 23] [14 23] [15 23] [16 23] [17 23] [18 22] [19 21] [20 20] [21 19] [22 18] [22 17] [22 16] [22 15] [23 14] [23 13] [23 12] [23 11] [23 10] [21 8] [20 8] [19 7] [18 6] [17 6] [16 6] [15 6] [14 6] [13 6] [12 6] [11 7] [10 7] [9 7] [8 8]]
+ :numseq [17 144 136 136 136 136 136 136 72 68 68 68 68 36 66 36 34 34 34 18 17 17 17 17 9 136 136 144 9 136 136 136 132 66 36 68 66 34 34 34 34 34 33 18 34 33 17]
+ :normalized-numseq [136 136 68 34 17 136 132 34 34 33]
+ :ltype 0}
+
+(get-freq a-03)
+;; => {:freq {33 1 34 3 68 1 132 1 136 3 17 1} :len 10}
+
+
+(def a-04
+  (-> pat-model
+      :lseq
+      second))
+{:line [[35 10] [35 9] [36 8] [37 7] [38 7] [39 6] [40 6] [41 5] [42 5] [43 5] [44 5] [45 5] [46 6] [47 6] [48 6] [49 7] [50 8] [51 9] [52 10] [52 11] [52 12] [52 13] [52 14] [51 15] [50 15] [49 16] [48 17] [47 17] [46 17] [45 17] [44 17] [43 17] [42 17] [41 17] [40 17] [39 17] [38 18] [37 18] [35 15] [35 14] [35 13] [35 12] [35 11]]
+ :numseq [136 144 17 33 18 33 18 33 34 34 34 66 36 34 66 68 68 68 132 136 136 136 9 18 33 17 18 34 34 34 34 34 34 34 34 33 18 35 9 136 136 136 136]
+ :normalized-numseq [33 33 36 68 33 34 34 33 136]
+ :ltype 0}
+
+(get-freq a-04)
+;; => {:freq {33 4 34 2 36 1 68 1 136 1} :len 9}
+
+
+(def a-05
+  (-> sat-model
+      :lseq
+      second))
+{:line [[7 42] [6 43] [6 44] [7 45] [7 46] [7 47] [7 48] [7 49] [8 50] [9 51] [10 51] [11 51] [12 52] [13 52] [14 52] [15 53] [16 53] [17 53] [18 52] [19 51] [19 50] [19 49] [19 48] [19 47] [19 46] [18 45] [18 44] [18 43] [17 42] [16 41] [15 41] [14 40] [13 40] [12 40] [11 40] [10 40] [9 41] [8 41]]
+ :numseq [17 144 72 132 136 136 136 72 68 36 34 66 36 34 66 36 34 82 17 41 200 136 136 136 132 72 136 132 68 66 36 66 34 34 34 33 18 33]
+ :normalized-numseq [132 72 36 36 136 72 34 33]
+ :ltype 0}
+
+(get-freq a-05)
+;; => {:freq {33 1 34 1 36 2 132 1 72 2 136 1} :len 8}
+
+(def a-06
+  (-> ta-model
+      :lseq
+      second))
+{:line [[7 48] [6 49] [6 50] [6 51] [6 52] [6 53] [6 54] [6 55] [6 56] [6 57] [6 58] [7 59] [8 60] [9 61] [10 62] [11 63] [12 64] [13 64] [14 64] [15 64] [16 64] [17 64] [18 64] [19 64] [20 64] [21 63] [22 62] [23 61] [24 60] [25 59] [25 58] [25 57] [25 56] [24 55] [24 54] [24 53] [24 52] [23 51] [23 50] [22 49] [21 49] [20 49] [19 49] [18 48] [17 48] [16 48] [15 48] [14 47] [13 47] [12 47] [11 47] [10 47] [9 47] [8 47]]
+ :numseq [17 144 136 136 136 136 136 136 136 136 72 68 68 68 68 68 36 34 34 34 34 34 34 34 18 17 17 17 17 9 136 136 132 72 136 136 132 72 132 74 50 34 36 66 34 34 36 66 34 34 34 34 34 33]
+ :normalized-numseq [136 136 68 34 34 17 136 132 36 34 34]
+ :ltype 0}
+
+(get-freq a-06)
+;; => {:freq {34 4 36 1 68 1 132 1 136 3 17 1} :len 11}
+
+
+;; c
+
+(def c-00
+  (-> c-model
+      :lseq
+      first))
+{:line [[6 23] [7 22] [8 22] [9 21] [10 21] [11 20] [12 20] [13 19] [14 18] [15 18] [16 17] [17 17] [18 16] [19 15] [20 15] [21 14] [22 14] [23 13] [24 13] [25 12] [26 12] [27 11] [28 10] [29 10] [30 9] [31 8] [32 8] [33 7] [34 6] [35 5]]
+ :numseq [16 33 18 33 18 33 18 17 33 18 33 18 17 33 18 33 18 33 18 33 18 17 33 18 17 33 18 17 17 1]
+ :normalized-numseq [18 18 18 33 18 17]
+ :ltype 1}
+
+(def c-01
+  (-> joc-model
+      :lseq
+      last))
+{:line [[31 64] [31 63] [32 62] [33 61] [34 61] [35 60] [36 59] [37 58] [38 58] [39 57] [40 56] [41 55] [42 55] [43 54] [44 53] [45 53] [46 52] [47 52] [48 51] [49 51] [50 50] [51 49] [52 49] [53 48] [54 47] [55 46] [56 46] [57 45] [58 44] [59 44] [60 44]]
+ :numseq [9 144 17 33 18 17 17 33 18 17 17 33 18 17 33 18 33 18 33 18 17 33 18 17 17 33 18 17 33 34 2]
+ :normalized-numseq [18 17 18 18 17 33 2]
+ :ltype 1}
+
+
+
+;; e
+
+(def e-00
+  (-> e-model
+      :lseq
+      first))
+{:line [[17 4] [16 5] [15 5] [14 5] [13 6] [12 6] [11 7] [10 7] [9 8] [8 8] [7 9] [6 10] [6 11] [5 12] [5 13] [5 14] [5 15] [5 16] [5 17] [6 18] [7 19] [8 20] [9 20] [10 21] [11 21] [12 22] [13 22] [14 22] [15 23]]
+ :numseq [1 18 34 33 18 33 18 33 18 33 17 144 9 144 136 136 136 136 72 68 68 36 66 36 66 36 34 66 4]
+ :normalized-numseq [18 33 136 136 66 36]
+ :ltype 1}
+
+;; f
+
+(def f-00
+  (-> f-model
+      :lseq
+      first))
+{:line [[6 6] [7 6] [8 7] [9 8] [10 9] [11 10] [12 11] [13 12] [14 13] [15 14] [16 15] [17 16] [18 16] [19 17] [20 17] [21 18] [22 18] [23 19] [24 20] [25 20] [26 21] [27 22] [28 22] [29 23] [30 24] [31 25] [32 25] [33 26] [34 26] [35 27] [36 28] [37 29] [38 29]]
+ :numseq [32 66 68 68 68 68 68 68 68 68 68 36 66 36 66 36 66 68 36 66 68 36 66 68 68 36 66 36 66 68 68 36 2]
+ :normalized-numseq [68 68 66 66 68 66 36]
+ :ltype 1}
+
+;; i
+
+(def i-00
+  (-> i-model
+      :lseq
+      first))
+{:line [[8 5] [9 5] [10 5] [11 5] [12 6] [13 7] [14 7] [15 8] [16 9] [17 10] [18 11] [18 12] [18 13] [19 14] [19 15] [19 16] [19 17] [18 18] [18 19] [17 20] [17 21] [16 22] [16 23] [15 24] [14 25] [13 25] [12 25] [11 26] [10 26] [9 26] [8 26] [7 26] [6 26] [5 26]]
+ :numseq [32 34 34 66 68 36 66 68 68 68 132 136 72 132 136 136 9 144 9 144 9 144 9 17 18 34 33 18 34 34 34 34 34 32]
+ :normalized-numseq [34 68 132 136 17 34 34]
+ :ltype 1}
+
+;; j
+
+(def j-00
+  (-> j-model
+      :lseq
+      first))
+{:line [[30 5] [29 5] [28 5] [27 6] [26 6] [25 7] [24 7] [23 8] [22 9] [21 9] [20 10] [19 10] [18 11] [17 12] [16 13] [15 14] [14 15] [13 16] [12 17] [12 18] [11 19] [11 20] [11 21] [10 22] [10 23] [9 24] [9 25] [8 26] [8 27] [7 28] [7 29] [6 30] [6 31] [6 32] [6 33] [6 34] [6 35] [6 36] [6 37] [6 38] [7 39] [7 40] [7 41] [8 42] [8 43] [9 44] [10 45] [10 46] [11 47] [12 48] [13 49] [14 50] [15 50] [16 51] [17 51] [18 52] [19 52] [20 53] [21 53] [22 54] [23 54] [24 55] [25 56] [26 56] [27 57] [28 57] [29 57] [30 57] [31 58] [32 58] [33 58] [34 59]]
+ :numseq [2 34 33 18 33 18 33 17 18 33 18 33 17 17 17 17 17 17 144 9 144 136 9 144 9 144 9 144 9 144 9 144 136 136 136 136 136 136 136 72 132 136 72 132 72 68 132 72 68 68 68 36 66 36 66 36 66 36 66 36 66 68 36 66 36 34 34 66 36 34 66 4]
+ :normalized-numseq [33 18 17 17 136 144 136 136 132 68 66 36 66 34 66]
+ :ltype 1}
+
+(def j-01
+  (-> joc-model
+      :lseq
+      first))
+{:line [[38 5] [37 5] [36 5] [35 5] [34 5] [33 5] [32 5] [31 5] [30 5] [29 6] [28 6] [27 7] [26 7] [25 8] [24 8] [23 9] [22 9] [21 9] [20 10] [19 10] [18 11] [17 11] [16 12] [15 13] [14 13] [13 14] [12 15] [11 16] [11 17] [10 18] [9 19] [9 20] [8 21] [8 22] [7 23] [7 24] [7 25] [7 26] [7 27] [6 28] [6 29] [6 30] [6 31] [6 32] [6 33] [6 34] [6 35] [6 36] [6 37] [6 38] [6 39] [6 40] [7 41] [7 42] [8 43] [8 44] [8 45] [8 46] [8 47] [9 48] [10 49] [10 50] [11 51] [12 52] [13 53] [14 54] [15 55] [16 56] [17 57] [18 58] [19 59] [20 59] [21 60] [22 61] [23 62] [24 63]]
+ :numseq [2 34 34 34 34 34 34 34 33 18 33 18 33 18 33 18 34 33 18 33 18 33 17 18 33 17 17 144 9 17 144 9 144 9 144 136 136 136 9 144 136 136 136 136 136 136 136 136 136 136 136 72 132 72 132 136 136 136 72 68 132 72 68 68 68 68 68 68 68 68 36 66 68 68 68 196]
+ :normalized-numseq [34 34 33 33 18 17 144 136 136 136 132 136 68 68 68 196]
+ :ltype 1}
+
+;; l
+
+(def l-00
+  (-> l-model
+      :lseq
+      first))
+{:line [[25 6] [25 7] [24 8] [24 9] [24 10] [23 11] [23 12] [23 13] [22 14] [22 15] [21 16] [20 17] [20 18] [20 19] [19 20] [19 21] [19 22] [18 23] [18 24] [17 25] [17 26] [16 27] [16 28] [15 29] [15 30] [14 31] [14 32] [14 33] [13 34] [13 35] [12 36] [12 37] [12 38] [11 39] [11 40] [10 41] [10 42] [9 43] [9 44] [9 45] [8 46] [8 47] [8 48] [7 49] [6 50] [6 51] [5 52]]
+ :numseq [128 9 144 136 9 144 136 9 144 9 17 144 136 9 144 136 9 144 9 144 9 144 9 144 9 144 136 9 144 9 144 136 9 144 9 144 9 144 136 9 144 136 9 17 144 9 16]
+ :normalized-numseq [128 136 136 136 9 136 136 136 136 16]
+ :ltype 1}
+
+;; m
+
+(def m-00
+  (-> m-model
+      :lseq
+      first))
+{:line [[5 33] [5 32] [5 31] [5 30] [5 29] [5 28] [5 27] [6 26] [6 25] [6 24] [6 23] [7 22] [7 21] [8 20] [9 19] [10 18] [11 17] [12 16] [13 15] [14 14] [15 13] [16 12] [17 11] [18 10] [19 9] [20 9] [21 8] [22 8] [23 7] [24 7] [25 7] [26 6] [27 6] [28 5] [29 5] [30 5] [31 5] [32 5] [33 5] [34 5] [35 5] [36 5] [37 5] [38 5] [39 5] [40 6] [41 6] [42 7] [43 7] [44 8] [45 9] [45 10] [46 11] [46 12] [47 13] [47 14] [48 15] [48 16] [48 17] [48 18] [48 19] [49 20] [49 21] [49 22] [49 23] [49 24] [49 25] [49 26] [49 27] [49 28] [48 29] [48 30] [48 31] [48 32] [48 33] [48 34] [47 35] [47 36] [47 37] [47 38] [47 39] [46 40]]
+ :numseq [8 136 136 136 136 136 144 9 136 136 144 9 144 17 17 17 17 17 17 17 17 17 17 17 33 18 33 18 33 34 18 33 18 33 34 34 34 34 34 34 34 34 34 34 66 36 66 36 66 68 132 72 132 72 132 72 132 136 136 136 72 132 136 136 136 136 136 136 136 9 144 136 136 136 136 9 144 136 136 136 9 16]
+ :normalized-numseq [136 136 17 17 17 33 33 34 34 66 132 136 136 136 136 136 16]
+ :ltype 1}
+
+
+(def m-01
+  (-> am-model
+      :lseq
+      first))
+{:line [[54 30] [54 29] [54 28] [54 27] [54 26] [54 25] [54 24] [54 23] [54 22] [54 21] [54 20] [54 19] [54 18] [53 17] [52 16] [52 15] [52 14] [52 13] [52 12] [51 11] [51 10] [50 9] [49 8] [48 8] [47 7] [46 7] [45 7] [44 6] [43 6] [42 6] [41 6] [40 6] [39 6] [38 6] [37 6] [36 6] [35 6] [34 6] [33 6] [32 6] [31 6] [30 6] [29 6] [28 7] [27 7] [26 7] [25 7] [24 7] [23 7] [22 7] [21 7] [20 8] [19 8] [18 9] [17 10] [16 10] [15 11] [14 12] [14 13] [13 14] [13 15] [12 16] [11 17] [11 18] [11 19] [11 20] [10 21] [10 22] [10 23]]
+ :numseq [8 136 136 136 136 136 136 136 136 136 136 136 132 68 72 136 136 136 132 72 132 68 66 36 66 34 36 66 34 34 34 34 34 34 34 34 34 34 34 34 34 34 33 18 34 34 34 34 34 34 33 18 33 17 18 33 17 144 9 144 9 17 144 136 136 9 144 136 73]
+ :normalized-numseq [136 136 132 136 66 34 34 34 34 34 18 33 136 136]
+ :ltype 1}
+
+(def m-02
+  (-> mos-model
+      :lseq
+      first))
+{:line [[6 37] [6 36] [6 35] [6 34] [7 33] [7 32] [7 31] [8 30] [8 29] [9 28] [9 27] [9 26] [10 25] [10 24] [11 23] [11 22] [12 21] [12 20] [13 19] [14 18] [15 17] [15 16] [16 15] [17 14] [17 13] [18 12] [19 11] [19 10] [20 9] [21 8] [22 7] [23 7] [24 6] [25 6] [26 6] [27 6] [28 6] [29 6] [30 6] [31 6] [32 6] [33 6] [34 6] [35 6] [36 6] [37 6] [38 6] [39 6] [40 6] [41 6] [42 6] [43 6] [44 7] [45 7] [46 8] [47 8] [48 8] [49 9] [50 9] [51 10] [52 10] [53 11] [54 12] [55 13] [55 14] [56 15] [57 16] [57 17] [57 18] [57 19] [57 20] [57 21] [57 22] [56 23] [55 24]]
+ :numseq [8 136 136 144 9 136 144 9 144 9 136 144 9 144 9 144 9 144 17 17 9 144 17 9 144 17 9 144 17 17 33 18 33 34 34 34 34 34 34 34 34 34 34 34 34 34 34 34 34 34 34 66 36 66 36 34 66 36 66 36 66 68 68 132 72 68 132 136 136 136 136 136 9 17 82]
+ :normalized-numseq [136 136 136 17 17 17 33 34 34 34 36 36 68 136 82]
+ :ltype 1}
+
+(def m-03
+  (-> om-model
+      :lseq
+      first))
+{:line [[62 29] [62 28] [62 27] [62 26] [62 25] [62 24] [61 23] [61 22] [61 21] [61 20] [61 19] [61 18] [60 17] [60 16] [60 15] [59 14] [58 13] [57 12] [56 11] [55 10] [54 10] [53 9] [52 8] [51 8] [50 8] [49 8] [48 7] [47 7] [46 7] [45 7] [44 7] [43 7] [42 7] [41 6] [40 6] [39 6] [38 6] [37 6] [36 6] [35 6] [34 6] [33 6] [32 6] [31 6] [30 7] [29 7] [28 7] [27 8] [26 8] [25 9] [24 9] [23 10] [22 11] [21 12] [20 13] [20 14] [19 15]]
+ :numseq [8 136 136 136 136 132 72 136 136 136 136 132 72 136 132 68 68 68 68 66 36 68 66 34 34 36 66 34 34 34 34 34 36 66 34 34 34 34 34 34 34 34 34 33 18 34 33 18 33 18 33 17 17 17 144 9 145]
+ :normalized-numseq [136 136 132 68 36 34 34 34 34 33 17 145]
+ :ltype 1}
+
+
+;; n
+(def n-00
+  (-> n-model
+      :lseq
+      first))
+{:line [[6 5] [6 6] [6 7] [6 8] [5 9] [5 10] [5 11] [5 12] [5 13] [5 14] [5 15] [5 16] [5 17] [6 18] [6 19] [6 20] [6 21] [6 22] [7 23] [7 24] [7 25] [8 26] [8 27] [8 28] [9 29] [9 30] [10 31] [10 32] [11 33] [12 34] [13 35] [14 36] [15 36] [16 37] [17 37] [18 37] [19 37] [20 38] [21 38] [22 38] [23 38] [24 38] [25 38] [26 38] [27 38] [28 38] [29 38] [30 38] [31 37] [32 37] [33 37] [34 36] [35 36] [36 36] [37 36] [38 35] [39 34] [40 33] [41 32] [42 31] [42 30] [43 29] [44 28] [45 27] [45 26] [46 25] [46 24] [47 23] [47 22] [47 21] [48 20] [48 19] [48 18] [49 17] [49 16] [49 15] [50 14] [50 13] [50 12] [50 11] [51 10] [51 9] [51 8] [51 7]]
+ :numseq [128 136 136 9 144 136 136 136 136 136 136 136 72 132 136 136 136 72 132 136 72 132 136 72 132 72 132 72 68 68 68 36 66 36 34 34 66 36 34 34 34 34 34 34 34 34 34 18 33 34 18 33 34 34 18 17 17 17 17 9 144 17 17 9 144 9 144 9 136 144 9 136 144 9 136 144 9 136 136 144 9 136 136 128]
+ :normalized-numseq [136 136 136 136 132 72 36 34 34 34 33 17 17 136 136 136 136]
+ :ltype 1}
+
+;; o
+
+(def o-00
+  (-> o-model
+      :lseq
+      second))
+{:line [[6 22] [6 21] [7 19] [8 18] [9 17] [9 16] [10 15] [10 14] [11 13] [11 12] [12 11] [13 10] [14 9] [15 8] [16 7] [17 6] [18 6] [19 5] [20 5] [21 5] [22 5] [23 5] [24 5] [25 5] [26 6] [27 6] [28 6] [29 6] [30 6] [31 7] [32 8] [33 9] [34 10] [35 11] [36 12] [36 13] [37 14] [37 15] [38 16] [37 17] [37 18] [37 19] [37 20] [36 21] [36 22] [36 23] [36 24] [35 25] [35 26] [35 27] [34 28] [34 29] [33 30] [32 31] [32 32] [31 33] [30 34] [29 35] [28 36] [27 37] [26 37] [25 38] [24 38] [23 38] [22 38] [21 39] [20 39] [19 39] [18 39] [17 39] [16 40] [15 40] [14 40] [13 40] [12 40] [11 40] [10 40] [9 40] [8 39] [7 38] [6 37] [6 36] [6 35] [6 34] [6 33] [6 32] [6 31] [6 30] [6 29] [6 28] [6 27] [6 26] [6 25] [6 24] [6 23]]
+ :numseq [136 136 17 17 9 144 9 144 9 144 17 17 17 17 17 33 18 33 34 34 34 34 34 66 36 34 34 34 66 68 68 68 68 68 132 72 132 72 5 144 136 136 9 144 136 136 9 144 136 9 144 9 17 144 9 17 17 17 17 18 33 18 34 34 33 18 34 34 34 33 18 34 34 34 34 34 34 36 68 68 72 136 136 136 136 136 136 136 136 136 136 136 136 136 136]
+ :normalized-numseq [17 144 17 33 34 34 68 72 136 136 17 17 33 34 34 36 136 136 136]
+ :ltype 0}
+
+
+
+(def o-01
+  (-> joc-model
+      :lseq
+      second))
+{:line [[14 78] [14 77] [15 76] [16 75] [16 74] [17 73] [18 72] [19 71] [20 70] [20 69] [21 68] [22 67] [23 66] [23 65] [24 64] [25 64] [26 64] [27 64] [28 64] [29 65] [30 65] [31 66] [31 67] [32 68] [33 69] [33 70] [34 71] [34 72] [34 73] [35 74] [36 75] [36 76] [37 77] [37 78] [37 79] [37 80] [37 81] [38 82] [38 83] [37 84] [37 85] [37 86] [36 87] [36 88] [36 89] [35 90] [35 91] [34 92] [33 93] [32 94] [31 95] [30 96] [29 97] [28 97] [27 97] [26 97] [25 97] [24 97] [23 97] [22 96] [21 96] [20 96] [19 96] [18 96] [17 95] [16 94] [15 93] [15 92] [15 91] [14 90] [14 89] [14 88] [14 87] [14 86] [14 85] [14 84] [14 83] [14 82] [14 81] [14 80] [14 79]]
+ :numseq [136 144 17 9 144 17 17 17 9 144 17 17 9 144 41 38 34 34 66 36 82 132 72 68 132 72 132 136 72 68 132 72 132 136 136 136 72 132 9 144 136 9 144 136 9 144 9 17 17 17 17 17 18 34 34 34 34 34 36 66 34 34 34 36 68 68 72 136 132 72 136 136 136 136 136 136 136 136 136 136 136]
+ :normalized-numseq [136 17 17 36 82 72 132 132 136 17 18 34 34 72 136 136 136]
+ :ltype 0}
+
+(def o-02
+  (-> mos-model
+      :lseq
+      second))
+{:line [[34 33] [34 32] [35 31] [35 30] [35 29] [36 28] [37 27] [38 26] [39 26] [40 25] [41 25] [42 25] [43 24] [44 24] [45 24] [46 24] [47 24] [48 24] [49 24] [50 24] [51 24] [52 24] [53 24] [54 24] [56 25] [57 26] [57 27] [58 28] [58 29] [59 30] [58 31] [58 32] [57 33] [57 34] [56 35] [56 36] [55 37] [55 38] [55 39] [55 40] [54 41] [54 42] [54 43] [54 44] [53 45] [53 46] [52 47] [51 48] [50 49] [49 50] [48 50] [47 50] [46 50] [45 50] [44 50] [43 49] [42 49] [41 49] [40 48] [39 47] [38 46] [37 45] [37 44] [36 43] [35 42] [35 41] [34 40] [34 39] [34 38] [34 37] [34 36] [34 35] [34 34]]
+ :numseq [136 144 9 136 144 17 17 33 18 33 34 18 33 34 34 34 34 34 34 34 34 34 34 34 68 132 72 132 72 69 144 9 144 9 144 9 144 136 136 9 144 136 136 9 144 9 17 17 17 18 34 34 34 34 36 66 34 36 68 68 68 72 132 68 72 132 72 136 136 136 136 136 136]
+ :normalized-numseq [136 18 34 34 34 72 144 136 136 17 34 66 72 136 136]
+ :ltype 0}
+
+(def o-03
+  (-> om-model
+      :lseq
+      second))
+{:line [[6 25] [6 24] [7 23] [8 22] [9 21] [9 20] [10 19] [11 18] [12 17] [13 17] [14 16] [15 16] [16 16] [17 16] [18 16] [19 16] [20 17] [20 18] [21 19] [22 20] [23 21] [24 21] [25 22] [26 22] [27 22] [28 23] [29 24] [30 25] [30 26] [30 27] [31 28] [31 29] [31 30] [31 31] [31 32] [31 33] [30 34] [30 35] [30 36] [29 37] [29 38] [28 39] [28 40] [27 41] [26 42] [26 43] [25 44] [24 44] [23 45] [22 46] [21 47] [20 47] [19 47] [18 47] [17 47] [16 47] [15 46] [14 46] [13 45] [12 44] [11 43] [10 42] [9 41] [8 40] [7 39] [7 38] [7 37] [7 36] [6 35] [6 34] [6 33] [6 32] [6 31] [6 30] [6 29] [6 28] [6 27] [6 26]]
+ :numseq [136 144 17 17 9 144 17 17 33 18 33 34 34 34 50 74 132 72 68 68 36 66 36 34 66 68 68 132 136 72 132 136 136 136 136 9 144 136 9 144 9 144 9 17 144 9 18 33 17 17 18 34 34 34 34 36 66 36 68 68 68 68 68 68 72 136 136 132 72 136 136 136 136 136 136 136 136 136]
+ :normalized-numseq [17 18 34 72 36 72 136 136 17 17 34 66 68 136 136 136]
+ :ltype 0}
+
+(def o-04
+  (-> por-model
+      :lseq
+      last))
+{:line [[41 24] [42 23] [42 22] [42 21] [42 20] [42 19] [42 18] [43 17] [43 16] [44 15] [44 14] [45 13] [45 12] [46 11] [47 10] [48 9] [49 8] [50 7] [51 7] [52 7] [53 6] [54 6] [55 6] [56 6] [57 6] [58 6] [59 6] [60 6] [61 6] [62 6] [63 7] [64 7] [65 8] [66 8] [67 9] [68 9] [69 10] [69 11] [70 12] [70 13] [71 14] [71 15] [71 16] [70 17] [70 18] [70 19] [70 20] [70 21] [69 22] [69 23] [68 24] [67 25] [66 26] [65 27] [64 27] [63 28] [62 28] [61 28] [60 28] [59 28] [58 28] [57 28] [56 28] [55 28] [54 28] [53 28] [52 28] [51 28] [50 27] [49 27] [48 27] [47 27] [46 27] [45 27] [44 27] [43 26] [42 26]]
+ :numseq [144 9 136 136 136 136 144 9 144 9 144 9 144 17 17 17 17 33 34 18 33 34 34 34 34 34 34 34 34 66 36 66 36 66 36 66 132 72 132 72 132 136 9 144 136 136 136 9 144 9 17 17 17 18 33 18 34 34 34 34 34 34 34 34 34 34 34 36 66 34 34 34 34 34 36 66 36]
+ :normalized-numseq [136 136 17 18 34 34 36 72 136 136 17 34 34 34 34 66]
+ :ltype 0}
+
+(def o-05
+  (-> pot-model
+      :lseq
+      last))
+{:line [[40 13] [39 14] [39 15] [39 16] [39 17] [39 18] [39 19] [39 20] [39 21] [40 22] [40 23] [40 24] [40 25] [41 26] [41 27] [41 28] [41 29] [41 30] [42 32] [43 32] [44 32] [45 33] [46 33] [47 33] [48 33] [49 33] [50 33] [51 33] [52 33] [53 33] [54 33] [55 33] [56 32] [57 32] [58 32] [59 32] [60 32] [61 32] [62 32] [63 32] [64 32] [65 31] [66 30] [67 29] [68 29] [69 28] [69 27] [70 26] [70 25] [71 24] [71 23] [72 22] [72 21] [72 20] [71 19] [71 18] [71 17] [70 16] [70 15] [70 14] [69 13] [69 12] [68 11] [67 10] [66 9] [65 8] [64 8] [63 7] [62 7] [61 7] [60 6] [59 6] [58 6] [57 6] [56 5] [55 5] [54 5] [53 5] [52 5] [51 5] [50 5] [49 5] [48 6] [47 6] [46 7] [45 7] [44 8] [43 9] [42 10] [41 11] [40 12]]
+ :numseq [9 144 136 136 136 136 136 136 72 132 136 136 72 132 136 136 136 136 39 34 66 36 34 34 34 34 34 34 34 34 34 18 33 34 34 34 34 34 34 34 18 17 17 33 18 9 144 9 144 9 144 9 136 132 72 136 132 72 136 132 72 132 68 68 68 66 36 66 34 36 66 34 34 36 66 34 34 34 34 34 34 33 18 33 18 33 17 17 17 17 144]
+ :normalized-numseq [136 136 136 136 34 34 34 34 18 9 132 132 68 36 36 34 33 17 144]
+ :ltype 0}
+
+
+;; p
+
+(def p-00
+  (-> p-model
+      :lseq
+      first))
+{:line [[5 8] [6 7] [7 7] [8 6] [9 6] [10 6] [11 6] [12 6] [13 6] [14 5] [15 5] [16 5] [17 5] [18 5] [19 5] [20 5] [21 6] [22 6] [23 5] [24 5] [25 5] [26 5] [27 5] [28 5] [29 6] [30 6] [31 6] [32 6] [33 6] [34 6] [35 6] [36 6] [37 6] [38 6]]
+ :numseq [16 33 18 33 34 34 34 34 18 33 34 34 34 34 34 66 36 18 33 34 34 34 34 66 36 34 34 34 34 34 34 34 34 2]
+ :normalized-numseq [33 34 34 34 34 34 34]
+ :ltype 1}
+
+
+(def p-01
+  (-> ap-model
+      :lseq
+      first))
+{:line [[46 8] [45 8] [44 8] [43 7] [42 7] [41 7] [40 7] [39 7] [38 7] [37 7] [36 8] [35 8] [34 8] [33 8] [32 8] [31 8] [30 7] [29 7] [28 7] [27 7] [26 7] [25 7] [24 8] [23 8] [22 9]]
+ :numseq [2 34 36 66 34 34 34 34 34 33 18 34 34 34 34 36 66 34 34 34 34 33 18 33 84]
+ :normalized-numseq [34 34 34 34 33]
+ :ltype 1}
+
+
+(def p-02
+  (-> pat-model
+      :lseq
+      first))
+{:line [[5 16] [6 16] [7 16] [8 16] [9 16] [10 16] [11 16] [12 16] [13 16] [14 16] [15 16] [16 16] [17 16] [18 17] [19 17] [20 17] [21 17] [22 17] [23 17] [24 17] [25 17] [26 17] [27 17] [28 16] [29 16] [30 16] [31 16] [32 16] [33 16] [34 16]]
+ :numseq [32 34 34 34 34 34 34 34 34 34 34 34 66 36 34 34 34 34 34 34 34 34 18 33 34 34 34 34 34 82]
+ :normalized-numseq [34 34 34 34 34 34]
+ :ltype 1}
+
+(def p-03
+  (-> por-model
+      :lseq
+      first))
+{:line [[7 23] [8 23] [9 23] [10 23] [11 23] [12 23] [13 23] [14 23] [15 24] [16 24] [17 24] [18 24] [19 24] [20 24] [21 24] [22 23] [23 23] [24 23] [25 23] [26 23] [27 24] [28 24] [29 24] [30 25] [31 25] [32 25] [33 25] [34 25] [35 26] [36 26] [37 27] [38 28]]
+ :numseq [32 34 34 34 34 34 34 66 36 34 34 34 34 34 18 33 34 34 34 66 36 34 66 36 34 34 34 66 36 66 68 148]
+ :normalized-numseq [34 34 34 34 36 36 148]
+ :ltype 1}
+
+(def p-04
+  (-> pot-model
+      :lseq
+      first))
+{:line [[6 31] [7 31] [8 31] [9 31] [10 31] [11 31] [12 31] [13 31] [14 31] [15 31] [16 31] [17 31] [18 31] [19 31] [20 31] [21 31] [22 31] [23 31] [24 31] [25 32] [26 32] [27 32] [28 32] [29 32] [30 32] [31 32] [32 32] [33 32] [34 32] [35 32] [36 32] [37 32] [38 32] [39 32] [40 32]]
+ :numseq [32 34 34 34 34 34 34 34 34 34 34 34 34 34 34 34 34 34 66 36 34 34 34 34 34 34 34 34 34 34 34 34 34 34 114]
+ :normalized-numseq [34 34 34 34 34 34 34]
+ :ltype 1}
+
+(def pi
+  (-> pi-model
+      :lseq
+      first))
+{:line [[5 7] [6 7] [7 7] [8 6] [9 6] [10 6] [11 6] [12 6] [13 6] [14 6] [15 6] [16 6] [17 6] [18 6] [19 6] [20 7] [21 7] [22 7] [23 7] [24 7] [25 6] [26 6] [27 6] [28 6] [29 6] [30 6] [31 6] [32 6] [33 6] [34 6] [35 7] [36 7] [37 7] [38 7] [39 7] [40 7] [41 7] [42 7] [43 7] [44 7] [45 8] [46 9] [46 10] [47 11] [47 12] [48 13] [48 14] [48 15] [48 16] [48 17] [47 18] [47 19] [46 20] [46 21] [45 22] [44 23] [43 23] [42 23] [41 24] [40 24] [39 24] [38 24] [37 24] [36 25] [35 25] [34 25]]
+ :numseq [32 34 18 33 34 34 34 34 34 34 34 34 34 34 66 36 34 34 34 18 33 34 34 34 34 34 34 34 34 66 36 34 34 34 34 34 34 34 34 66 68 132 72 132 72 132 136 136 136 9 144 9 144 9 17 18 34 33 18 34 34 34 33 18 34 32]
+ :normalized-numseq [33 34 34 34 34 34 34 34 72 136 17 33 34 32]
+ :ltype 1}
+
+;; r
+
+(def r-01
+  (-> por-model
+      :lseq
+      second))
+{:line [[39 27] [40 26] [41 25] [38 29] [38 30] [38 31] [37 32] [37 33] [37 34] [37 35] [36 36] [35 37] [35 38] [34 39] [34 40] [34 41] [33 42] [32 43] [31 44] [30 45] [30 46] [30 47] [29 48] [29 49] [29 50] [28 51] [27 52] [26 53] [26 54] [25 55] [25 56] [24 57] [23 58] [22 59] [22 60] [22 61] [21 62] [21 63] [20 64] [19 65] [19 66] [18 67] [18 68] [18 69] [17 70] [17 71] [16 72] [16 73] [15 74] [14 75] [13 76] [13 77] [12 78] [12 79] [11 80] [10 81] [10 82] [10 83] [9 84] [9 85] [8 86] [8 87] [7 88] [6 89] [6 90] [6 91] [6 92]]
+ :numseq [17 17 73 136 136 9 144 136 136 9 17 144 9 144 136 9 17 17 17 144 136 9 144 136 9 17 17 144 9 144 9 17 17 144 136 9 144 9 17 144 9 144 136 9 144 9 144 9 17 17 144 9 144 9 17 144 136 9 144 9 144 9 17 144 136 136 8]
+ :normalized-numseq [73 136 136 17 136 17 17 17 136 17 17 136 136 136]
+ :ltype 1}
+
+
+;; s
+(def s-00
+  (-> s-model
+      :lseq
+      first))
+{:line [[11 6] [12 6] [13 6] [14 7] [15 8] [16 9] [17 9] [18 10] [19 10] [20 11] [21 11] [22 12] [23 12] [24 13] [25 13] [26 14] [27 14] [28 15] [29 16] [30 17] [31 18] [32 19] [32 20] [33 21] [33 22] [34 23] [34 24] [35 25] [35 26] [35 27] [34 28] [34 29] [34 30] [34 31] [34 32] [34 33] [33 34] [33 35] [32 36] [32 37] [32 38] [31 39] [31 40] [30 41] [29 42] [28 43] [27 44] [26 44] [25 45] [24 46] [23 46] [22 47] [21 48] [20 49] [19 49] [18 50] [17 50] [16 51] [15 51] [14 51] [13 52] [12 51] [11 51] [10 51] [9 51] [8 51] [7 51] [6 51] [5 51]]
+ :numseq [32 34 66 68 68 36 66 36 66 36 66 36 66 36 66 36 66 68 68 68 68 132 72 132 72 132 72 132 136 9 144 136 136 136 136 9 144 9 144 136 9 144 9 17 17 17 18 33 17 18 33 17 17 18 33 18 33 18 34 33 20 66 34 34 34 34 34 34 32]
+ :normalized-numseq [66 36 66 68 72 132 136 136 17 18 18 33 34 34]
+ :ltype 1}
+
+
+(def s-01
+  (-> sat-model
+      :lseq
+      first))
+{:line [[21 5] [22 5] [23 5] [24 6] [25 6] [26 7] [27 7] [28 7] [29 7] [30 7] [31 7] [32 7] [33 8] [34 8] [35 9] [36 10] [37 11] [38 11] [39 12] [40 13] [41 14] [42 14] [43 15] [44 16] [44 17] [45 18] [45 19] [46 20] [46 21] [46 22] [47 23] [47 24] [47 25] [47 26] [47 27] [46 28] [46 29] [46 30] [46 31] [46 32] [46 33] [45 34] [45 35] [44 36] [44 37] [43 38] [43 39] [43 40] [43 41] [42 42] [41 42] [40 43] [39 44] [38 45] [37 45] [36 46] [35 47] [34 47] [33 48] [32 48] [31 49] [30 49] [29 49] [28 50] [27 50] [26 51] [25 51] [24 51] [23 51] [22 51] [21 51] [20 51]]
+ :numseq [32 34 66 36 66 36 34 34 34 34 34 66 36 66 68 68 36 66 68 68 36 66 68 132 72 132 72 132 136 72 132 136 136 136 9 144 136 136 136 136 9 144 9 144 9 144 136 136 9 18 33 17 17 18 33 17 18 33 18 33 18 34 33 18 33 18 34 34 34 34 34 38]
+ :normalized-numseq [32 36 34 66 66 72 132 136 136 144 33 17 18 33 34 38]
+ :ltype 1}
+
+(def s-02
+  (-> mos-model
+      :lseq
+      last))
+{:line [[60 31] [61 31] [62 32] [63 32] [64 33] [65 34] [66 35] [67 36] [68 37] [69 38] [70 39] [71 40] [72 41] [72 42] [73 43] [73 44] [74 45] [75 46] [75 47] [76 48] [76 49] [76 50] [77 51] [77 52] [77 53] [77 54] [78 55] [78 56] [78 57] [78 58] [78 59] [78 60] [78 61] [78 62] [78 63] [77 64] [77 65] [76 66] [76 67] [76 68] [76 69] [76 70] [75 71] [74 72] [74 73] [73 74] [73 75] [72 76] [72 77] [71 78] [70 79] [69 80] [68 80] [67 81] [66 82] [65 83] [64 83] [63 83] [62 84] [61 84] [60 85] [59 86] [58 86] [57 86] [56 86] [55 87] [54 87] [53 87] [52 87] [51 87] [50 87] [49 87] [48 87] [47 87]]
+ :numseq [36 66 36 66 68 68 68 68 68 68 68 68 132 72 132 72 68 132 72 132 136 72 132 136 136 72 132 136 136 136 136 136 136 136 9 144 9 144 136 136 136 9 17 144 9 144 9 144 9 17 17 18 33 17 17 18 34 33 18 33 17 18 34 34 33 18 34 34 34 34 34 34 34 32]
+ :normalized-numseq [66 68 72 72 136 136 136 136 17 17 17 33 33 34 34]
+ :ltype 1}
+
+;; t
+(-> t-model
+    :lseq
+    first)
+{:line [[7 6] [7 7] [7 8] [7 9] [7 10] [7 11] [6 12] [6 13] [6 14] [6 15] [5 16] [5 17] [5 18] [5 19] [5 20] [5 21] [5 22] [5 23] [5 24] [5 25] [5 26] [5 27] [5 28] [5 29] [5 30] [5 31] [5 32] [5 33] [5 34] [5 35] [5 36] [5 37] [5 38] [5 39] [5 40] [5 41] [5 42]]
+ :numseq [128 136 136 136 136 9 144 136 136 9 144 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 8]
+ :normalized-numseq [136 136 136 136 136 136 136 136]
+ :ltype 1}
+
+(def t-01
+  (-> pat-model
+      :lseq
+      last))
+{:line [[35 17] [36 18] [36 19] [36 20] [35 21] [35 22] [35 23] [35 24] [35 25] [35 26] [35 27] [35 28] [35 29] [35 30] [35 31] [35 32] [34 33] [34 34] [34 35] [34 36] [34 37] [34 38] [34 39] [34 40] [34 41] [34 42] [34 43] [34 44] [34 45] [34 46] [34 47]]
+ :numseq [68 164 152 9 144 136 136 136 136 136 136 136 136 136 136 9 144 136 136 136 136 136 136 136 136 136 136 136 136 136 8]
+ :normalized-numseq [68 144 136 136 136 136 136]
+ :ltype 1}
+
+(def t-02
+  (-> sat-model
+      :lseq
+      last))
+{:line [[18 54] [18 55] [17 56] [17 57] [17 58] [17 59] [17 60] [17 61] [17 62] [17 63] [17 64] [17 65] [17 66] [17 67] [17 68] [17 69] [17 70] [18 71] [18 72] [18 73] [18 74] [18 75] [18 76] [18 77] [18 78] [18 79] [18 80] [18 81]]
+ :numseq [132 9 144 136 136 136 136 136 136 136 136 136 136 136 136 136 72 132 136 136 136 136 136 136 136 136 136 8]
+ :normalized-numseq [132 136 136 136 136 136 136]
+ :ltype 1}
+
+(def t-03
+  (-> ta-model
+      :lseq
+      first))
+{:line [[28 5] [28 6] [28 7] [28 8] [27 9] [26 10] [26 11] [26 12] [26 13] [26 14] [26 15] [25 16] [25 17] [25 18] [25 19] [25 20] [25 21] [25 22] [25 23] [25 24] [24 25] [24 26] [24 27] [24 28] [24 29] [24 30] [24 31] [24 32] [24 33] [24 34] [24 35] [24 36] [24 37] [24 38] [24 39] [24 40] [24 41] [24 42] [24 43] [24 44] [24 45] [23 46] [23 47] [22 48]]
+ :numseq [128 136 136 9 17 144 136 136 136 136 9 144 136 136 136 136 136 136 136 9 144 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 9 144 9 145]
+ :normalized-numseq [128 136 136 136 136 136 136 136 136 144]
+ :ltype 1}
+
+(def t-04
+  (-> pot-model
+      :lseq
+      second))
+{:line [[41 33] [41 32] [41 34] [41 35] [41 36] [41 37] [41 38] [41 39] [41 40] [41 41] [41 42] [41 43] [42 44] [42 45] [42 46] [42 47] [42 48] [42 49] [42 50] [42 51] [42 52] [42 53] [43 54] [43 55] [43 56] [43 57] [44 58] [44 59] [44 60] [44 61] [44 62] [44 63] [44 64] [44 65]]
+ :numseq [156 170 136 136 136 136 136 136 136 136 136 72 132 136 136 136 136 136 136 136 136 72 132 136 136 72 132 136 136 136 136 136 136 8]
+ :normalized-numseq [136 136 136 136 136 136 136]
+ :ltype 1}
+
+(defn get-freq
+  [model]
+  (let [nseq (:normalized-numseq model)]
+    {:len (count nseq)
+     :freq  (frequencies nseq)}))
+
+(defn get-freq-diff
+  [standard current]
+  (reduce (fn [acc freq]
+            (+ acc (abs (- (get standard freq) (get current freq 0)))))
+          0
+          (keys standard)))
+
+(def type-0-sequences
+  [{:letter "o"
+    :len 17
+    :len-tolerance 2
+    :freq {34 3, 36 1, 72 2, 136 5, 17 2, 18 1}
+    :freq-tolerance 5}
+   {:letter "a"
+    :len 10
+    :len-tolerance 2
+    :freq {34 2, 36 1, 68 1, 136 2, 17 2}
+    :freq-tolerance 6}])
+
+
+;; a 
+{:freq {34 1 66 1 36 1 68 1 136 4 144 1 17 2 18 1} :len 12}
+{:freq {34 1 66 1 36 1 68 1 72 1 136 2 17 3} :len 10}
+{:freq {66 1 36 2 68 1 132 1 136 4 17 2 18 1} :len 12}
+{:freq {33 1 34 3 68 1 132 1 136 3 17 1} :len 10}
+{:freq {33 4 34 2 36 1 68 1 136 1} :len 9}
+{:freq {33 1 34 1 36 2 132 1 72 2 136 1} :len 8}
+{:freq {34 4 36 1 68 1 132 1 136 3 17 1} :len 11}
+
+(def standard {34 2 36 1 68 1 136 2 17 2})
+
+(get-freq-diff standard {34 1 66 1 36 1 68 1 136 4 144 1 17 2 18 1})
+;; => 3
+(get-freq-diff standard {34 1 66 1 36 1 68 1 72 1 136 2 17 3})
+;; => 2
+
+(get-freq-diff standard {66 1 36 2 68 1 132 1 136 4 17 2 18 1})
+;; => 5
+
+(get-freq-diff standard {33 1 34 3 68 1 132 1 136 3 17 1})
+;; => 4
+(get-freq-diff standard {33 4 34 2 36 1 68 1 136 1})
+;; => 3
+(get-freq-diff standard {33 1 34 1 36 2 132 1 72 2 136 1})
+;; => 6
+(get-freq-diff standard {34 4 36 1 68 1 132 1 136 3 17 1})
+;; => 4
+
+;; o
+
+(get-freq o-00)
+;; => {:freq {33 2 34 4 36 1 68 1 72 1 136 5 144 1 17 4} :len 19}
+(get-freq o-01)
+;; => {:freq {34 2 36 1 132 2 72 2 136 5 17 3 18 1 82 1} :len 17}
+(get-freq o-02)
+;; => {:freq {34 4 66 1 72 2 136 5 144 1 17 1 18 1} :len 15}
+(get-freq o-03)
+;; => {:freq {34 2 66 1 36 1 68 1 72 2 136 5 17 3 18 1} :len 16}
+(get-freq o-04)
+;; => {:freq {34 6 66 1 36 1 72 1 136 4 17 2 18 1} :len 16}
+(get-freq o-05)
+;; => {:freq {33 1 34 5 36 2 68 1 132 2 136 4 9 1 144 1 17 1 18 1} :len 19}
+
+(/ (+ 19 17 15 16 16 19) 6)
+;; => 17
+(int (/ (+ 4 2 4 2 6 5) 6))
+;; => 4
+(int (/ (+ 1 1 1 1 2) 6))
+;; => 1
+(int (/ (+ 1 2 2 2 1) 6))
+;; => 1
+(int (/ (+ 5 5 5 5 4 4) 6))
+;; => 5
+(int (/ (+ 1 2 1 3 2 1) 6))
+;; => 1
+
+(int (/ (+ ) 6))
+(int (/ (+ ) 6))
+
+(get-freq-diff {34 4, 36 1, 72 1, 136 5, 17 2, 18 1} {33 2 34 4 36 1 68 1 72 1 136 5 144 1 17 4})
+;; => 3
+(get-freq-diff {34 4, 36 1, 72 1, 136 5, 17 2, 18 1} {34 2 36 1 132 2 72 2 136 5 17 3 18 1 82 1})
+;; => 4
+(get-freq-diff {34 4, 36 1, 72 1, 136 5, 17 2, 18 1} {34 4 66 1 72 2 136 5 144 1 17 1 18 1})
+;; => 3
+(get-freq-diff {34 4, 36 1, 72 1, 136 5, 17 2, 18 1} {34 2 66 1 36 1 68 1 72 2 136 5 17 3 18 1})
+;; => 4
+(get-freq-diff {34 4, 36 1, 72 1, 136 5, 17 2, 18 1} {34 6 66 1 36 1 72 1 136 4 17 2 18 1})
+;; => 3
+(get-freq-diff {34 4, 36 1, 72 1, 136 5, 17 2, 18 1} {33 1 34 5 36 2 68 1 132 2 136 4 9 1 144 1 17 1 18 1})
+;; => 5
+
+(def type-1-sequences
+  [{:letter "c"
+    :len 6
+    :len-tolerance 2
+    :freq {33 1, 17 1, 18 4}
+    :freq-tolerance 2}
+   {:letter "e"
+    :len 6
+    :len-tolerance 2 
+    :freq {33 1, 66 1, 36 1, 136 2, 18 1}
+    :freq-tolerance 2}
+   {:letter "f"
+    :len 7
+    :len-tolerance 2 
+    :freq {66 3, 36 1, 68 3}
+    :freq-tolerance 2}
+   {:letter "i"
+    :len 7
+    :len-tolerance 2 
+    :freq {34 3, 68 1, 132 1, 136 1, 17 1}
+    :freq-tolerance 2}
+   {:letter "j"
+    :len 15
+    :len-tolerance 2 
+    :freq {33 1, 34 1, 66 3, 36 1, 68 1, 132 1, 136 3, 144 1, 17 2, 18 1}
+    :freq-tolerance 10}
+   {:letter "l"
+    :len 10
+    :len-tolerance 2
+    :freq {136 7, 9 2, 144 1}
+    :freq-tolerance 5}
+   {:letter "m"
+    :len 14
+    :len-tolerance 3
+    :freq {33 1, 34 4, 132 1, 136 4, 17 3}
+    :freq-tolerance 5}
+   ])
+
+;; c
+
+(get-freq c-00)
+;; => {:freq {33 1 17 1 18 4} :len 6}
+(get-freq c-01)
+;; => {:freq {33 1 2 1 17 2 18 3} :len 7}
+(get-freq-diff {33 1 17 1 18 4} {33 1 2 1 17 2 18 3})
+;; => 2
+
+;; e
+(get-freq e-00)
+;; => {:freq {33 1 66 1 36 1 136 2 18 1} :len 6}
+
+;; f
+(get-freq f-00)
+;; => {:freq {66 3 36 1 68 3} :len 7}
+
+;; i
+(get-freq i-00)
+;; => {:freq {34 3 68 1 132 1 136 1 17 1} :len 7}
+
+;; j
+(get-freq j-00)
+;; => {:freq {33 1 34 1 66 3 36 1 68 1 132 1 136 3 144 1 17 2 18 1} :len 15}
+(get-freq j-01)
+;; => {:freq {33 2 34 2 68 3 132 1 196 1 136 4 144 1 17 1 18 1} :len 16}
+
+(get-freq-diff {33 1 34 1 66 3 36 1 68 1 132 1 136 3 144 1 17 2 18 1} {33 2 34 2 68 3 132 1 196 1 136 4 144 1 17 1 18 1})
+;; => 10
+
+;; l
+(get-freq l-00)
+;; => {:freq {128 1 136 7 9 1 16 1} :len 10}
+
+;; m
+(get-freq m-00)
+;; => {:freq {33 2 34 2 66 1 132 1 136 7 16 1 17 3} :len 17}
+(get-freq m-01)
+;; => {:freq {33 1 34 5 66 1 132 1 136 5 18 1} :len 14}
+(get-freq m-02)
+;; => {:freq {33 1 34 3 36 2 68 1 136 4 17 3 82 1} :len 15}
+(get-freq m-03)
+;; => {:freq {33 1 34 4 36 1 68 1 132 1 136 2 17 1 145 1} :len 12}
+
+(int (/ (+ 17 14 15 12) 4))
+;; => 14
+
+(int (/ (+ ) 4))
+
+(int (/ (+ 7 5 4 2) 4))
+;; => 4
+
+(get-freq-diff {33 1, 34 4, 132 1, 136 5, 17 3} {33 2 34 2 66 1 132 1 136 7 16 1 17 3})
+;; => 5
+(get-freq-diff {33 1, 34 4, 132 1, 136 5, 17 3} {33 1 34 5 66 1 132 1 136 5 18 1})
+;; => 4
+(get-freq-diff {33 1, 34 4, 132 1, 136 5, 17 3} {33 1 34 3 36 2 68 1 136 4 17 3 82 1})
+;; => 3
+(get-freq-diff {33 1, 34 4, 132 1, 136 5, 17 3} {33 1 34 4 36 1 68 1 132 1 136 2 17 1 145 1})
+;; => 5
+  #+end_src 
+
+* 2025-03-10
+
+#+begin_src clojure
+(import [cv2 :as cv2])
+
+(require
+  '[steno.converter :as cnv]
+  '[steno.utils :as utl])
+
+(add-tap (bound-fn* utl/print4tap))
+
+(defn build-model
+  [fileimage]
+  (let [mat* (cnv/image2matrix (cv2/imread fileimage))
+        lineseq* (cnv/matrix2lineseq mat*)
+        _ (tap> {:lseq* lineseq*})
+        lineseq (cnv/format-lineseq lineseq*)]
+    (tap> {:lseq lineseq})
+    (doseq [ls lineseq]
+      (utl/show-matrix (utl/cells2matrix [100 100] (:line ls))))
+    {:mat* mat*
+     :lseq lineseq
+     :lseq* lineseq*}))
+
+
+(def a-model (build-model "tmp/templates/word015.png"))
+(def ale-model (build-model "tmp/templates/word000.png"))
+(def am-model (build-model "tmp/templates/word004.png"))
+(def ap-model (build-model "tmp/templates/word012.png"))
+(def c-model (build-model "tmp/templates/word026.png"))
+(def e-model (build-model "tmp/templates/word020.png"))
+(def f-model (build-model "tmp/templates/word025.png"))
+(def i-model (build-model "tmp/templates/word016.png"))
+(def j-model (build-model "tmp/templates/word013.png"))
+(def joc-model (build-model "tmp/templates/word002.png"))
+(def l-model (build-model "tmp/templates/word024.png"))
+(def m-model (build-model "tmp/templates/word017.png"))
+(def mos-model (build-model "tmp/templates/word003.png"))
+(def n-model (build-model "tmp/templates/word018.png"))
+(def o-model (build-model "tmp/templates/word021.png"))
+(def om-model (build-model "tmp/templates/word006.png"))
+(def p-model (build-model "tmp/templates/word023.png"))
+(def pat-model (build-model "tmp/templates/word007.png"))
+(def pi-model (build-model "tmp/templates/word001.png"))
+(def por-model (build-model "tmp/templates/word009.png"))
+(def pot-model (build-model "tmp/templates/word008.png"))
+(def s-model (build-model "tmp/templates/word014.png"))
+(def sat-model (build-model "tmp/templates/word005.png"))
+(def t-model (build-model "tmp/templates/word022.png"))
+(def ta-model (build-model "tmp/templates/word011.png"))
+
+(def tata-model (build-model "tmp/templates/word010.png"))
+(def tz-model (build-model "tmp/templates/word019.png"))
+
+
+(defn get-loop-start
+  [line]
+  (reduce (fn [{:keys [min-x min-y min-pos] :as res} [pos [x y]]]
+            (if (or (< x min-x) (and (= x min-x) (< y min-y)))
+              {:min-x x :min-y y :min-pos pos}
+              res))
+          {:min-x (first (first line))
+           :min-y (second (first line))
+           :min-pos 0}
+          (map-indexed list (rest line))))
+
+;; a
+
+(def a-00
+  (-> a-model
+      :lseq
+      first))
+{:line [[6 16] [6 17] [6 18] [6 19] [6 20] [6 21] [6 22] [7 23] [8 24] [9 24] [10 24] [11 25] [12 25] [13 25] [14 25] [15 24] [16 24] [17 24] [18 23] [19 23] [20 22] [21 21] [22 20] [22 19] [23 18] [23 17] [23 16] [23 15] [23 14] [24 13] [24 12] [23 11] [23 10] [22 9] [21 8] [20 7] [19 7] [18 6] [17 5] [16 5] [15 5] [14 5] [13 5] [12 6] [11 7] [10 8] [9 9] [8 10] [8 11] [7 12] [7 13] [7 14] [7 15]]
+:numseq [144 136 136 136 136 136 72 68 36 34 66 36 34 34 18 33 34 18 33 18 17 17 9 144 9 136 136 136 144 9 132 72 132 68 68 66 36 68 66 34 34 34 33 17 17 17 17 144 9 144 136 136 9]
+:normalized-numseq [136 68 34 33 17 136 72 66 33 17 136]
+:ltype 0}
+
+(get-freq a-00)
+{:freq {34 1 66 1 36 1 68 1 136 4 144 1 17 2 18 1} :len 12}
+
+
+(def a-01
+(-> ale-model
+    :lseq
+    second))
+{:line [[33 12] [32 13] [32 14] [32 15] [32 16] [33 17] [33 18] [34 19] [35 20] [36 21] [37 21] [38 21] [39 22] [40 22] [42 22] [43 21] [43 20] [44 19] [45 18] [45 17] [45 16] [46 15] [46 14] [46 13] [46 12] [47 11] [46 10] [46 9] [45 8] [44 7] [43 7] [42 6] [41 6] [40 6] [39 6] [38 6] [37 6] [36 7] [35 8] [34 9] [33 10] [33 11]]
+:numseq [9 144 136 136 72 132 72 68 68 36 34 66 36 66 17 9 144 17 9 136 144 9 136 136 144 5 72 132 68 66 36 66 34 34 34 34 33 17 17 17 144 136]
+:normalized-numseq [136 68 36 17 136 68 34 17 144]
+:ltype 0}
+
+(get-freq a-01)
+;; => {:freq {34 1 66 1 36 1 68 1 72 1 136 2 17 3} :len 10}
+
+
+(def a-02
+(-> am-model
+    :lseq
+    second))
+{:line [[5 32] [5 31] [6 30] [6 29] [6 28] [6 27] [7 26] [8 25] [9 24] [11 24] [12 24] [13 25] [14 26] [15 26] [16 26] [17 26] [18 27] [19 27] [20 28] [21 29] [22 29] [23 30] [23 31] [24 32] [24 33] [24 34] [24 35] [24 36] [24 37] [23 38] [23 39] [22 40] [21 41] [21 42] [20 43] [19 44] [18 45] [17 46] [16 46] [15 46] [14 45] [13 45] [12 45] [11 45] [10 44] [9 44] [8 43] [7 42] [6 41] [5 40] [5 39] [5 38] [5 37] [5 36] [5 35] [5 34] [5 33]]
+:numseq [136 144 9 136 136 144 17 17 17 36 66 68 36 34 34 66 36 66 68 36 66 132 72 132 136 136 136 136 9 144 9 17 144 9 17 17 17 18 34 36 66 34 34 36 66 36 68 68 68 72 136 136 136 136 136 136 136]
+:normalized-numseq [136 17 36 66 132 136 17 18 36 68 136 136]
+:ltype 0}
+
+(get-freq a-02)
+;; => {:freq {66 1 36 2 68 1 132 1 136 4 17 2 18 1} :len 12}
+
+(def a-03
+(-> ap-model
+    :lseq
+    second))
+{:line [[7 9] [6 10] [6 11] [6 12] [6 13] [6 14] [6 15] [6 16] [6 17] [7 18] [8 19] [9 20] [10 21] [11 22] [12 22] [13 23] [14 23] [15 23] [16 23] [17 23] [18 22] [19 21] [20 20] [21 19] [22 18] [22 17] [22 16] [22 15] [23 14] [23 13] [23 12] [23 11] [23 10] [21 8] [20 8] [19 7] [18 6] [17 6] [16 6] [15 6] [14 6] [13 6] [12 6] [11 7] [10 7] [9 7] [8 8]]
+ :numseq [17 144 136 136 136 136 136 136 72 68 68 68 68 36 66 36 34 34 34 18 17 17 17 17 9 136 136 144 9 136 136 136 132 66 36 68 66 34 34 34 34 34 33 18 34 33 17]
+ :normalized-numseq [136 136 68 34 17 136 132 34 34 33]
+ :ltype 0}
+
+(get-freq a-03)
+;; => {:freq {33 1 34 3 68 1 132 1 136 3 17 1} :len 10}
+
+
+(def a-04
+  (-> pat-model
+      :lseq
+      second))
+{:line [[35 10] [35 9] [36 8] [37 7] [38 7] [39 6] [40 6] [41 5] [42 5] [43 5] [44 5] [45 5] [46 6] [47 6] [48 6] [49 7] [50 8] [51 9] [52 10] [52 11] [52 12] [52 13] [52 14] [51 15] [50 15] [49 16] [48 17] [47 17] [46 17] [45 17] [44 17] [43 17] [42 17] [41 17] [40 17] [39 17] [38 18] [37 18] [35 15] [35 14] [35 13] [35 12] [35 11]]
+ :numseq [136 144 17 33 18 33 18 33 34 34 34 66 36 34 66 68 68 68 132 136 136 136 9 18 33 17 18 34 34 34 34 34 34 34 34 33 18 35 9 136 136 136 136]
+ :normalized-numseq [33 33 36 68 33 34 34 33 136]
+ :ltype 0}
+
+(get-freq a-04)
+;; => {:freq {33 4 34 2 36 1 68 1 136 1} :len 9}
+
+
+(def a-05
+  (-> sat-model
+      :lseq
+      second))
+{:line [[7 42] [6 43] [6 44] [7 45] [7 46] [7 47] [7 48] [7 49] [8 50] [9 51] [10 51] [11 51] [12 52] [13 52] [14 52] [15 53] [16 53] [17 53] [18 52] [19 51] [19 50] [19 49] [19 48] [19 47] [19 46] [18 45] [18 44] [18 43] [17 42] [16 41] [15 41] [14 40] [13 40] [12 40] [11 40] [10 40] [9 41] [8 41]]
+ :numseq [17 144 72 132 136 136 136 72 68 36 34 66 36 34 66 36 34 82 17 41 200 136 136 136 132 72 136 132 68 66 36 66 34 34 34 33 18 33]
+ :normalized-numseq [132 72 36 36 136 72 34 33]
+ :ltype 0}
+
+(get-freq a-05)
+;; => {:freq {33 1 34 1 36 2 132 1 72 2 136 1} :len 8}
+
+(def a-06
+  (-> ta-model
+      :lseq
+      second))
+{:line [[7 48] [6 49] [6 50] [6 51] [6 52] [6 53] [6 54] [6 55] [6 56] [6 57] [6 58] [7 59] [8 60] [9 61] [10 62] [11 63] [12 64] [13 64] [14 64] [15 64] [16 64] [17 64] [18 64] [19 64] [20 64] [21 63] [22 62] [23 61] [24 60] [25 59] [25 58] [25 57] [25 56] [24 55] [24 54] [24 53] [24 52] [23 51] [23 50] [22 49] [21 49] [20 49] [19 49] [18 48] [17 48] [16 48] [15 48] [14 47] [13 47] [12 47] [11 47] [10 47] [9 47] [8 47]]
+ :numseq [17 144 136 136 136 136 136 136 136 136 72 68 68 68 68 68 36 34 34 34 34 34 34 34 18 17 17 17 17 9 136 136 132 72 136 136 132 72 132 74 50 34 36 66 34 34 36 66 34 34 34 34 34 33]
+ :normalized-numseq [136 136 68 34 34 17 136 132 36 34 34]
+ :ltype 0}
+
+(get-freq a-06)
+;; => {:freq {34 4 36 1 68 1 132 1 136 3 17 1} :len 11}
+
+
+;; c
+
+(def c-00
+  (-> c-model
+      :lseq
+      first))
+{:line [[6 23] [7 22] [8 22] [9 21] [10 21] [11 20] [12 20] [13 19] [14 18] [15 18] [16 17] [17 17] [18 16] [19 15] [20 15] [21 14] [22 14] [23 13] [24 13] [25 12] [26 12] [27 11] [28 10] [29 10] [30 9] [31 8] [32 8] [33 7] [34 6] [35 5]]
+ :numseq [16 33 18 33 18 33 18 17 33 18 33 18 17 33 18 33 18 33 18 33 18 17 33 18 17 33 18 17 17 1]
+ :normalized-numseq [18 18 18 33 18 17]
+ :ltype 1}
+
+(def c-01
+  (-> joc-model
+      :lseq
+      last))
+{:line [[31 64] [31 63] [32 62] [33 61] [34 61] [35 60] [36 59] [37 58] [38 58] [39 57] [40 56] [41 55] [42 55] [43 54] [44 53] [45 53] [46 52] [47 52] [48 51] [49 51] [50 50] [51 49] [52 49] [53 48] [54 47] [55 46] [56 46] [57 45] [58 44] [59 44] [60 44]]
+ :numseq [9 144 17 33 18 17 17 33 18 17 17 33 18 17 33 18 33 18 33 18 17 33 18 17 17 33 18 17 33 34 2]
+ :normalized-numseq [18 17 18 18 17 33 2]
+ :ltype 1}
+
+
+
+;; e
+
+(def e-00
+  (-> e-model
+      :lseq
+      first))
+{:line [[17 4] [16 5] [15 5] [14 5] [13 6] [12 6] [11 7] [10 7] [9 8] [8 8] [7 9] [6 10] [6 11] [5 12] [5 13] [5 14] [5 15] [5 16] [5 17] [6 18] [7 19] [8 20] [9 20] [10 21] [11 21] [12 22] [13 22] [14 22] [15 23]]
+ :numseq [1 18 34 33 18 33 18 33 18 33 17 144 9 144 136 136 136 136 72 68 68 36 66 36 66 36 34 66 4]
+ :normalized-numseq [18 33 136 136 66 36]
+ :ltype 1}
+
+;; f
+
+(def f-00
+  (-> f-model
+      :lseq
+      first))
+{:line [[6 6] [7 6] [8 7] [9 8] [10 9] [11 10] [12 11] [13 12] [14 13] [15 14] [16 15] [17 16] [18 16] [19 17] [20 17] [21 18] [22 18] [23 19] [24 20] [25 20] [26 21] [27 22] [28 22] [29 23] [30 24] [31 25] [32 25] [33 26] [34 26] [35 27] [36 28] [37 29] [38 29]]
+ :numseq [32 66 68 68 68 68 68 68 68 68 68 36 66 36 66 36 66 68 36 66 68 36 66 68 68 36 66 36 66 68 68 36 2]
+ :normalized-numseq [68 68 66 66 68 66 36]
+ :ltype 1}
+
+;; i
+
+(def i-00
+  (-> i-model
+      :lseq
+      first))
+{:line [[8 5] [9 5] [10 5] [11 5] [12 6] [13 7] [14 7] [15 8] [16 9] [17 10] [18 11] [18 12] [18 13] [19 14] [19 15] [19 16] [19 17] [18 18] [18 19] [17 20] [17 21] [16 22] [16 23] [15 24] [14 25] [13 25] [12 25] [11 26] [10 26] [9 26] [8 26] [7 26] [6 26] [5 26]]
+ :numseq [32 34 34 66 68 36 66 68 68 68 132 136 72 132 136 136 9 144 9 144 9 144 9 17 18 34 33 18 34 34 34 34 34 32]
+ :normalized-numseq [34 68 132 136 17 34 34]
+ :ltype 1}
+
+;; j
+
+(def j-00
+  (-> j-model
+      :lseq
+      first))
+{:line [[30 5] [29 5] [28 5] [27 6] [26 6] [25 7] [24 7] [23 8] [22 9] [21 9] [20 10] [19 10] [18 11] [17 12] [16 13] [15 14] [14 15] [13 16] [12 17] [12 18] [11 19] [11 20] [11 21] [10 22] [10 23] [9 24] [9 25] [8 26] [8 27] [7 28] [7 29] [6 30] [6 31] [6 32] [6 33] [6 34] [6 35] [6 36] [6 37] [6 38] [7 39] [7 40] [7 41] [8 42] [8 43] [9 44] [10 45] [10 46] [11 47] [12 48] [13 49] [14 50] [15 50] [16 51] [17 51] [18 52] [19 52] [20 53] [21 53] [22 54] [23 54] [24 55] [25 56] [26 56] [27 57] [28 57] [29 57] [30 57] [31 58] [32 58] [33 58] [34 59]]
+ :numseq [2 34 33 18 33 18 33 17 18 33 18 33 17 17 17 17 17 17 144 9 144 136 9 144 9 144 9 144 9 144 9 144 136 136 136 136 136 136 136 72 132 136 72 132 72 68 132 72 68 68 68 36 66 36 66 36 66 36 66 36 66 68 36 66 36 34 34 66 36 34 66 4]
+ :normalized-numseq [33 18 17 17 136 144 136 136 132 68 66 36 66 34 66]
+ :ltype 1}
+
+(def j-01
+  (-> joc-model
+      :lseq
+      first))
+{:line [[38 5] [37 5] [36 5] [35 5] [34 5] [33 5] [32 5] [31 5] [30 5] [29 6] [28 6] [27 7] [26 7] [25 8] [24 8] [23 9] [22 9] [21 9] [20 10] [19 10] [18 11] [17 11] [16 12] [15 13] [14 13] [13 14] [12 15] [11 16] [11 17] [10 18] [9 19] [9 20] [8 21] [8 22] [7 23] [7 24] [7 25] [7 26] [7 27] [6 28] [6 29] [6 30] [6 31] [6 32] [6 33] [6 34] [6 35] [6 36] [6 37] [6 38] [6 39] [6 40] [7 41] [7 42] [8 43] [8 44] [8 45] [8 46] [8 47] [9 48] [10 49] [10 50] [11 51] [12 52] [13 53] [14 54] [15 55] [16 56] [17 57] [18 58] [19 59] [20 59] [21 60] [22 61] [23 62] [24 63]]
+ :numseq [2 34 34 34 34 34 34 34 33 18 33 18 33 18 33 18 34 33 18 33 18 33 17 18 33 17 17 144 9 17 144 9 144 9 144 136 136 136 9 144 136 136 136 136 136 136 136 136 136 136 136 72 132 72 132 136 136 136 72 68 132 72 68 68 68 68 68 68 68 68 36 66 68 68 68 196]
+ :normalized-numseq [34 34 33 33 18 17 144 136 136 136 132 136 68 68 68 196]
+ :ltype 1}
+
+;; l
+
+(def l-00
+  (-> l-model
+      :lseq
+      first))
+{:line [[25 6] [25 7] [24 8] [24 9] [24 10] [23 11] [23 12] [23 13] [22 14] [22 15] [21 16] [20 17] [20 18] [20 19] [19 20] [19 21] [19 22] [18 23] [18 24] [17 25] [17 26] [16 27] [16 28] [15 29] [15 30] [14 31] [14 32] [14 33] [13 34] [13 35] [12 36] [12 37] [12 38] [11 39] [11 40] [10 41] [10 42] [9 43] [9 44] [9 45] [8 46] [8 47] [8 48] [7 49] [6 50] [6 51] [5 52]]
+ :numseq [128 9 144 136 9 144 136 9 144 9 17 144 136 9 144 136 9 144 9 144 9 144 9 144 9 144 136 9 144 9 144 136 9 144 9 144 9 144 136 9 144 136 9 17 144 9 16]
+ :normalized-numseq [128 136 136 136 9 136 136 136 136 16]
+ :ltype 1}
+
+;; m
+
+(def m-00
+  (-> m-model
+      :lseq
+      first))
+{:line [[5 33] [5 32] [5 31] [5 30] [5 29] [5 28] [5 27] [6 26] [6 25] [6 24] [6 23] [7 22] [7 21] [8 20] [9 19] [10 18] [11 17] [12 16] [13 15] [14 14] [15 13] [16 12] [17 11] [18 10] [19 9] [20 9] [21 8] [22 8] [23 7] [24 7] [25 7] [26 6] [27 6] [28 5] [29 5] [30 5] [31 5] [32 5] [33 5] [34 5] [35 5] [36 5] [37 5] [38 5] [39 5] [40 6] [41 6] [42 7] [43 7] [44 8] [45 9] [45 10] [46 11] [46 12] [47 13] [47 14] [48 15] [48 16] [48 17] [48 18] [48 19] [49 20] [49 21] [49 22] [49 23] [49 24] [49 25] [49 26] [49 27] [49 28] [48 29] [48 30] [48 31] [48 32] [48 33] [48 34] [47 35] [47 36] [47 37] [47 38] [47 39] [46 40]]
+ :numseq [8 136 136 136 136 136 144 9 136 136 144 9 144 17 17 17 17 17 17 17 17 17 17 17 33 18 33 18 33 34 18 33 18 33 34 34 34 34 34 34 34 34 34 34 66 36 66 36 66 68 132 72 132 72 132 72 132 136 136 136 72 132 136 136 136 136 136 136 136 9 144 136 136 136 136 9 144 136 136 136 9 16]
+ :normalized-numseq [136 136 17 17 17 33 33 34 34 66 132 136 136 136 136 136 16]
+ :ltype 1}
+
+
+(def m-01
+  (-> am-model
+      :lseq
+      first))
+{:line [[54 30] [54 29] [54 28] [54 27] [54 26] [54 25] [54 24] [54 23] [54 22] [54 21] [54 20] [54 19] [54 18] [53 17] [52 16] [52 15] [52 14] [52 13] [52 12] [51 11] [51 10] [50 9] [49 8] [48 8] [47 7] [46 7] [45 7] [44 6] [43 6] [42 6] [41 6] [40 6] [39 6] [38 6] [37 6] [36 6] [35 6] [34 6] [33 6] [32 6] [31 6] [30 6] [29 6] [28 7] [27 7] [26 7] [25 7] [24 7] [23 7] [22 7] [21 7] [20 8] [19 8] [18 9] [17 10] [16 10] [15 11] [14 12] [14 13] [13 14] [13 15] [12 16] [11 17] [11 18] [11 19] [11 20] [10 21] [10 22] [10 23]]
+ :numseq [8 136 136 136 136 136 136 136 136 136 136 136 132 68 72 136 136 136 132 72 132 68 66 36 66 34 36 66 34 34 34 34 34 34 34 34 34 34 34 34 34 34 33 18 34 34 34 34 34 34 33 18 33 17 18 33 17 144 9 144 9 17 144 136 136 9 144 136 73]
+ :normalized-numseq [136 136 132 136 66 34 34 34 34 34 18 33 136 136]
+ :ltype 1}
+
+(def m-02
+  (-> mos-model
+      :lseq
+      first))
+{:line [[6 37] [6 36] [6 35] [6 34] [7 33] [7 32] [7 31] [8 30] [8 29] [9 28] [9 27] [9 26] [10 25] [10 24] [11 23] [11 22] [12 21] [12 20] [13 19] [14 18] [15 17] [15 16] [16 15] [17 14] [17 13] [18 12] [19 11] [19 10] [20 9] [21 8] [22 7] [23 7] [24 6] [25 6] [26 6] [27 6] [28 6] [29 6] [30 6] [31 6] [32 6] [33 6] [34 6] [35 6] [36 6] [37 6] [38 6] [39 6] [40 6] [41 6] [42 6] [43 6] [44 7] [45 7] [46 8] [47 8] [48 8] [49 9] [50 9] [51 10] [52 10] [53 11] [54 12] [55 13] [55 14] [56 15] [57 16] [57 17] [57 18] [57 19] [57 20] [57 21] [57 22] [56 23] [55 24]]
+ :numseq [8 136 136 144 9 136 144 9 144 9 136 144 9 144 9 144 9 144 17 17 9 144 17 9 144 17 9 144 17 17 33 18 33 34 34 34 34 34 34 34 34 34 34 34 34 34 34 34 34 34 34 66 36 66 36 34 66 36 66 36 66 68 68 132 72 68 132 136 136 136 136 136 9 17 82]
+ :normalized-numseq [136 136 136 17 17 17 33 34 34 34 36 36 68 136 82]
+ :ltype 1}
+
+(def m-03
+  (-> om-model
+      :lseq
+      first))
+{:line [[62 29] [62 28] [62 27] [62 26] [62 25] [62 24] [61 23] [61 22] [61 21] [61 20] [61 19] [61 18] [60 17] [60 16] [60 15] [59 14] [58 13] [57 12] [56 11] [55 10] [54 10] [53 9] [52 8] [51 8] [50 8] [49 8] [48 7] [47 7] [46 7] [45 7] [44 7] [43 7] [42 7] [41 6] [40 6] [39 6] [38 6] [37 6] [36 6] [35 6] [34 6] [33 6] [32 6] [31 6] [30 7] [29 7] [28 7] [27 8] [26 8] [25 9] [24 9] [23 10] [22 11] [21 12] [20 13] [20 14] [19 15]]
+ :numseq [8 136 136 136 136 132 72 136 136 136 136 132 72 136 132 68 68 68 68 66 36 68 66 34 34 36 66 34 34 34 34 34 36 66 34 34 34 34 34 34 34 34 34 33 18 34 33 18 33 18 33 17 17 17 144 9 145]
+ :normalized-numseq [136 136 132 68 36 34 34 34 34 33 17 145]
+ :ltype 1}
+
+
+;; n
+(def n-00
+  (-> n-model
+      :lseq
+      first))
+{:line [[6 5] [6 6] [6 7] [6 8] [5 9] [5 10] [5 11] [5 12] [5 13] [5 14] [5 15] [5 16] [5 17] [6 18] [6 19] [6 20] [6 21] [6 22] [7 23] [7 24] [7 25] [8 26] [8 27] [8 28] [9 29] [9 30] [10 31] [10 32] [11 33] [12 34] [13 35] [14 36] [15 36] [16 37] [17 37] [18 37] [19 37] [20 38] [21 38] [22 38] [23 38] [24 38] [25 38] [26 38] [27 38] [28 38] [29 38] [30 38] [31 37] [32 37] [33 37] [34 36] [35 36] [36 36] [37 36] [38 35] [39 34] [40 33] [41 32] [42 31] [42 30] [43 29] [44 28] [45 27] [45 26] [46 25] [46 24] [47 23] [47 22] [47 21] [48 20] [48 19] [48 18] [49 17] [49 16] [49 15] [50 14] [50 13] [50 12] [50 11] [51 10] [51 9] [51 8] [51 7]]
+ :numseq [128 136 136 9 144 136 136 136 136 136 136 136 72 132 136 136 136 72 132 136 72 132 136 72 132 72 132 72 68 68 68 36 66 36 34 34 66 36 34 34 34 34 34 34 34 34 34 18 33 34 18 33 34 34 18 17 17 17 17 9 144 17 17 9 144 9 144 9 136 144 9 136 144 9 136 144 9 136 136 144 9 136 136 128]
+ :normalized-numseq [136 136 136 136 132 72 36 34 34 34 33 17 17 136 136 136 136]
+ :ltype 1}
+
+;; o
+
+(def o-00
+  (-> o-model
+      :lseq
+      second))
+{:line [[6 22] [6 21] [7 19] [8 18] [9 17] [9 16] [10 15] [10 14] [11 13] [11 12] [12 11] [13 10] [14 9] [15 8] [16 7] [17 6] [18 6] [19 5] [20 5] [21 5] [22 5] [23 5] [24 5] [25 5] [26 6] [27 6] [28 6] [29 6] [30 6] [31 7] [32 8] [33 9] [34 10] [35 11] [36 12] [36 13] [37 14] [37 15] [38 16] [37 17] [37 18] [37 19] [37 20] [36 21] [36 22] [36 23] [36 24] [35 25] [35 26] [35 27] [34 28] [34 29] [33 30] [32 31] [32 32] [31 33] [30 34] [29 35] [28 36] [27 37] [26 37] [25 38] [24 38] [23 38] [22 38] [21 39] [20 39] [19 39] [18 39] [17 39] [16 40] [15 40] [14 40] [13 40] [12 40] [11 40] [10 40] [9 40] [8 39] [7 38] [6 37] [6 36] [6 35] [6 34] [6 33] [6 32] [6 31] [6 30] [6 29] [6 28] [6 27] [6 26] [6 25] [6 24] [6 23]]
+ :numseq [136 136 17 17 9 144 9 144 9 144 17 17 17 17 17 33 18 33 34 34 34 34 34 66 36 34 34 34 66 68 68 68 68 68 132 72 132 72 5 144 136 136 9 144 136 136 9 144 136 9 144 9 17 144 9 17 17 17 17 18 33 18 34 34 33 18 34 34 34 33 18 34 34 34 34 34 34 36 68 68 72 136 136 136 136 136 136 136 136 136 136 136 136 136 136]
+ :normalized-numseq [17 144 17 33 34 34 68 72 136 136 17 17 33 34 34 36 136 136 136]
+ :ltype 0}
+
+
+
+(def o-01
+  (-> joc-model
+      :lseq
+      second))
+{:line [[14 78] [14 77] [15 76] [16 75] [16 74] [17 73] [18 72] [19 71] [20 70] [20 69] [21 68] [22 67] [23 66] [23 65] [24 64] [25 64] [26 64] [27 64] [28 64] [29 65] [30 65] [31 66] [31 67] [32 68] [33 69] [33 70] [34 71] [34 72] [34 73] [35 74] [36 75] [36 76] [37 77] [37 78] [37 79] [37 80] [37 81] [38 82] [38 83] [37 84] [37 85] [37 86] [36 87] [36 88] [36 89] [35 90] [35 91] [34 92] [33 93] [32 94] [31 95] [30 96] [29 97] [28 97] [27 97] [26 97] [25 97] [24 97] [23 97] [22 96] [21 96] [20 96] [19 96] [18 96] [17 95] [16 94] [15 93] [15 92] [15 91] [14 90] [14 89] [14 88] [14 87] [14 86] [14 85] [14 84] [14 83] [14 82] [14 81] [14 80] [14 79]]
+ :numseq [136 144 17 9 144 17 17 17 9 144 17 17 9 144 41 38 34 34 66 36 82 132 72 68 132 72 132 136 72 68 132 72 132 136 136 136 72 132 9 144 136 9 144 136 9 144 9 17 17 17 17 17 18 34 34 34 34 34 36 66 34 34 34 36 68 68 72 136 132 72 136 136 136 136 136 136 136 136 136 136 136]
+ :normalized-numseq [136 17 17 36 82 72 132 132 136 17 18 34 34 72 136 136 136]
+ :ltype 0}
+
+(def o-02
+  (-> mos-model
+      :lseq
+      second))
+{:line [[34 33] [34 32] [35 31] [35 30] [35 29] [36 28] [37 27] [38 26] [39 26] [40 25] [41 25] [42 25] [43 24] [44 24] [45 24] [46 24] [47 24] [48 24] [49 24] [50 24] [51 24] [52 24] [53 24] [54 24] [56 25] [57 26] [57 27] [58 28] [58 29] [59 30] [58 31] [58 32] [57 33] [57 34] [56 35] [56 36] [55 37] [55 38] [55 39] [55 40] [54 41] [54 42] [54 43] [54 44] [53 45] [53 46] [52 47] [51 48] [50 49] [49 50] [48 50] [47 50] [46 50] [45 50] [44 50] [43 49] [42 49] [41 49] [40 48] [39 47] [38 46] [37 45] [37 44] [36 43] [35 42] [35 41] [34 40] [34 39] [34 38] [34 37] [34 36] [34 35] [34 34]]
+ :numseq [136 144 9 136 144 17 17 33 18 33 34 18 33 34 34 34 34 34 34 34 34 34 34 34 68 132 72 132 72 69 144 9 144 9 144 9 144 136 136 9 144 136 136 9 144 9 17 17 17 18 34 34 34 34 36 66 34 36 68 68 68 72 132 68 72 132 72 136 136 136 136 136 136]
+ :normalized-numseq [136 18 34 34 34 72 144 136 136 17 34 66 72 136 136]
+ :ltype 0}
+
+(def o-03
+  (-> om-model
+      :lseq
+      second))
+{:line [[6 25] [6 24] [7 23] [8 22] [9 21] [9 20] [10 19] [11 18] [12 17] [13 17] [14 16] [15 16] [16 16] [17 16] [18 16] [19 16] [20 17] [20 18] [21 19] [22 20] [23 21] [24 21] [25 22] [26 22] [27 22] [28 23] [29 24] [30 25] [30 26] [30 27] [31 28] [31 29] [31 30] [31 31] [31 32] [31 33] [30 34] [30 35] [30 36] [29 37] [29 38] [28 39] [28 40] [27 41] [26 42] [26 43] [25 44] [24 44] [23 45] [22 46] [21 47] [20 47] [19 47] [18 47] [17 47] [16 47] [15 46] [14 46] [13 45] [12 44] [11 43] [10 42] [9 41] [8 40] [7 39] [7 38] [7 37] [7 36] [6 35] [6 34] [6 33] [6 32] [6 31] [6 30] [6 29] [6 28] [6 27] [6 26]]
+ :numseq [136 144 17 17 9 144 17 17 33 18 33 34 34 34 50 74 132 72 68 68 36 66 36 34 66 68 68 132 136 72 132 136 136 136 136 9 144 136 9 144 9 144 9 17 144 9 18 33 17 17 18 34 34 34 34 36 66 36 68 68 68 68 68 68 72 136 136 132 72 136 136 136 136 136 136 136 136 136]
+ :normalized-numseq [17 18 34 72 36 72 136 136 17 17 34 66 68 136 136 136]
+ :ltype 0}
+
+(def o-04
+  (-> por-model
+      :lseq
+      last))
+{:line [[41 24] [42 23] [42 22] [42 21] [42 20] [42 19] [42 18] [43 17] [43 16] [44 15] [44 14] [45 13] [45 12] [46 11] [47 10] [48 9] [49 8] [50 7] [51 7] [52 7] [53 6] [54 6] [55 6] [56 6] [57 6] [58 6] [59 6] [60 6] [61 6] [62 6] [63 7] [64 7] [65 8] [66 8] [67 9] [68 9] [69 10] [69 11] [70 12] [70 13] [71 14] [71 15] [71 16] [70 17] [70 18] [70 19] [70 20] [70 21] [69 22] [69 23] [68 24] [67 25] [66 26] [65 27] [64 27] [63 28] [62 28] [61 28] [60 28] [59 28] [58 28] [57 28] [56 28] [55 28] [54 28] [53 28] [52 28] [51 28] [50 27] [49 27] [48 27] [47 27] [46 27] [45 27] [44 27] [43 26] [42 26]]
+ :numseq [144 9 136 136 136 136 144 9 144 9 144 9 144 17 17 17 17 33 34 18 33 34 34 34 34 34 34 34 34 66 36 66 36 66 36 66 132 72 132 72 132 136 9 144 136 136 136 9 144 9 17 17 17 18 33 18 34 34 34 34 34 34 34 34 34 34 34 36 66 34 34 34 34 34 36 66 36]
+ :normalized-numseq [136 136 17 18 34 34 36 72 136 136 17 34 34 34 34 66]
+ :ltype 0}
+
+(def o-05
+  (-> pot-model
+      :lseq
+      last))
+{:line [[40 13] [39 14] [39 15] [39 16] [39 17] [39 18] [39 19] [39 20] [39 21] [40 22] [40 23] [40 24] [40 25] [41 26] [41 27] [41 28] [41 29] [41 30] [42 32] [43 32] [44 32] [45 33] [46 33] [47 33] [48 33] [49 33] [50 33] [51 33] [52 33] [53 33] [54 33] [55 33] [56 32] [57 32] [58 32] [59 32] [60 32] [61 32] [62 32] [63 32] [64 32] [65 31] [66 30] [67 29] [68 29] [69 28] [69 27] [70 26] [70 25] [71 24] [71 23] [72 22] [72 21] [72 20] [71 19] [71 18] [71 17] [70 16] [70 15] [70 14] [69 13] [69 12] [68 11] [67 10] [66 9] [65 8] [64 8] [63 7] [62 7] [61 7] [60 6] [59 6] [58 6] [57 6] [56 5] [55 5] [54 5] [53 5] [52 5] [51 5] [50 5] [49 5] [48 6] [47 6] [46 7] [45 7] [44 8] [43 9] [42 10] [41 11] [40 12]]
+ :numseq [9 144 136 136 136 136 136 136 72 132 136 136 72 132 136 136 136 136 39 34 66 36 34 34 34 34 34 34 34 34 34 18 33 34 34 34 34 34 34 34 18 17 17 33 18 9 144 9 144 9 144 9 136 132 72 136 132 72 136 132 72 132 68 68 68 66 36 66 34 36 66 34 34 36 66 34 34 34 34 34 34 33 18 33 18 33 17 17 17 17 144]
+ :normalized-numseq [136 136 136 136 34 34 34 34 18 9 132 132 68 36 36 34 33 17 144]
+ :ltype 0}
+
+
+;; p
+
+(def p-00
+  (-> p-model
+      :lseq
+      first))
+{:line [[5 8] [6 7] [7 7] [8 6] [9 6] [10 6] [11 6] [12 6] [13 6] [14 5] [15 5] [16 5] [17 5] [18 5] [19 5] [20 5] [21 6] [22 6] [23 5] [24 5] [25 5] [26 5] [27 5] [28 5] [29 6] [30 6] [31 6] [32 6] [33 6] [34 6] [35 6] [36 6] [37 6] [38 6]]
+ :numseq [16 33 18 33 34 34 34 34 18 33 34 34 34 34 34 66 36 18 33 34 34 34 34 66 36 34 34 34 34 34 34 34 34 2]
+ :normalized-numseq [33 34 34 34 34 34 34]
+ :ltype 1}
+
+
+(def p-01
+  (-> ap-model
+      :lseq
+      first))
+{:line [[46 8] [45 8] [44 8] [43 7] [42 7] [41 7] [40 7] [39 7] [38 7] [37 7] [36 8] [35 8] [34 8] [33 8] [32 8] [31 8] [30 7] [29 7] [28 7] [27 7] [26 7] [25 7] [24 8] [23 8] [22 9]]
+ :numseq [2 34 36 66 34 34 34 34 34 33 18 34 34 34 34 36 66 34 34 34 34 33 18 33 84]
+ :normalized-numseq [34 34 34 34 33]
+ :ltype 1}
+
+
+(def p-02
+  (-> pat-model
+      :lseq
+      first))
+{:line [[5 16] [6 16] [7 16] [8 16] [9 16] [10 16] [11 16] [12 16] [13 16] [14 16] [15 16] [16 16] [17 16] [18 17] [19 17] [20 17] [21 17] [22 17] [23 17] [24 17] [25 17] [26 17] [27 17] [28 16] [29 16] [30 16] [31 16] [32 16] [33 16] [34 16]]
+ :numseq [32 34 34 34 34 34 34 34 34 34 34 34 66 36 34 34 34 34 34 34 34 34 18 33 34 34 34 34 34 82]
+ :normalized-numseq [34 34 34 34 34 34]
+ :ltype 1}
+
+(def p-03
+  (-> por-model
+      :lseq
+      first))
+{:line [[7 23] [8 23] [9 23] [10 23] [11 23] [12 23] [13 23] [14 23] [15 24] [16 24] [17 24] [18 24] [19 24] [20 24] [21 24] [22 23] [23 23] [24 23] [25 23] [26 23] [27 24] [28 24] [29 24] [30 25] [31 25] [32 25] [33 25] [34 25] [35 26] [36 26] [37 27] [38 28]]
+ :numseq [32 34 34 34 34 34 34 66 36 34 34 34 34 34 18 33 34 34 34 66 36 34 66 36 34 34 34 66 36 66 68 148]
+ :normalized-numseq [34 34 34 34 36 36 148]
+ :ltype 1}
+
+(def p-04
+  (-> pot-model
+      :lseq
+      first))
+{:line [[6 31] [7 31] [8 31] [9 31] [10 31] [11 31] [12 31] [13 31] [14 31] [15 31] [16 31] [17 31] [18 31] [19 31] [20 31] [21 31] [22 31] [23 31] [24 31] [25 32] [26 32] [27 32] [28 32] [29 32] [30 32] [31 32] [32 32] [33 32] [34 32] [35 32] [36 32] [37 32] [38 32] [39 32] [40 32]]
+ :numseq [32 34 34 34 34 34 34 34 34 34 34 34 34 34 34 34 34 34 66 36 34 34 34 34 34 34 34 34 34 34 34 34 34 34 114]
+ :normalized-numseq [34 34 34 34 34 34 34]
+ :ltype 1}
+
+(def pi
+  (-> pi-model
+      :lseq
+      first))
+{:line [[5 7] [6 7] [7 7] [8 6] [9 6] [10 6] [11 6] [12 6] [13 6] [14 6] [15 6] [16 6] [17 6] [18 6] [19 6] [20 7] [21 7] [22 7] [23 7] [24 7] [25 6] [26 6] [27 6] [28 6] [29 6] [30 6] [31 6] [32 6] [33 6] [34 6] [35 7] [36 7] [37 7] [38 7] [39 7] [40 7] [41 7] [42 7] [43 7] [44 7] [45 8] [46 9] [46 10] [47 11] [47 12] [48 13] [48 14] [48 15] [48 16] [48 17] [47 18] [47 19] [46 20] [46 21] [45 22] [44 23] [43 23] [42 23] [41 24] [40 24] [39 24] [38 24] [37 24] [36 25] [35 25] [34 25]]
+ :numseq [32 34 18 33 34 34 34 34 34 34 34 34 34 34 66 36 34 34 34 18 33 34 34 34 34 34 34 34 34 66 36 34 34 34 34 34 34 34 34 66 68 132 72 132 72 132 136 136 136 9 144 9 144 9 17 18 34 33 18 34 34 34 33 18 34 32]
+ :normalized-numseq [33 34 34 34 34 34 34 34 72 136 17 33 34 32]
+ :ltype 1}
+
+;; r
+
+(def r-01
+  (-> por-model
+      :lseq
+      second))
+{:line [[39 27] [40 26] [41 25] [38 29] [38 30] [38 31] [37 32] [37 33] [37 34] [37 35] [36 36] [35 37] [35 38] [34 39] [34 40] [34 41] [33 42] [32 43] [31 44] [30 45] [30 46] [30 47] [29 48] [29 49] [29 50] [28 51] [27 52] [26 53] [26 54] [25 55] [25 56] [24 57] [23 58] [22 59] [22 60] [22 61] [21 62] [21 63] [20 64] [19 65] [19 66] [18 67] [18 68] [18 69] [17 70] [17 71] [16 72] [16 73] [15 74] [14 75] [13 76] [13 77] [12 78] [12 79] [11 80] [10 81] [10 82] [10 83] [9 84] [9 85] [8 86] [8 87] [7 88] [6 89] [6 90] [6 91] [6 92]]
+ :numseq [17 17 73 136 136 9 144 136 136 9 17 144 9 144 136 9 17 17 17 144 136 9 144 136 9 17 17 144 9 144 9 17 17 144 136 9 144 9 17 144 9 144 136 9 144 9 144 9 17 17 144 9 144 9 17 144 136 9 144 9 144 9 17 144 136 136 8]
+ :normalized-numseq [73 136 136 17 136 17 17 17 136 17 17 136 136 136]
+ :ltype 1}
+
+
+;; s
+(def s-00
+  (-> s-model
+      :lseq
+      first))
+{:line [[11 6] [12 6] [13 6] [14 7] [15 8] [16 9] [17 9] [18 10] [19 10] [20 11] [21 11] [22 12] [23 12] [24 13] [25 13] [26 14] [27 14] [28 15] [29 16] [30 17] [31 18] [32 19] [32 20] [33 21] [33 22] [34 23] [34 24] [35 25] [35 26] [35 27] [34 28] [34 29] [34 30] [34 31] [34 32] [34 33] [33 34] [33 35] [32 36] [32 37] [32 38] [31 39] [31 40] [30 41] [29 42] [28 43] [27 44] [26 44] [25 45] [24 46] [23 46] [22 47] [21 48] [20 49] [19 49] [18 50] [17 50] [16 51] [15 51] [14 51] [13 52] [12 51] [11 51] [10 51] [9 51] [8 51] [7 51] [6 51] [5 51]]
+ :numseq [32 34 66 68 68 36 66 36 66 36 66 36 66 36 66 36 66 68 68 68 68 132 72 132 72 132 72 132 136 9 144 136 136 136 136 9 144 9 144 136 9 144 9 17 17 17 18 33 17 18 33 17 17 18 33 18 33 18 34 33 20 66 34 34 34 34 34 34 32]
+ :normalized-numseq [66 36 66 68 72 132 136 136 17 18 18 33 34 34]
+ :ltype 1}
+
+
+(def s-01
+  (-> sat-model
+      :lseq
+      first))
+{:line [[21 5] [22 5] [23 5] [24 6] [25 6] [26 7] [27 7] [28 7] [29 7] [30 7] [31 7] [32 7] [33 8] [34 8] [35 9] [36 10] [37 11] [38 11] [39 12] [40 13] [41 14] [42 14] [43 15] [44 16] [44 17] [45 18] [45 19] [46 20] [46 21] [46 22] [47 23] [47 24] [47 25] [47 26] [47 27] [46 28] [46 29] [46 30] [46 31] [46 32] [46 33] [45 34] [45 35] [44 36] [44 37] [43 38] [43 39] [43 40] [43 41] [42 42] [41 42] [40 43] [39 44] [38 45] [37 45] [36 46] [35 47] [34 47] [33 48] [32 48] [31 49] [30 49] [29 49] [28 50] [27 50] [26 51] [25 51] [24 51] [23 51] [22 51] [21 51] [20 51]]
+ :numseq [32 34 66 36 66 36 34 34 34 34 34 66 36 66 68 68 36 66 68 68 36 66 68 132 72 132 72 132 136 72 132 136 136 136 9 144 136 136 136 136 9 144 9 144 9 144 136 136 9 18 33 17 17 18 33 17 18 33 18 33 18 34 33 18 33 18 34 34 34 34 34 38]
+ :normalized-numseq [32 36 34 66 66 72 132 136 136 144 33 17 18 33 34 38]
+ :ltype 1}
+
+(def s-02
+  (-> mos-model
+      :lseq
+      last))
+{:line [[60 31] [61 31] [62 32] [63 32] [64 33] [65 34] [66 35] [67 36] [68 37] [69 38] [70 39] [71 40] [72 41] [72 42] [73 43] [73 44] [74 45] [75 46] [75 47] [76 48] [76 49] [76 50] [77 51] [77 52] [77 53] [77 54] [78 55] [78 56] [78 57] [78 58] [78 59] [78 60] [78 61] [78 62] [78 63] [77 64] [77 65] [76 66] [76 67] [76 68] [76 69] [76 70] [75 71] [74 72] [74 73] [73 74] [73 75] [72 76] [72 77] [71 78] [70 79] [69 80] [68 80] [67 81] [66 82] [65 83] [64 83] [63 83] [62 84] [61 84] [60 85] [59 86] [58 86] [57 86] [56 86] [55 87] [54 87] [53 87] [52 87] [51 87] [50 87] [49 87] [48 87] [47 87]]
+ :numseq [36 66 36 66 68 68 68 68 68 68 68 68 132 72 132 72 68 132 72 132 136 72 132 136 136 72 132 136 136 136 136 136 136 136 9 144 9 144 136 136 136 9 17 144 9 144 9 144 9 17 17 18 33 17 17 18 34 33 18 33 17 18 34 34 33 18 34 34 34 34 34 34 34 32]
+ :normalized-numseq [66 68 72 72 136 136 136 136 17 17 17 33 33 34 34]
+ :ltype 1}
+
+;; t
+(-> t-model
+    :lseq
+    first)
+{:line [[7 6] [7 7] [7 8] [7 9] [7 10] [7 11] [6 12] [6 13] [6 14] [6 15] [5 16] [5 17] [5 18] [5 19] [5 20] [5 21] [5 22] [5 23] [5 24] [5 25] [5 26] [5 27] [5 28] [5 29] [5 30] [5 31] [5 32] [5 33] [5 34] [5 35] [5 36] [5 37] [5 38] [5 39] [5 40] [5 41] [5 42]]
+ :numseq [128 136 136 136 136 9 144 136 136 9 144 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 8]
+ :normalized-numseq [136 136 136 136 136 136 136 136]
+ :ltype 1}
+
+(def t-01
+  (-> pat-model
+      :lseq
+      last))
+{:line [[35 17] [36 18] [36 19] [36 20] [35 21] [35 22] [35 23] [35 24] [35 25] [35 26] [35 27] [35 28] [35 29] [35 30] [35 31] [35 32] [34 33] [34 34] [34 35] [34 36] [34 37] [34 38] [34 39] [34 40] [34 41] [34 42] [34 43] [34 44] [34 45] [34 46] [34 47]]
+ :numseq [68 164 152 9 144 136 136 136 136 136 136 136 136 136 136 9 144 136 136 136 136 136 136 136 136 136 136 136 136 136 8]
+ :normalized-numseq [68 144 136 136 136 136 136]
+ :ltype 1}
+
+(def t-02
+  (-> sat-model
+      :lseq
+      last))
+{:line [[18 54] [18 55] [17 56] [17 57] [17 58] [17 59] [17 60] [17 61] [17 62] [17 63] [17 64] [17 65] [17 66] [17 67] [17 68] [17 69] [17 70] [18 71] [18 72] [18 73] [18 74] [18 75] [18 76] [18 77] [18 78] [18 79] [18 80] [18 81]]
+ :numseq [132 9 144 136 136 136 136 136 136 136 136 136 136 136 136 136 72 132 136 136 136 136 136 136 136 136 136 8]
+ :normalized-numseq [132 136 136 136 136 136 136]
+ :ltype 1}
+
+(def t-03
+  (-> ta-model
+      :lseq
+      first))
+{:line [[28 5] [28 6] [28 7] [28 8] [27 9] [26 10] [26 11] [26 12] [26 13] [26 14] [26 15] [25 16] [25 17] [25 18] [25 19] [25 20] [25 21] [25 22] [25 23] [25 24] [24 25] [24 26] [24 27] [24 28] [24 29] [24 30] [24 31] [24 32] [24 33] [24 34] [24 35] [24 36] [24 37] [24 38] [24 39] [24 40] [24 41] [24 42] [24 43] [24 44] [24 45] [23 46] [23 47] [22 48]]
+ :numseq [128 136 136 9 17 144 136 136 136 136 9 144 136 136 136 136 136 136 136 9 144 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 9 144 9 145]
+ :normalized-numseq [128 136 136 136 136 136 136 136 136 144]
+ :ltype 1}
+
+(def t-04
+  (-> pot-model
+      :lseq
+      second))
+{:line [[41 33] [41 32] [41 34] [41 35] [41 36] [41 37] [41 38] [41 39] [41 40] [41 41] [41 42] [41 43] [42 44] [42 45] [42 46] [42 47] [42 48] [42 49] [42 50] [42 51] [42 52] [42 53] [43 54] [43 55] [43 56] [43 57] [44 58] [44 59] [44 60] [44 61] [44 62] [44 63] [44 64] [44 65]]
+ :numseq [156 170 136 136 136 136 136 136 136 136 136 72 132 136 136 136 136 136 136 136 136 72 132 136 136 72 132 136 136 136 136 136 136 8]
+ :normalized-numseq [136 136 136 136 136 136 136]
+ :ltype 1}
+
+(defn get-freq
+  [model]
+  (let [nseq (:normalized-numseq model)]
+    {:len (count nseq)
+     :freq  (frequencies nseq)}))
+
+(defn get-freq-diff
+  [standard current]
+  (reduce (fn [acc freq]
+            (+ acc (abs (- (get standard freq) (get current freq 0)))))
+          0
+          (keys standard)))
+
+(def type-0-sequences
+  [{:letter "o"
+    :len 17
+    :len-tolerance 2
+    :freq {34 3, 36 1, 72 2, 136 5, 17 2, 18 1}
+    :freq-tolerance 5}
+   {:letter "a"
+    :len 10
+    :len-tolerance 2
+    :freq {34 2, 36 1, 68 1, 136 2, 17 2}
+    :freq-tolerance 6}])
+
+
+;; a 
+{:freq {34 1 66 1 36 1 68 1 136 4 144 1 17 2 18 1} :len 12}
+{:freq {34 1 66 1 36 1 68 1 72 1 136 2 17 3} :len 10}
+{:freq {66 1 36 2 68 1 132 1 136 4 17 2 18 1} :len 12}
+{:freq {33 1 34 3 68 1 132 1 136 3 17 1} :len 10}
+{:freq {33 4 34 2 36 1 68 1 136 1} :len 9}
+{:freq {33 1 34 1 36 2 132 1 72 2 136 1} :len 8}
+{:freq {34 4 36 1 68 1 132 1 136 3 17 1} :len 11}
+
+(def standard {34 2 36 1 68 1 136 2 17 2})
+
+(get-freq-diff standard {34 1 66 1 36 1 68 1 136 4 144 1 17 2 18 1})
+;; => 3
+(get-freq-diff standard {34 1 66 1 36 1 68 1 72 1 136 2 17 3})
+;; => 2
+
+(get-freq-diff standard {66 1 36 2 68 1 132 1 136 4 17 2 18 1})
+;; => 5
+
+(get-freq-diff standard {33 1 34 3 68 1 132 1 136 3 17 1})
+;; => 4
+(get-freq-diff standard {33 4 34 2 36 1 68 1 136 1})
+;; => 3
+(get-freq-diff standard {33 1 34 1 36 2 132 1 72 2 136 1})
+;; => 6
+(get-freq-diff standard {34 4 36 1 68 1 132 1 136 3 17 1})
+;; => 4
+
+;; o
+
+(get-freq o-00)
+;; => {:freq {33 2 34 4 36 1 68 1 72 1 136 5 144 1 17 4} :len 19}
+(get-freq o-01)
+;; => {:freq {34 2 36 1 132 2 72 2 136 5 17 3 18 1 82 1} :len 17}
+(get-freq o-02)
+;; => {:freq {34 4 66 1 72 2 136 5 144 1 17 1 18 1} :len 15}
+(get-freq o-03)
+;; => {:freq {34 2 66 1 36 1 68 1 72 2 136 5 17 3 18 1} :len 16}
+(get-freq o-04)
+;; => {:freq {34 6 66 1 36 1 72 1 136 4 17 2 18 1} :len 16}
+(get-freq o-05)
+;; => {:freq {33 1 34 5 36 2 68 1 132 2 136 4 9 1 144 1 17 1 18 1} :len 19}
+
+(/ (+ 19 17 15 16 16 19) 6)
+;; => 17
+(int (/ (+ 4 2 4 2 6 5) 6))
+;; => 4
+(int (/ (+ 1 1 1 1 2) 6)
+;; => 1
+(int (/ (+ 1 2 2 2 1) 6))
+;; => 1
+(int (/ (+ 5 5 5 5 4 4) 6))
+;; => 5
+(int (/ (+ 1 2 1 3 2 1) 6))
+;; => 1
+
+(int (/ (+ ) 6))
+(int (/ (+ ) 6))
+
+(get-freq-diff {34 4, 36 1, 72 1, 136 5, 17 2, 18 1} {33 2 34 4 36 1 68 1 72 1 136 5 144 1 17 4})
+;; => 3
+(get-freq-diff {34 4, 36 1, 72 1, 136 5, 17 2, 18 1} {34 2 36 1 132 2 72 2 136 5 17 3 18 1 82 1})
+;; => 4
+(get-freq-diff {34 4, 36 1, 72 1, 136 5, 17 2, 18 1} {34 4 66 1 72 2 136 5 144 1 17 1 18 1})
+;; => 3
+(get-freq-diff {34 4, 36 1, 72 1, 136 5, 17 2, 18 1} {34 2 66 1 36 1 68 1 72 2 136 5 17 3 18 1})
+;; => 4
+(get-freq-diff {34 4, 36 1, 72 1, 136 5, 17 2, 18 1} {34 6 66 1 36 1 72 1 136 4 17 2 18 1})
+;; => 3
+(get-freq-diff {34 4, 36 1, 72 1, 136 5, 17 2, 18 1} {33 1 34 5 36 2 68 1 132 2 136 4 9 1 144 1 17 1 18 1})
+;; => 5
+
+(def type-1-sequences
+  [{:letter "c"
+    :len 6
+    :len-tolerance 2
+    :freq {33 1, 17 1, 18 4}
+    :freq-tolerance 2}
+   {:letter "e"
+    :len 6
+    :len-tolerance 2 
+    :freq {33 1, 66 1, 36 1, 136 2, 18 1}
+    :freq-tolerance 2}
+   {:letter "f"
+    :len 7
+    :len-tolerance 2 
+    :freq {66 3, 36 1, 68 3}
+    :freq-tolerance 2}
+   {:letter "i"
+    :len 7
+    :len-tolerance 2 
+    :freq {34 3, 68 1, 132 1, 136 1, 17 1}
+    :freq-tolerance 2}
+   {:letter "j"
+    :len 15
+    :len-tolerance 2 
+    :freq {33 1, 34 1, 66 3, 36 1, 68 1, 132 1, 136 3, 144 1, 17 2, 18 1}
+    :freq-tolerance 10}
+   {:letter "l"
+    :len 10
+    :len-tolerance 2
+    :freq {136 7, 9 2, 144 1}
+    :freq-tolerance 5}
+   {:letter "m"
+    :len 14
+    :len-tolerance 3
+    :freq {33 1, 34 4, 132 1, 136 4, 17 3}
+    :freq-tolerance 5}
+   {:letter "n"
+    :len 17
+    :len-tolerance 2 
+    :freq {33 1, 34 3, 36 1, 132 1, 72 1, 136 8, 17 2}
+    :freq-tolerance 5}
+   ])
+
+;; c
+
+(get-freq c-00)
+;; => {:freq {33 1 17 1 18 4} :len 6}
+(get-freq c-01)
+;; => {:freq {33 1 2 1 17 2 18 3} :len 7}
+(get-freq-diff {33 1 17 1 18 4} {33 1 2 1 17 2 18 3})
+;; => 2
+
+;; e
+(get-freq e-00)
+;; => {:freq {33 1 66 1 36 1 136 2 18 1} :len 6}
+
+;; f
+(get-freq f-00)
+;; => {:freq {66 3 36 1 68 3} :len 7}
+
+;; i
+(get-freq i-00)
+;; => {:freq {34 3 68 1 132 1 136 1 17 1} :len 7}
+
+;; j
+(get-freq j-00)
+;; => {:freq {33 1 34 1 66 3 36 1 68 1 132 1 136 3 144 1 17 2 18 1} :len 15}
+(get-freq j-01)
+;; => {:freq {33 2 34 2 68 3 132 1 196 1 136 4 144 1 17 1 18 1} :len 16}
+
+(get-freq-diff {33 1 34 1 66 3 36 1 68 1 132 1 136 3 144 1 17 2 18 1} {33 2 34 2 68 3 132 1 196 1 136 4 144 1 17 1 18 1})
+;; => 10
+
+;; l
+(get-freq l-00)
+;; => {:freq {128 1 136 7 9 1 16 1} :len 10}
+
+;; m
+(get-freq m-00)
+;; => {:freq {33 2 34 2 66 1 132 1 136 7 16 1 17 3} :len 17}
+(get-freq m-01)
+;; => {:freq {33 1 34 5 66 1 132 1 136 5 18 1} :len 14}
+(get-freq m-02)
+;; => {:freq {33 1 34 3 36 2 68 1 136 4 17 3 82 1} :len 15}
+(get-freq m-03)
+;; => {:freq {33 1 34 4 36 1 68 1 132 1 136 2 17 1 145 1} :len 12}
+
+(int (/ (+ 17 14 15 12) 4))
+;; => 14
+
+(int (/ (+ ) 4))
+
+(int (/ (+ 7 5 4 2) 4))
+;; => 4
+
+(get-freq-diff {33 1, 34 4, 132 1, 136 5, 17 3} {33 2 34 2 66 1 132 1 136 7 16 1 17 3})
+;; => 5
+(get-freq-diff {33 1, 34 4, 132 1, 136 5, 17 3} {33 1 34 5 66 1 132 1 136 5 18 1})
+;; => 4
+(get-freq-diff {33 1, 34 4, 132 1, 136 5, 17 3} {33 1 34 3 36 2 68 1 136 4 17 3 82 1})
+;; => 3
+(get-freq-diff {33 1, 34 4, 132 1, 136 5, 17 3} {33 1 34 4 36 1 68 1 132 1 136 2 17 1 145 1})
+;; => 5
+
+;; n
+(get-freq n-00)
+;; => {:freq {33 1 34 3 36 1 132 1 72 1 136 8 17 2} :len 17}
+
+#+end_src
+
+* 2025-03-11
+
+#+begin_src clojure
+(import [cv2 :as cv2])
+
+(require
+  '[steno.converter :as cnv]
+  '[steno.utils :as utl])
+
+(add-tap (bound-fn* utl/print4tap))
+
+(defn get-freq-diff
+  [standard current]
+  (reduce (fn [acc freq]
+            (+ acc (abs (- (get standard freq) (get current freq 0)))))
+          0
+          (keys standard)))
+
+(defn build-model
+  [fileimage]
+  (let [mat* (cnv/image2matrix (cv2/imread fileimage))
+        lineseq* (cnv/matrix2lineseq mat*)
+        _ (tap> {:lseq* lineseq*})
+        lineseq (cnv/format-lineseq lineseq*)]
+    (tap> {:lseq lineseq})
+    (doseq [ls lineseq]
+      (utl/show-matrix (utl/cells2matrix [100 100] (:line ls))))
+    {:mat* mat*
+     :lseq lineseq
+     :lseq* lineseq*}))
+
+(def type-1-sequences
+  [{:letter "c"
+    :len 6
+    :len-tolerance 2
+    :freq {33 1, 17 1, 18 4}
+    :freq-tolerance 2}
+   {:letter "g"
+    :len 12
+    :len-tolerance 4 
+    :freq {33 2, 17 2, 18 8}
+    :freq-tolerance 4}
+   {:letter "e"
+    :len 6
+    :len-tolerance 2 
+    :freq {33 1, 66 1, 36 1, 136 2, 18 1}
+    :freq-tolerance 2}
+   {:letter "f"
+    :len 7
+    :len-tolerance 2 
+    :freq {66 3, 36 1, 68 3}
+    :freq-tolerance 2}
+   {:letter "v"
+    :len 14
+    :len-tolerance 4
+    :freq {66 6, 36 2, 68 6}
+    :freq-tolerance 4}
+   {:letter "i"
+    :len 7
+    :len-tolerance 2 
+    :freq {34 3, 68 1, 132 1, 136 1, 17 1}
+    :freq-tolerance 2}
+   {:letter "j"
+    :len 15
+    :len-tolerance 2 
+    :freq {33 1, 34 1, 66 3, 36 1, 68 1, 132 1, 136 3, 144 1, 17 2, 18 1}
+    :freq-tolerance 10}
+   {:letter "l"
+    :len 10
+    :len-tolerance 2
+    :freq {136 7, 9 2, 144 1}
+    :freq-tolerance 5}
+   {:letter "m"
+    :len 14
+    :len-tolerance 3
+    :freq {33 1, 34 4, 132 1, 136 4, 17 3}
+    :freq-tolerance 5}
+   {:letter "n"
+    :len 17
+    :len-tolerance 2 
+    :freq {33 1, 34 3, 36 1, 132 1, 72 1, 136 8, 17 2}
+    :freq-tolerance 5}
+   {:letter "p"
+    :len 6
+    :len-tolerance 2 
+    :freq {34 6}
+    :freq-tolerance 2}
+   {:letter "b"
+    :len 12
+    :len-tolerance 4 
+    :freq {34 12}
+    :freq-tolerance 4}
+   {:letter "r"
+    :len 14
+    :len-tolerance 2 
+    :freq {136 7 73 1 17 6}
+    :freq-tolerance 2}
+   {:letter "s"
+    :len 14
+    :len-tolerance 2 
+    :freq {33 1, 34 2, 66 1, 68 1, 136 3, 17 1, 18 2}
+    :freq-tolerance 6}
+   {:letter "t"
+    :len 7
+    :len-tolerance 2
+    :freq {136 7}
+    :freq-tolerance 2}
+   {:letter "d"
+    :len 14
+    :len-tolerance 4
+    :freq {136 14}
+    :freq-tolerance 4}
+   ])
+
+(def ap-model (build-model "tmp/templates/word012.png"))
+(def mos-model (build-model "tmp/templates/word003.png"))
+(def p-model (build-model "tmp/templates/word023.png"))
+(def pat-model (build-model "tmp/templates/word007.png"))
+(def por-model (build-model "tmp/templates/word009.png"))
+(def pot-model (build-model "tmp/templates/word008.png"))
+(def s-model (build-model "tmp/templates/word014.png"))
+(def sat-model (build-model "tmp/templates/word005.png"))
+(def t-model (build-model "tmp/templates/word022.png"))
+(def ta-model (build-model "tmp/templates/word011.png"))
+
+;; p
+(def p-00 (-> p-model  :lseq first))
+;; => {:freq {33 1 34 6} :len 7 }
+(def p-01 (-> ap-model :lseq first))
+;; => {:freq {33 1 34 4} :len 5}
+(def p-02 (-> pat-model :lseq first))
+;; => {:freq {34 6} :len 6}
+(def p-03 (-> por-model :lseq first))
+;; => {:freq {34 4 36 2 148 1} :len 7}
+(def p-04 (-> pot-model :lseq first))
+;; => {:freq {34 7} :len 7}
+
+;; r
+(def r-01 (-> por-model :lseq second))
+  ;; => {:freq {136 7 73 1 17 6} :len 14}
+
+;; s
+(def s-00 (-> s-model :lseq first))
+;; => {:freq {33 1 34 2 66 2 36 1 68 1 132 1 72 1 136 2 17 1 18 2} :len 14}
+(get-freq-diff {33 1, 34 2, 66 1, 68 1, 136 3, 17 1, 18 2} (:freq s-00))
+;; => 2
+(def s-01 (-> sat-model :lseq first))
+;; =>  {:freq {33 1 34 2 66 1 36 1 68 2 132 1 38 1 136 3 9 1 18 2} :len 15}
+(get-freq-diff {33 1, 34 2, 66 1, 68 1, 136 3, 17 1, 18 2} (:freq s-01))
+;; => 2
+(def s-02 (-> mos-model :lseq last))
+;; => {:freq {33 2 34 2 66 1 68 1 72 2 136 4 17 3} :len 15}
+(get-freq-diff {33 1, 34 2, 66 1, 68 1, 136 3, 17 1, 18 2} (:freq s-02))
+;; => 6
+
+;; t
+(def t-00 (-> t-model :lseq first))
+  ;; => {:freq {136 8} :len 8}
+(def t-01 (-> pat-model :lseq last))
+  ;; => {:freq {8 1 136 5 144 1} :len 7}
+(def t-02 (-> sat-model :lseq last))
+  ;; => {:freq {132 1 136 5} :len 6}
+(def t-03 (-> ta-model :lseq first))
+  ;; => {:freq {128 1 136 7 144 1} :len 9}
+(def t-04 (-> pot-model :lseq second))
+;; => {:freq {136 7} :len 7}
+
+
+(sort-by :len  #(> %1 %2) type-1-sequences)
+;; => ({:letter "n" :freq-tolerance 5 :freq {33 1 34 3 36 1 132 1 72 1 136 8 17 2} :len 17 :len-tolerance 2} {:letter "j" :freq-tolerance 10 :freq {33 1 34 1 66 3 36 1 68 1 132 1 136 3 144 1 17 2 18 1} :len 15 :len-tolerance 2} {:letter "v" :freq-tolerance 4 :freq {66 6 36 2 68 6} :len 14 :len-tolerance 4} {:letter "m" :freq-tolerance 5 :freq {33 1 34 4 132 1 136 4 17 3} :len 14 :len-tolerance 3} {:letter "r" :freq-tolerance 2 :freq {136 7 73 1 17 6} :len 14 :len-tolerance 2} {:letter "s" :freq-tolerance 6 :freq {33 1 34 2 66 1 68 1 136 3 17 1 18 2} :len 14 :len-tolerance 2} {:letter "d" :freq-tolerance 4 :freq {136 14} :len 14 :len-tolerance 4} {:letter "g" :freq-tolerance 4 :freq {33 2 17 2 18 8} :len 12 :len-tolerance 4} {:letter "b" :freq-tolerance 4 :freq {34 12} :len 12 :len-tolerance 4} {:letter "l" :freq-tolerance 5 :freq {136 7 9 2 144 1} :len 10 :len-tolerance 2} {:letter "f" :freq-tolerance 2 :freq {66 3 36 1 68 3} :len 7 :len-tolerance 2} {:letter "i" :freq-tolerance 2 :freq {34 3 68 1 132 1 136 1 17 1} :len 7 :len-tolerance 2} {:letter "t" :freq-tolerance 2 :freq {136 7} :len 7 :len-tolerance 2} {:letter "c" :freq-tolerance 2 :freq {33 1 17 1 18 4} :len 6 :len-tolerance 2} {:letter "e" :freq-tolerance 2 :freq {33 1 66 1 36 1 136 2 18 1} :len 6 :len-tolerance 2} {:letter "p" :freq-tolerance 2 :freq {34 6} :len 6 :len-tolerance 2})
+
+#+end_src

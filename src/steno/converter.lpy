@@ -16,20 +16,26 @@
    ])
 
 
-(def pos [2r10000000
-          2r01000000
-          2r00100000
-          2r00010000
-          2r00001000
-          2r00000100
-          2r00000010
-          2r00000001])
+(def ^{:doc "Direction position in the cell number"} pos
+  [2r10000000 ; E  
+   2r01000000 ; SE 
+   2r00100000 ; S  
+   2r00010000 ; SV 
+   2r00001000 ; V  
+   2r00000100  ; NV
+   2r00000010  ; N 
+   2r00000001] ; NE
+  )
 
 
 (def dummy-cell [-1 -1])
 
+(def ^{:doc "Factor that determines how close two cells must be to be neighbors (sum of dx and dy)"} neighbor-factor 10)
 
-(defn image->matrix
+(def lineseq-min-size 10)
+
+
+(defn image2matrix
   "Convert an image to binary matrix."
   [img]
   (let [[rows cols _] (.- img shape)]
@@ -141,23 +147,40 @@
 
    Params:
    - mat : the word matrix
-   - start-cell : [row column]
-   - prev-cell : previous cell in sequence (dummy cell if new sequence)
+   - status: (map) status of the extracting process
+     - start-cell : [row column]
+     - prev-cells : (set) previous cells with value 1 processed
 
-   Returns: [next-start-cell next-prev-cell numeric-sequence]  "
-  [mat start-cell prev-cell]
+   Returns: status map updated + numseq"
+  [mat {:keys [start-cell prev-cells]}]
   (loop [start start-cell
-         prev prev-cell
-         acc []]
+         prev prev-cells
+         line []]
     (let [[neighbors val] (get-cell-number-and-neighbors mat start)
-          new-neighbors (disj neighbors prev)
-          new-acc (conj acc val)
-          num (count new-neighbors)]
-      (tap> {:cell start :val val :neighbors new-neighbors})
-      (cond
-        (zero? num) [dummy-cell start new-acc]
-        (= num 1) (recur (first new-neighbors) start new-acc)
-        :else [start prev acc]))))
+          new-neighbors (set/difference neighbors prev)
+          new-line (conj line (conj start val))
+          new-prev (conj prev start)]
+      ;; (tap> {:cell start :val val :neighbors new-neighbors})
+      (if-not (= (count new-neighbors) 1)
+        {:start-cells new-neighbors
+         :prev-cells new-prev
+         :line new-line}
+        (recur (first new-neighbors) new-prev new-line)))))
+
+
+(defn parallel-lineseq?
+  "True if line sequence is a loop"
+  [lseq]
+  (= (utl/nested-levels lseq) 3))
+
+
+(defn parallel2liniar
+  "Transform a one line parallel sequence into a liniar sequence"
+  [line-seq]
+  (let [lseq (filterv seq line-seq)]
+    (if (and (parallel-lineseq? lseq) (= (count lseq) 1))
+      (first lseq)
+      lseq)))
 
 
 (defn get-parallel-sequence
@@ -165,30 +188,30 @@
 
    Params:
    - mat : the word matrix
-   - start-cell : [row column]
-   - prev-cell : previous cell in sequence (dummy cell if new sequence)
-
-   Returns: [next-start-cell next-prev-cell parallel-numeric-sequences]  "
-  [mat start prev]
-  (let [neighbors         (get-next-neighbors mat start prev)
-        _                 (tap> {:cell start :prev prev :neighbors neighbors})
-        res               (map (fn [cell]
-                                 (tap> {:cell cell})
-                                 (get-liniar-sequence mat cell start))
-                            neighbors)
-        seqs              (mapv #(nth % 2) res)
-        new-prevs         (set (map first res))
-        next-neighbors    (->> res
-                            (map (fn [[s p _]]
-                                   (get-next-neighbors mat s p)))
-                            (apply set/union)
-                            (set))
-        new-prev          (first (set/difference next-neighbors new-prevs))
-        [new-neighbors _] (get-cell-number-and-neighbors mat new-prev)
-        new-start         (-> new-neighbors
-                            (set/difference next-neighbors)
-                            first)]
-    [new-start new-prev seqs]))
+   - status: (map) status of the extracting process
+      - start-cells : (set) cells to process
+      - prev-cells : (set) previous cells with value 1
+  
+   Returns: state map updated + :line (the line sequence)  "
+  [mat {:keys [start-cells prev-cells]}]
+  (let [{:keys [line] :as state} (reduce (fn [acc cell]
+                                           ;; (tap> {:cell cell})
+                                           ;; (tap> acc)
+                                           (if (get (:prev-cells acc) cell)
+                                             acc
+                                             (let [new-seq (get-liniar-sequence mat
+                                                             (assoc acc
+                                                               :start-cell cell))
+                                                   new-acc  {:prev-cells (:prev-cells new-seq)
+                                                             :line (conj (:line acc) (:line new-seq))
+                                                             :start-cells (into (:start-cells acc) (:start-cells new-seq))}]
+                                               ;; (tap> new-acc)
+                                               new-acc)))
+                                   {:prev-cells prev-cells
+                                    :line []
+                                    :start-cells #{}}
+                                   start-cells)]
+    (assoc state :line (parallel2liniar line))))
 
 
 (defn extract-neighbors
@@ -202,31 +225,181 @@
            directions pos))))
 
 
+(defn neighbors?
+  "True if the cells are adiacent"
+  [[x1 y1 _] [x2 y2 _]]
+  (<= (+ (abs (- x1 x2))  (abs (- y1 y2))) neighbor-factor))
+
+
+(defn small-lineseq?
+  "True if lineseq size is small (5-)"
+  [lseq]
+  (let [size (count lseq)]
+    (and (pos? size) (< size 5))))
+
+
+(defn get-ltype
+  "Returns the line sequence type: loop (0) or liniar (1)"
+  [lseq]
+  (if (and (not (small-lineseq? lseq)) (neighbors? (first lseq) (last lseq))) 0 1))
+
+
+(defn continuation?
+  "True if the 2 line sequences are adiacent"
+  [lseq1 lseq2]
+  (neighbors? (last lseq1) (first lseq2)))
+
+
+(defn loop?
+  "True if the 2 line sequences build a loop"
+  [lseq1 lseq2]
+  (and (neighbors? (first lseq1) (first lseq2))
+    (neighbors? (last lseq1) (last lseq2))))
+
+
+(defn reverse-loop?
+  "True if the 2 line sequences build a loop, second lseq is reversed"
+  [lseq1 lseq2]
+  (and (neighbors? (first lseq1) (last lseq2))
+    (neighbors? (last lseq1) (first lseq2))))
+
+
+(defn process-lineseq
+  [{:keys [prev res modifs-count]} lseq]
+  (tap> {:lseq lseq})
+  (tap> {:modifs-count modifs-count})
+  (tap> {:prev prev})
+  (tap> {:res res})
+  (if (parallel-lineseq? lseq)
+    (let [[lseq1 lseq2] lseq]
+      (cond
+        (= (or (get-ltype lseq1) 0) (= (get-ltype lseq2) 0))
+        {:prev nil
+         :res (filterv identity  (conj res prev lseq1 lseq2))
+         :modifs-count (inc modifs-count)}
+        (loop? lseq1 lseq2)
+        {:prev nil
+         :res (filterv identity  (conj res prev (into lseq1 (rseq lseq2))))
+         :modifs-count (inc modifs-count)}
+        :else
+        {:prev lseq2
+         :res (filterv identity  (conj res prev lseq1))
+         :modifs-count (inc modifs-count)}))
+    (cond
+      (= (get-ltype lseq) 0)
+      {:prev nil
+       :res (filterv identity  (conj res prev lseq))
+       :modifs-count modifs-count}
+      (small-lineseq? prev) ; small  prev, add it to the lseq
+      {:prev (into prev lseq)
+       :res res
+       :modifs-count (inc modifs-count)}
+      (and prev (loop? prev lseq))
+      {:prev nil
+       :res (filterv identity  (conj res (into prev (rseq lseq))))
+       :modifs-count (inc modifs-count)}
+      (and prev (reverse-loop? prev lseq))
+      {:prev nil
+       :res (filterv identity  (conj res (into prev lseq)))
+       :modifs-count (inc modifs-count)}
+      :else
+      {:prev lseq
+       :res (filterv identity (conj res prev))
+       :modifs-count modifs-count})))
+
+
+(defn median
+  [coll]
+  (let [sorted (sort coll)
+        cnt (count sorted)
+        halfway (quot cnt 2)]
+    (nth sorted halfway)))
+
+
+(def normalize-bin-size 5)
+
+
+(defn normalize-numseq
+  [numseq bin-size]
+  (mapv median (partition-all bin-size numseq)))
+
+
+(defn get-loop-start
+  [line]
+  (reduce (fn [{:keys [min-x min-y] :as res} [pos [x y _]]]
+            (if (or (< x min-x) (and (= x min-x) (< y min-y)))
+              {:min-x x :min-y y :min-pos pos}
+              res))
+    {:min-x (first (first line))
+     :min-y (second (first line))
+     :min-pos 0}
+    (map-indexed list (rest line))))
+
+
+(defn normalize-loop
+  [line]
+  (let [pos (:min-pos (get-loop-start line))]
+    (into (subvec line pos) (subvec line 0 pos))))
+
+
+(defn make-lineseq-item
+  [item]
+  (let [ltype (get-ltype item)
+        ls (if (zero? ltype) (normalize-loop item) item)
+        nseq (mapv last ls)
+        nnseq (normalize-numseq nseq normalize-bin-size)]
+    {:ltype ltype
+     :line (mapv #(subvec % 0 2) ls)
+     :numseq nseq
+     :normalized-numseq nnseq
+     :len (count nnseq)
+     :freq (frequencies nnseq)}))
+
+
+(defn format-lineseq
+  [lineseq]
+  (let [{:keys [prev res modifs-count]} (reduce process-lineseq
+                                          {:prev nil
+                                           :res []
+                                           :modifs-count 0}
+                                          lineseq)
+        new-lineseq (filterv identity (conj res prev))]
+    (tap> {:modifs modifs-count
+           :lineseq new-lineseq})
+    (if (zero? modifs-count)
+      (mapv make-lineseq-item new-lineseq)
+      (format-lineseq new-lineseq))))
+
+
 ;; module entry points
 
-(defn matrix->numseq
-  "Convert a word matrix in a vector of numeric sequences."
+(defn matrix2lineseq
+  "Convert a word matrix in a vector of line sequences."
   [mat]
-  (loop [start (get-start-cell mat)
-         prev dummy-cell
+  (loop [state {:start-cells #{(get-start-cell mat)}
+                :prev-cells #{}
+                :line []}
          acc []]
-    (let [[new-start new-prev seq] (get-liniar-sequence mat start prev)]
-      (if (= new-start dummy-cell)
-        (conj acc seq)
-        (let [[st pr pseqs] (get-parallel-sequence mat new-start new-prev)]
-          (recur st pr (conj acc seq pseqs)))))))
+    ;; (tap> state)
+    (let [new-state (if (= (count (:start-cells state)) 1)
+                      (get-liniar-sequence mat (assoc state :start-cell (first (:start-cells state))))
+                      (get-parallel-sequence mat state))
+          new-acc (conj acc (:line new-state))]
+      (if (empty? (:start-cells new-state))
+        (filterv seq new-acc)
+        (recur new-state new-acc)))))
 
 
-(defn numseq->matrix
+(defn numseq2matrix
   "Convert a numeric sequence in a binary matrix"
   [numseq]
   (let [start-cell [100 100]
         cells* (:cells (reduce (fn [{:keys [cells start prev] :as acc} num]
-                                 (tap> acc)
+                                 ;; (tap> acc)
                                  (let [new-cells (-> num
                                                    (extract-neighbors start)
                                                    (disj prev))]
-                                   (tap> {:new-cells new-cells})
+                                   ;; (tap> {:new-cells new-cells})
                                    {:cells (into cells new-cells)
                                     :start (first new-cells)
                                     :prev start}))
@@ -239,66 +412,14 @@
         cells (mapv (fn [[x y]] [(- x x-min) (- y y-min)]) cells*)
         x-max (inc (apply max (map first cells)))
         y-max (inc (apply max (map second cells)))]
-    (utl/cells->matrix [x-max y-max] cells)))
+    (utl/cells2matrix [x-max y-max] cells)))
 
 
 (comment
 
   (import [cv2 :as cv2])
 
-  (require '[steno.utils :as utl])
-
-  (def p-template (image->matrix (cv2/imread "tmp/templates/word023.png")))
+  (add-tap (bound-fn* utl/print4tap))
   
-  (def t-template (image->matrix (cv2/imread "tmp/templates/word022.png")))
-
-  (def c-template (image->matrix (cv2/imread "tmp/templates/word026.png")))
-
-  (def p-seq (matrix->numseq p-template))
-  ;; => [[16 33 18 33 34 34 34 34 18 33 34 34 34 34 34 66 36 18 33 34 34 34 34 66 36 34 34 34 34 34 34 34 34 2]]
-
-  
-  
-  (def t-seq (matrix->numseq t-template))
-  ;; => [[128 136 136 136 136 9 144 136 136 9 144 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 8]]
-
-  (def c-seq  (matrix->numseq c-template))
-  ;; => [[16 33 18 33 18 33 18 17 33 18 33 18 17 33 18 33 18 33 18 33 18 17 33 18 17 33 18 17 17 1]]
-  
-
-  (utl/show-matrix c-template)
-
-  (require '[basilisp-pprint.pprint :as p])
-
-
-  (def big-map (zipmap
-                 [:a :b :c :d :e]
-                 (repeat
-                   (zipmap [:a :b :c :d :e]
-                           (take 5 (range))))))
-  ;; => #'user/big-map
-
-  big-map
-  ;; => {:e {:e 4 :a 0 :c 2 :d 3 :b 1} :a {:e 4 :a 0 :c 2 :d 3 :b 1} :c {:e 4 :a 0 :c 2 :d 3 :b 1} :d {:e 4 :a 0 :c 2 :d 3 :b 1} :b {:e 4 :a 0 :c 2 :d 3 :b 1}}
-
-  (p/pprint big-map)
-
-  (p/print-table [:a] [{:a [1 2 3]} {:a 7}])
-
-
-  (print {:a 2 :b {:a 1 :b "cucu"}})
-
-  (add-tap (bound-fn* print))
-
-  (tap> {:a 2 :b 5})
-
-  (def pat-template (image->matrix (cv2/imread "tmp/templates/word007.png")))
-
-  (utl/show-matrix pat-template)
-
-  (def pat-seq (matrix->numseq pat-template))
-  pat-seq
-  ;; => [[32 34 34 34 34 34 34 34 34 34 34 34 66 36 34 34 34 34 34 34 34 34 18 33 34 34 34 34 34] [[9 136 136 136 136 136 144 17 33 18 33 18 33 34 34 34 66 36 34 66 68 68 68 132 136 136 136 9 18 33 17 18 34 34 34 34 34 34 34 34 33 18] [68]] [9 144 136 136 136 136 136 136 136 136 136 136 9 144 136 136 136 136 136 136 136 136 136 136 136 136 136 8]]
-
   ;;
   )
