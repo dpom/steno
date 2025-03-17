@@ -350,8 +350,8 @@
         nnseq (normalize-numseq nseq normalize-bin-size)]
     {:ltype ltype
      :line (mapv #(subvec % 0 2) ls)
-     :numseq nseq
-     :normalized-numseq nnseq
+     :numseq* nseq
+     :numseq nnseq
      :len (count nnseq)
      :freq (frequencies nnseq)}))
 

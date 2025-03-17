@@ -4298,3 +4298,113 @@ joc-numseq*
 ;; => ({:letter "n" :freq-tolerance 5 :freq {33 1 34 3 36 1 132 1 72 1 136 8 17 2} :len 17 :len-tolerance 2} {:letter "j" :freq-tolerance 10 :freq {33 1 34 1 66 3 36 1 68 1 132 1 136 3 144 1 17 2 18 1} :len 15 :len-tolerance 2} {:letter "v" :freq-tolerance 4 :freq {66 6 36 2 68 6} :len 14 :len-tolerance 4} {:letter "m" :freq-tolerance 5 :freq {33 1 34 4 132 1 136 4 17 3} :len 14 :len-tolerance 3} {:letter "r" :freq-tolerance 2 :freq {136 7 73 1 17 6} :len 14 :len-tolerance 2} {:letter "s" :freq-tolerance 6 :freq {33 1 34 2 66 1 68 1 136 3 17 1 18 2} :len 14 :len-tolerance 2} {:letter "d" :freq-tolerance 4 :freq {136 14} :len 14 :len-tolerance 4} {:letter "g" :freq-tolerance 4 :freq {33 2 17 2 18 8} :len 12 :len-tolerance 4} {:letter "b" :freq-tolerance 4 :freq {34 12} :len 12 :len-tolerance 4} {:letter "l" :freq-tolerance 5 :freq {136 7 9 2 144 1} :len 10 :len-tolerance 2} {:letter "f" :freq-tolerance 2 :freq {66 3 36 1 68 3} :len 7 :len-tolerance 2} {:letter "i" :freq-tolerance 2 :freq {34 3 68 1 132 1 136 1 17 1} :len 7 :len-tolerance 2} {:letter "t" :freq-tolerance 2 :freq {136 7} :len 7 :len-tolerance 2} {:letter "c" :freq-tolerance 2 :freq {33 1 17 1 18 4} :len 6 :len-tolerance 2} {:letter "e" :freq-tolerance 2 :freq {33 1 66 1 36 1 136 2 18 1} :len 6 :len-tolerance 2} {:letter "p" :freq-tolerance 2 :freq {34 6} :len 6 :len-tolerance 2})
 
 #+end_src
+
+* 2025-03-15
+
+- incep implementarea translatorului:
+  #+begin_src clojure
+(import [cv2 :as cv2])
+
+(require
+  '[steno.converter :as cnv]
+  '[steno.utils :as utl]
+  '[steno.reference-sequences :as rs])
+
+(add-tap (bound-fn* utl/print4tap))
+
+(def min-refseq
+  (let [{:keys [len len-tolerance]} (last rs/type-1-refsequences)]
+    (- len len-tolerance)))
+
+min-refseq
+;; => 4
+
+(defn get-freq-diff
+  [current reference]
+  (reduce (fn [acc freq]
+            (+ acc (abs (- (get reference freq) (get current freq 0)))))
+          0
+          (keys reference)))
+
+(defn build-model
+  [fileimage]
+  (let [mat* (cnv/image2matrix (cv2/imread fileimage))
+        lineseq* (cnv/matrix2lineseq mat*)]
+    (->> lineseq*
+         cnv/format-lineseq
+         (mapv #(select-keys % [:numseq :len :ltype])))))
+
+
+(def pat-model (build-model "tmp/templates/word007.png"))
+[{:len 6 :numseq [34 34 34 34 34 34] :ltype 1}
+ {:len 9 :numseq [33 33 36 68 33 34 34 33 136] :ltype 0}
+ {:len 7 :numseq [144 136 136 136 136 136 8] :ltype 1}]
+
+(defn check-ref
+  [nseq nseq-len result {:keys [letter len len-tolerance freq freq-tolerance] :as ref}]
+  (tap> (select-keys ref [:letter :len]))
+  (if (> nseq-len (- len len-tolerance))
+    (let [l (min nseq-len (+ len len-tolerance))
+          ns (take l nseq)
+          f (frequencies ns)
+          t (get-freq-diff f freq)]
+      (tap> {:l l :ns ns :f f :t t})
+      (if (<= t freq-tolerance)
+        (reduced [letter (drop l ns)])
+        result))
+    result))
+
+(defn translate-numseq
+  [{:keys [numseq ltype]}]
+  (let [dict (if (zero? ltype) rs/type-0-refsequences rs/type-1-refsequences)]
+    (loop [s numseq
+           acc ""]
+      (tap> {:nseq s :acc acc})
+      (let [l (count s)]
+        (if (< l min-refseq)
+          acc
+          (let [[letter new-s] (reduce
+                                 #(check-ref s l %1 %2)
+                                 ["*" []]
+                                 dict)]
+            (recur  new-s  (str acc letter))))))))
+
+(defn translate-word
+  [model]
+  (apply str (map translate-numseq model)))
+
+
+
+(translate-word pat-model)
+;; => "pat"
+
+
+(let [ap-model (build-model "tmp/templates/word012.png")]
+  (translate-word ap-model))
+;; => "pa"
+(let [mos-model (build-model "tmp/templates/word003.png")]
+  (translate-word mos-model))
+;; => "maj"
+(let [p-model (build-model "tmp/templates/word023.png")]
+  (translate-word p-model))
+;; => "p"
+(let [por-model (build-model "tmp/templates/word009.png")]
+  (translate-word por-model))
+;; => "pro"
+(let [pot-model (build-model "tmp/templates/word008.png")]
+  (translate-word pot-model))
+;; => "pt*"
+(let [s-model (build-model "tmp/templates/word014.png")]
+  (translate-word s-model))
+;; => "j"
+(let [sat-model (build-model "tmp/templates/word005.png")]
+  (translate-word sat-model))
+;; => "j*t"
+(let [t-model (build-model "tmp/templates/word022.png")]
+  (translate-word t-model))
+;; => "t"
+(let [ta-model (build-model "tmp/templates/word011.png")]
+  (translate-word ta-model))
+;; => "la"
+
+  #+end_src
