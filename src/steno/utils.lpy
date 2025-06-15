@@ -11,7 +11,7 @@
   "Display an image using pyplot."
   [img]
   (plt/imshow img ** :cmap "gray")
-  (Mpld3/show))
+  (mpld3/show))
 
 
 (defn show-matrix
@@ -55,6 +55,7 @@
       (let [max-nested (apply max (map nested-levels v))]
         (inc max-nested)))
     0))
+
 
 (defn compare-cell
   "Cells ([x y ...]) comparator"

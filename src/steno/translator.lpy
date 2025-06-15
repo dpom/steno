@@ -15,13 +15,14 @@
 
 (def tap-topic "translator")
 
+
 (defn get-freq-diff
   "Compute the difference between a sequence frequencies and a reference one"
   [current reference]
   (reduce (fn [acc freq]
             (+ acc (abs (- (get reference freq) (get current freq 0)))))
-          0
-          (keys reference)))
+    0
+    (keys reference)))
 
 
 (defn check-ref
@@ -71,18 +72,18 @@
   (let [mat* (cnv/image2matrix (cv2/imread fileimage))
         lineseq* (cnv/matrix2lineseq mat*)]
     (->> lineseq*
-         cnv/format-lineseq
-         (sort-by #(first (:line %)) utl/compare-cell)
-         (mapv #(select-keys % [:numseq :len :ltype])))))
+      cnv/format-lineseq
+      (sort-by #(first (:line %)) utl/compare-cell)
+      (mapv #(select-keys % [:numseq :len :ltype])))))
 
 
 (defn translate-word
   "Translate a word (image)"
   [fileimage]
   (->> fileimage
-       build-model
-       (map translate-numseq)
-       (apply str)))
+    build-model
+    (map translate-numseq)
+    (apply str)))
 
 
 (comment

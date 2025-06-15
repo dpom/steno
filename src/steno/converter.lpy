@@ -36,6 +36,7 @@
 
 (def tap-topic "converter")
 
+
 (defn image2matrix
   "Convert an image to binary matrix."
   [img]
@@ -341,6 +342,7 @@
   [line]
   (let [pos (:min-pos (get-loop-start line))]
     (into (subvec line pos) (subvec line 0 pos))))
+
 
 (defn normalize-liniar
   [line]
