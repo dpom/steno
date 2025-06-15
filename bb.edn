@@ -8,20 +8,20 @@
                                  (if (empty? src-file)
                                    "src"
                                    src-file))))}
-  style     {:doc  "Checks code style on default or specific file"
-             :task (let [[src-file] *command-line-args*]
-                     (shell (str "cljstyle check "
-                                 (if (empty? src-file)
-                                   "src test resources"
-                                   src-file))))}
-  format    {:doc  "Formats codebase on default or specific file"
-             :task (let [[src-file] *command-line-args*]
-                     (shell  (str "cljstyle fix "
+  style      {:doc  "Checks code style on default or specific file"
+              :task (let [[src-file] *command-line-args*]
+                      (shell (str "cljfmt check "
                                   (if (empty? src-file)
                                     "src test resources"
                                     src-file))))}
+  format     {:doc  "Formats codebase on default or specific file"
+              :task (let [[src-file] *command-line-args*]
+                      (shell  (str "cljfmt fix "
+                                   (if (empty? src-file)
+                                     "src test resources"
+                                     src-file))))}
   app    {:doc  "Run the application"
           :requires ([clojure.string :as str])
           :task (shell (str "uv run steno "
-                         (str/join " " *command-line-args*)))}
+                            (str/join " " *command-line-args*)))}
   }}

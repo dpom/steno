@@ -4408,3 +4408,9 @@ min-refseq
 ;; => "la"
 
   #+end_src
+
+* 2025-06-15
+
+** 17-order-of-letter-in-word-sequence
+
+- 
