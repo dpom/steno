@@ -3,6 +3,7 @@
     [basilisp-pprint.pprint :as p]
     [matplotlib :as matp]
     [matplotlib.pyplot :as plt]
+    [mpld3 :as mpld3]
     [numpy :as np]))
 
 
@@ -10,14 +11,14 @@
   "Display an image using pyplot."
   [img]
   (plt/imshow img ** :cmap "gray")
-  (plt/show))
+  (Mpld3/show))
 
 
 (defn show-matrix
   "Display a binary matrix."
   [mat]
   (plt/imshow mat ** :cmap "gray" :interpolation "nearest")
-  (plt/show))
+  (mpld3/show))
 
 
 (defn show-two-matrices
@@ -27,7 +28,7 @@
     (.imshow (first axs) img1 ** :cmap "gray" :vmin 0 :vmax 1)
     (.imshow (second axs) img2 ** :cmap "gray" :vmin 0 :vmax 1)
     ;; (plt/tight_layout)
-    (plt/show)))
+    (mpld3/show)))
 
 
 (defn print4tap
@@ -55,6 +56,12 @@
         (inc max-nested)))
     0))
 
+(defn compare-cell
+  "Cells ([x y ...]) comparator"
+  [cell1 cell2]
+  (compare (+ (first cell1) (second cell1))
+    (+ (first cell2) (second cell2))))
+
 
 (comment
 
@@ -67,5 +74,8 @@
   (nested-levels [[[1]] [[2]]])         ; => 3
   (nested-levels "not a vector")        ; => 0
 
+  (compare-cell [46 8] [22 9])
+  ;; => 1
+  
   ;;
   )
