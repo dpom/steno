@@ -1,0 +1,17 @@
+(ns steno.translator-test
+  (:require
+    [basilisp.io :as io]
+    [basilisp.test :refer [deftest is are testing]]
+    [steno.translator :as sut]))
+
+(deftest my-test
+  (is true))
+
+(deftest translate-word-test
+  (let [dir "./test/resources/templates"]
+    (are [file word]
+        (= word (sut/translate-word (io/path dir file)))
+      "word008.png" "pot"
+      "word015.png" "a"
+      "word022.png" "t"
+      "word023.png" "p")))

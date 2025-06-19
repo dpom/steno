@@ -1,7 +1,9 @@
 * steno
+  :PROPERTIES:
+  :CATEGORY: steno
+  :END:
 
 steno is a personal project to digitize my stenographic writings.
-
 
 
 ** Description
@@ -80,9 +82,23 @@ bb kondo
 
 To make sure that no unformatted commits with lint errors end up in the main branch run initially:
 #+begin_src shell
-	git config core.hooksPath hooks
+git config --local  core.hooksPath ./githooks
 #+end_src
 The ~pre-push~ script will block the push if there are style or lint errors in code.
+
+** Tasks
+*** DONE #1 Refactor project layout to use basilisp
+*** DONE #3 Split the page image in word images
+*** DONE #4 Reduce lines to 1 pixel
+*** DONE #5 Convert a word image in a number sequence
+*** #8  Order of word images bug
+*** DONE #9 Build the "standard" sequences
+*** #16 Build an AI translator enhancement
+*** DONE #17 Order of letter in word sequence bug
+SCHEDULED: <2025-06-19 Jo>
+:LOGBOOK:
+CLOCK: [2025-06-19 Jo 09:48]--[2025-06-19 Jo 11:32] =>  1:44
+:END:
 
 ** References
 

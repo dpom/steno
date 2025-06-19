@@ -12,6 +12,7 @@ dependencies = [
     "matplotlib>=3.10.0",
     "mpld3>=0.5.10",
     "opencv-python>=4.10.0.84",
+    "pytest>=8.4.1",
     "scikit-image>=0.25.0",
 ]
 
@@ -25,3 +26,8 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/steno"]
 
+[tool.pytest.ini_options]
+# addopts = "-s --no-header --no-summary" # force cmd flags
+# testpaths = [ # what directories contain tests
+#     "test",
+# ]

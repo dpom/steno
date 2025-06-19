@@ -4408,3 +4408,117 @@ min-refseq
 ;; => "la"
 
   #+end_src
+
+* 2025-06-15
+
+** 17-order-of-letter-in-word-sequence
+
+- corectez ordinea numseq in word seq:
+  #+begin_src clojure
+(require
+  '[steno.converter :as cnv]
+  '[steno.translator :as tran]
+  '[steno.utils :as utl]
+  )
+
+(def filename "test/resources/templates/word009.png")
+
+(tran/translate-word filename)
+;; => "opl"
+
+(import [cv2 :as cv2])
+
+
+
+
+(import [threading :as th])
+
+(defn say-hi
+  []
+  (println "Hi from thread!"))
+
+(def t (th/Thread ** :target say-hy))
+
+(.start t)
+
+(import [multiprocessing :as mp])
+(import [time :as t])
+
+(defn func [num]
+  (doseq [i (range 1 10)]
+    (t/sleep 0.01)
+    (println (format "Processing %d: prints %d" num i))))
+
+(doseq [j (range 0 3)]
+  (let [p (mp/Process ** :target func :args [j])]
+    (.start p)))
+
+(def p (utl/start-proc utl/show-matrix  (-> filename
+                                            cv2/imread
+                                            cnv/image2matrix)))
+
+(def model (tran/build-model filename))
+
+(def model
+  (-> filename
+      cv2/imread
+      cnv/image2matrix
+      cnv/matrix2lineseq
+      cnv/format-lineseq))
+
+(def model-item (first model))
+
+(utl/compare-cell (first (:line model-item)) (last (:line model-item)))
+;; => 1
+
+
+(defn normalize-line
+  [model-item]
+  (let [line (:line model-item)]
+    (if (= 1 (utl/compare-cell (first line)  (last line)))
+      (assoc model-item :line (reverse line))
+      model-item)))
+
+(->> model
+     (map normalize-line)
+     (sort-by #(first (:line %)) utl/compare-cell))
+
+(tran/translate-word filename)
+;; => "pol"
+
+(def ap-model (tran/translate-word "test/resources/templates/word012.png")
+  ;; => "ap"
+  )
+;; => "pa"
+(def mos-model (tran/translate-word "test/resources/templates/word003.png")
+  ;; => "maj"
+  )
+;; => "maj"
+(def p-model (tran/translate-word "test/resources/templates/word023.png")
+  )
+;; => "p"
+(def por-model (tran/translate-word "test/resources/templates/word009.png")
+  ;; => "pol"
+  )
+;; => "pro"
+(def pot-model (tran/translate-word "test/resources/templates/word008.png")
+  ;; => "p*t"
+  )
+;; => "pt*"
+(def s-model (tran/translate-word "test/resources/templates/word014.png")
+  ;; => "j"
+  )
+;; => "j"
+(def sat-model (tran/translate-word "test/resources/templates/word005.png")
+  ;; => "j*t"
+  )
+;; => "j*t"
+(def t-model (tran/translate-word "test/resources/templates/word022.png")
+  )
+;; => "t"
+(def ta-model (tran/translate-word "test/resources/templates/word011.png")
+  ;; => "la"
+  )
+;; => "la"
+
+  #+end_src
