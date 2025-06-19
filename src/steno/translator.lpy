@@ -1,29 +1,25 @@
 (ns steno.translator
   (:require
-    [steno.converter :as cnv]
-    [steno.utils :as utl]
-    [steno.reference-sequences :as rs])
+   [steno.converter :as cnv]
+   [steno.utils :as utl]
+   [steno.reference-sequences :as rs])
   (:import [cv2 :as cv2]))
-
 
 (def ^{:doc "The length of the shortest reference sequence"} min-refseq
   (let [{:keys [len len-tolerance]} (last rs/type-1-refsequences)]
     (- len len-tolerance)))
 
-
 (def ^{:doc "The unknown letter indicator"} unknown-letter "*")
 
 (def tap-topic "translator")
-
 
 (defn get-freq-diff
   "Compute the difference between a sequence frequencies and a reference one"
   [current reference]
   (reduce (fn [acc freq]
             (+ acc (abs (- (get reference freq) (get current freq 0)))))
-    0
-    (keys reference)))
-
+          0
+          (keys reference)))
 
 (defn check-ref
   "Check if a normalized sequence could be the reference sequence.
@@ -48,14 +44,13 @@
         result))
     result))
 
-
 (defn translate-numseq
   "Translate a normalized sequence"
   [{:keys [numseq ltype]}]
   (let [dict (if (zero? ltype) rs/type-0-refsequences rs/type-1-refsequences)]
     (loop [s numseq
            acc ""]
-      (tap> tap-topic {:nseq s :acc acc})
+      ;; (tap> tap-topic {:nseq s :acc acc})
       (let [l (count s)]
         (if (< l min-refseq)
           acc
@@ -65,6 +60,13 @@
                                  dict)]
             (recur  new-s  (str acc letter))))))))
 
+(defn normalize-line
+  "Line item line should start with the cell closest to the origin"
+  [model-item]
+  (let [line (:line model-item)]
+    (if (= 1 (utl/compare-cell (first line)  (last line)))
+      (assoc model-item :line (reverse line))
+      model-item)))
 
 (defn build-model
   "Build a word model from an image"
@@ -72,26 +74,25 @@
   (let [mat* (cnv/image2matrix (cv2/imread fileimage))
         lineseq* (cnv/matrix2lineseq mat*)]
     (->> lineseq*
-      cnv/format-lineseq
-      (sort-by #(first (:line %)) utl/compare-cell)
-      (mapv #(select-keys % [:numseq :len :ltype])))))
-
+         cnv/format-lineseq
+         (map normalize-line)
+         (sort-by #(first (:line %)) utl/compare-cell)
+         (mapv #(select-keys % [:numseq :len :ltype])))))
 
 (defn translate-word
   "Translate a word (image)"
   [fileimage]
   (->> fileimage
-    build-model
-    (map translate-numseq)
-    (apply str)))
-
+       build-model
+       (map translate-numseq)
+       (apply str)))
 
 (comment
 
-  (translate-word "tmp/templates/word007.png")
+  (translate-word "test/resources/templates/word007.png")
   ;; => "pat"
 
-  (translate-word "tmp/templates/word012.png")
+  (translate-word "test/resources/templates/word012.png")
   ;; => "pa"
 
   (import [cv2 :as cv2])
@@ -103,7 +104,7 @@
 
   (add-tap tap-topic (bound-fn* utl/print4tap))
 
-  (def lseq (-> "tmp/templates/word012.png"
+  (def lseq (-> "test/resources/templates/word012.png"
                 cv2/imread
                 cnv/image2matrix
                 cnv/matrix2lineseq
@@ -129,10 +130,10 @@
 
   (compare-cell [46 8] [22 9])
   ;; => 1
-  
+
   (sort compare-cell (:line (first lseq)))
   ;; => ([23 8] [22 9] [25 7] [24 8] [26 7] [27 7] [28 7] [29 7] [30 7] [31 8] [32 8] [33 8] [34 8] [35 8] [37 7] [36 8] [38 7] [39 7] [40 7] [41 7] [42 7] [43 7] [44 8] [45 8] [46 8])
-  
+
   (defn normalize-liniar
     [line]
     (if (compare-cell (first line) (last line))
@@ -142,30 +143,29 @@
   (normalize-liniar (:line (first lseq)))
   ;; => ([22 9] [23 8] [24 8] [25 7] [26 7] [27 7] [28 7] [29 7] [30 7] [31 8] [32 8] [33 8] [34 8] [35 8] [36 8] [37 7] [38 7] [39 7] [40 7] [41 7] [42 7] [43 7] [44 8] [45 8] [46 8])
 
-  (utl/show-matrix  (-> "tmp/templates/word012.png"
+  (utl/show-matrix  (-> "test/resources/templates/word012.png"
                         cv2/imread
                         cnv/image2matrix))
 
   (sort-by #(first (:line %)) utl/compare-cell lseq)
   ;; => ({:line [[7 9] [6 10] [6 11] [6 12] [6 13] [6 14] [6 15] [6 16] [6 17] [7 18] [8 19] [9 20] [10 21] [11 22] [12 22] [13 23] [14 23] [15 23] [16 23] [17 23] [18 22] [19 21] [20 20] [21 19] [22 18] [22 17] [22 16] [22 15] [23 14] [23 13] [23 12] [23 11] [23 10] [21 8] [20 8] [19 7] [18 6] [17 6] [16 6] [15 6] [14 6] [13 6] [12 6] [11 7] [10 7] [9 7] [8 8]] :numseq* [17 144 136 136 136 136 136 136 72 68 68 68 68 36 66 36 34 34 34 18 17 17 17 17 9 136 136 144 9 136 136 136 132 66 36 68 66 34 34 34 34 34 33 18 34 33 17] :freq {33 1 34 3 68 1 132 1 136 3 17 1} :len 10 :numseq [136 136 68 34 17 136 132 34 34 33] :ltype 0} {:line [[22 9] [23 8] [24 8] [25 7] [26 7] [27 7] [28 7] [29 7] [30 7] [31 8] [32 8] [33 8] [34 8] [35 8] [36 8] [37 7] [38 7] [39 7] [40 7] [41 7] [42 7] [43 7] [44 8] [45 8] [46 8]] :numseq* [84 33 18 33 34 34 34 34 66 36 34 34 34 34 18 33 34 34 34 34 34 66 36 34 2] :freq {33 1 34 4} :len 5 :numseq [33 34 34 34 34] :ltype 1})
-  
-  (translate-word "tmp/templates/word012.png")
+
+  (translate-word "test/resources/templates/word012.png")
   ;; => "ap"
 
-  (translate-word "tmp/templates/word009.png")
+  (translate-word "test/resources/templates/word009.png")
   ;; => "opl"
 
-  (utl/show-matrix  (-> "tmp/templates/word009.png"
+  (utl/show-matrix  (-> "test/resources/templates/word009.png"
                         cv2/imread
                         cnv/image2matrix))
 
-  (def lseq-por (-> "tmp/templates/word009.png"
+  (def lseq-por (-> "test/resources/templates/word009.png"
                     cv2/imread
                     cnv/image2matrix
                     cnv/matrix2lineseq
                     cnv/format-lineseq))
   lseq-por
-  
-  
+
   ;;
   )

@@ -1,27 +1,28 @@
 {:paths ["src"]
  :tasks
- {nrepl     {:doc  "Starts the REPL"
-             :task (shell "basilisp nrepl-server")}
-  kondo     {:doc  "Runs kondo linter on default or specific file"
-             :task (let [[src-file] *command-line-args*]
-                     (shell (str "clj-kondo --lint "
-                                 (if (empty? src-file)
-                                   "src"
-                                   src-file))))}
-  style      {:doc  "Checks code style on default or specific file"
-              :task (let [[src-file] *command-line-args*]
-                      (shell (str "cljfmt check "
-                                  (if (empty? src-file)
-                                    "src test resources"
-                                    src-file))))}
-  format     {:doc  "Formats codebase on default or specific file"
-              :task (let [[src-file] *command-line-args*]
-                      (shell  (str "cljfmt fix "
-                                   (if (empty? src-file)
-                                     "src test resources"
-                                     src-file))))}
-  app    {:doc  "Run the application"
+ {nrepl  {:doc  "Starts the REPL"
+          :task (shell "basilisp nrepl-server")}
+  kondo  {:doc  "Runs kondo linter on default or specific file"
+          :task (let [[src-file] *command-line-args*]
+                  (shell (str "clj-kondo --lint "
+                              (if (empty? src-file)
+                                "src"
+                                src-file))))}
+  style  {:doc  "Checks code style on default or specific file"
+          :task (let [[src-file] *command-line-args*]
+                  (shell (str "cljfmt check "
+                              (if (empty? src-file)
+                                "src test resources"
+                                src-file))))}
+  format {:doc  "Formats codebase on default or specific file"
+          :task (let [[src-file] *command-line-args*]
+                  (shell  (str "cljfmt fix "
+                               (if (empty? src-file)
+                                 "src test resources"
+                                 src-file))))}
+  test   {:doc  "Run tests"
+          :task (shell "basilisp test --include-path test")}
+  app    {:doc      "Run the application"
           :requires ([clojure.string :as str])
-          :task (shell (str "uv run steno "
-                            (str/join " " *command-line-args*)))}
-  }}
+          :task     (shell (str "uv run steno "
+                                (str/join " " *command-line-args*)))}}}
