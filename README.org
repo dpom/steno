@@ -1,7 +1,9 @@
 * steno
+  :PROPERTIES:
+  :CATEGORY: steno
+  :END:
 
 steno is a personal project to digitize my stenographic writings.
-
 
 
 ** Description
@@ -92,7 +94,11 @@ The ~pre-push~ script will block the push if there are style or lint errors in c
 *** #8  Order of word images bug
 *** DONE #9 Build the "standard" sequences
 *** #16 Build an AI translator enhancement
-*** #17 Order of letter in word sequence bug
+*** DONE #17 Order of letter in word sequence bug
+SCHEDULED: <2025-06-19 Jo>
+:LOGBOOK:
+CLOCK: [2025-06-19 Jo 09:48]--[2025-06-19 Jo 11:32] =>  1:44
+:END:
 
 ** References
 
