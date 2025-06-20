@@ -66,7 +66,6 @@ To see the =params= available run:
 bb app -h
 #+end_src
 
-
 ** Development
 
 
@@ -91,7 +90,12 @@ The ~pre-push~ script will block the push if there are style or lint errors in c
 *** DONE #3 Split the page image in word images
 *** DONE #4 Reduce lines to 1 pixel
 *** DONE #5 Convert a word image in a number sequence
-*** #8  Order of word images bug
+*** DONE #8  Order of word images bug
+SCHEDULED: <2025-06-20 Vi>
+:LOGBOOK:
+CLOCK: [2025-06-20 Vi 12:21]--[2025-06-20 Vi 12:25] =>  0:04
+CLOCK: [2025-06-20 Vi 08:36]--[2025-06-20 Vi 11:22] =>  2:46
+:END:
 *** DONE #9 Build the "standard" sequences
 *** #16 Build an AI translator enhancement
 *** DONE #17 Order of letter in word sequence bug
