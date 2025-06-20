@@ -3,6 +3,14 @@
   (:import
     [cv2 :as cv2]))
 
+(defn compare-img-position
+  "Compare the position of 2 images in page."
+  [h-max img1 img2]
+  (let [ydif (- (:y img1) (:y img2))]
+    (cond
+      (and (pos? ydif) (> ydif h-max)) 1
+      (and (neg? ydif) (> (abs ydif) h-max)) -1
+      :else (compare (:x img1) (:x img2)))))
 
 (defn extract-word-images
   "Extract word images from the page image stored in PAGE-FILENAME file. Returns the word images vector."
@@ -11,31 +19,31 @@
         gray (cv2/cvtColor image cv2/COLOR_BGR2GRAY)
         blur (cv2/GaussianBlur gray [5 5] 0)
         thresh (second (cv2/threshold blur 0 255 (+ cv2/THRESH_BINARY_INV
-                                                   cv2/THRESH_OTSU)))
+                                                    cv2/THRESH_OTSU)))
         kernel (cv2/getStructuringElement cv2/MORPH_RECT [7 7])
         dilate (cv2/dilate thresh kernel ** :iterations 1)
         cnts* (cv2/findContours dilate cv2/RETR_EXTERNAL cv2/CHAIN_APPROX_SIMPLE)
-        cnts (if (= (count cnts*) 2) (first cnts*) (second cnts*))]
-    (map (fn [contour]
-           (let [[x y w h] (cv2/boundingRect contour)]
-             (aget image #py ((slice y (+ y h)) (slice x (+ x w))))))
-      cnts)))
+        cnts (if (= (count cnts*) 2) (first cnts*) (second cnts*))
+        words (map (fn [contour]
+                     (let [[x y w h] (cv2/boundingRect contour)]
+                       {:x x :y y :h h
+                        :image (aget image #py ((slice y (+ y h)) (slice x (+ x w))))}))
+                   cnts)
+        h-max (apply max (map :h words))
+        cip (partial compare-img-position h-max)]
+    (->> words
+         (sort cip)
+         (map :image))))
 
-
-(defn save-word-images
+(defn save-word-images!
   "Save the WORDS images vector in files in OUTDIR folder. The filename format is wordXXX.png where XXX is the index of the word in the vector."
   [words outdir]
   (map-indexed #(cv2/imwrite (format "%s/word%03d.png" outdir %1) %2)  words))
 
-
 (comment
 
-  (def words (extract-word-images "test/resources/orig.png"))
+  (def imagefile "test/resources/template.png")
 
-  (count words)
-  ;; => 244
-
-  (save-word-images words "tmp/word-images")
-  
+  (save-word-images! (extract-word-images imagefile) "tmp/templates")
   ;;
   )

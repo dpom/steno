@@ -4522,3 +4522,141 @@ min-refseq
 ;; => "la"
 
   #+end_src
+- comment in =translator=:
+  #+begin_src clojure
+  (comment
+
+  (add-tap (bound-fn* utl/print4tap))
+
+  (defn check-translate-word
+    [filename expected]
+    (format "expected: %s - get: %s" expected (translate-word (str "./test/resources/" filename))))
+
+  (check-translate-word "templates/word007.png" "pat")
+  ;; => "expected: pat - get: pat"
+
+  (check-translate-word "templates/word012.png" "ap")
+  ;; => "expected: ap - get: ap"
+
+  (def translation-table
+    [["templates/word000.png" "are"]
+     ["templates/word001.png" "pe"]
+     ["templates/word002.png" "joc"]
+     ["templates/word003.png" "mos"]
+     ["templates/word004.png" "am"]
+     ["templates/word005.png" "sat"]
+     ["templates/word006.png" "om"]
+     ["templates/word007.png" "pat"]
+     ["templates/word008.png" "pot"]
+     ["templates/word009.png" "ce"]
+     ["templates/word010.png" "d"]
+     ["templates/word011.png" "ta"]
+     ["templates/word012.png" "ap"]
+     ["templates/word013.png" "j"]
+     ["templates/word014.png" "s"]
+     ["templates/word015.png" "a"]
+     ["templates/word016.png" "e"]
+     ["templates/word017.png" "m"]
+     ["templates/word018.png" "n"]
+     ["templates/word019.png" "ge"]
+     ["templates/word020.png" "i"]
+     ["templates/word021.png" "o"]
+     ["templates/word022.png" "t"]
+     ["templates/word023.png" "p"]
+     ["templates/word024.png" "l"]
+     ["templates/word025.png" "f"]
+     ["templates/word026.png" "c"]])
+
+  (apply check-translate-word (first translation-table))
+  ;; => "expected: are - get: ad"
+
+  (require
+    '[basilisp-pprint.pprint :as p])
+
+  (p/pprint
+    (mapv #(apply check-translate-word %) translation-table))
+
+  ["expected: are - get: ad"
+   "expected: pe - get: b"
+   "expected: joc - get: sac"
+   "expected: mos - get: maj"
+   "expected: am - get: ea"
+   "expected: sat - get: j*t"
+   "expected: om - get: om"
+   "expected: pat - get: pat"
+   "expected: pot - get: p*t"
+   "expected: ce - get: pol"
+   "expected: d - get: d"
+   "expected: ta - get: la"
+   "expected: ap - get: ap"
+   "expected: j - get: j"
+   "expected: s - get: j"
+   "expected: a - get: a"
+   "expected: e - get: i"
+   "expected: m - get: n"
+   "expected: n - get: n"
+   "expected: ge - get: l"
+   "expected: i - get: e"
+   "expected: o - get: o"
+   "expected: t - get: t"
+   "expected: p - get: p"
+   "expected: l - get: l"
+   "expected: f - get: *"
+   "expected: c - get: c"]
+
+  ;;
+  )
+  #+end_src
+
+* 2025-06-20
+
+** #8  Order of word images bug
+
+- bug este probabil in =extractor=:
+  #+begin_src clojure
+  (comment
+
+  (def imagefile "test/resources/template.png")
+
+  (def words (extract-word-images imagefile))
+
+  (count words)
+  ;; => 27
+
+  (first words)
+
+  (map #(select-keys % [:x :y :w :h]) words)
+  ;; => ({:h 53 :x 229 :y 980 :w 95} {:h 54 :x 107 :y 959 :w 31} {:h 65 :x 837 :y 813 :w 103} {:h 84 :x 436 :y 811 :w 93} {:h 60 :x 93 :y 810 :w 52} {:h 53 :x 661 :y 808 :w 89} {:h 68 :x 237 :y 798 :w 53} {:h 59 :x 136 :y 663 :w 55} {:h 78 :x 279 :y 657 :w 70} {:h 77 :x 482 :y 653 :w 98} {:h 27 :x 424 :y 556 :w 89} {:h 34 :x 226 :y 543 :w 70} {:h 52 :x 134 :y 531 :w 30} {:h 41 :x 337 :y 400 :w 65} {:h 41 :x 457 :y 398 :w 57} {:h 30 :x 608 :y 395 :w 31} {:h 25 :x 912 :y 388 :w 32} {:h 55 :x 131 :y 385 :w 47} {:h 58 :x 227 :y 382 :w 44} {:h 31 :x 990 :y 380 :w 84} {:h 22 :x 819 :y 379 :w 28} {:h 44 :x 690 :y 376 :w 46} {:h 13 :x 309 :y 276 :w 48} {:h 44 :x 168 :y 249 :w 13} {:h 32 :x 981 :y 248 :w 59} {:h 44 :x 788 :y 245 :w 35} {:h 42 :x 619 :y 238 :w 29})
+
+  (require '[steno.utils :as utl])
+
+  (def proc (utl/start-proc utl/show-image (cv2/imread imagefile)))
+
+  (def h-max (apply max (map :h words)))
+  ;; => 84
+
+  (def w-max (apply max (map :w words)))
+  ;; => 103
+
+  (defn compare-img-position
+    "Compare the position of 2 images in page."
+    [h-max img1 img2]
+    (let [ydif (- (:y img1) (:y img2))]
+      (cond
+        (and (pos? ydif) (> ydif h-max)) 1
+        (and (neg? ydif) (> (abs ydif) h-max)) -1
+        :else (compare (:x img1) (:x img2)))))
+
+  (def sorted-words
+    (let [cip (partial compare-img-position h-max)]
+      (sort cip words)))
+
+  (map #(select-keys % [:x :y]) sorted-words)
+  ;; => ({:x 168 :y 249} {:x 309 :y 276} {:x 619 :y 238} {:x 788 :y 245} {:x 981 :y 248} {:x 131 :y 385} {:x 227 :y 382} {:x 337 :y 400} {:x 457 :y 398} {:x 608 :y 395} {:x 690 :y 376} {:x 819 :y 379} {:x 912 :y 388} {:x 990 :y 380} {:x 134 :y 531} {:x 226 :y 543} {:x 424 :y 556} {:x 136 :y 663} {:x 279 :y 657} {:x 482 :y 653} {:x 93 :y 810} {:x 237 :y 798} {:x 436 :y 811} {:x 661 :y 808} {:x 837 :y 813} {:x 107 :y 959} {:x 229 :y 980})
+
+  (save-word-images (extract-word-images imagefile) "tmp/templates")
+  ;; => (true true true true true true true true true true true true true true true true true true true true true true true true true true true)
+
+  ;;
+  )
+  #+end_src
