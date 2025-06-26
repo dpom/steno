@@ -4660,3 +4660,9 @@ min-refseq
   ;;
   )
   #+end_src
+
+* 2025-06-25
+
+** #21 Make translator system modular
+
+- reorganizez codul pentru ca translatorul sa fie modular

@@ -1,23 +1,76 @@
 (ns steno.core
   (:require
-    [basilisp.string :as str]
-    [steno.extractor :as ext]
-    [steno.image-processor :as img])
+   [basilisp-pprint.pprint :as p]
+   [basilisp.string :as str]
+   [steno.extractor :as ext]
+   [steno.image-processor :as img])
   (:import
-    [argparse :as arg]
-    [os :as os]
-    [cv2 :as cv2]))
+   [argparse :as arg]
+   [os :as os]
+   [cv2 :as cv2]
+   [pyaml_env :as yml]))
 
+(defn get-config
+  [args]
+  (let [config-file (.- args config)
+        config (yml/parse_config config-file)
+        dict-args (.- args __dict__)]
+    (merge config dict-args)))
+
+(defn action-help
+  [config]
+  (.print_help (get config "parser")))
+
+(defn action-list-config
+  [config]
+  (println "Application config: " config))
+
+(defn action-extract-words
+  [config]
+  (let [in-filename (get config "input")
+        outdir (or (get config "output") (get config "words_dir"))]
+    (println "Extract and process word images from " in-filename)
+    (doall (ext/save-word-images! (map img/process_image (ext/extract-word-images in-filename)) outdir))
+    (println "Saved words in " outdir)))
+
+(defn action-dummy
+  [_config]
+  (println "Action dummy"))
+
+(def actions
+  {"help"          action-help
+   "list_config"   action-list-config
+   "extract_words" action-extract-words
+   "dummy"         action-dummy})
 
 (defn cli
   []
-  (let [parser (arg/ArgumentParser)]
-    (.add_argument parser "input_image_path" ** :help "the path of the input image")
-    (.add_argument parser "output_directory" ** :help "the output directory path")
-    (let [args (.parse_args parser)
-          page-filename (.- args input_image_path)
-          outdir (.- args output_directory)
-          _ (println "Extract and process word images from " page-filename)
-          words (map img/process_image (ext/extract-word-images page-filename))]
-      (doall (ext/save-word-images words outdir))
-      (println "Saved words in " outdir))))
+  (let [parser (arg/ArgumentParser ** :prog "steno" :description "Translate shorthand notes image in plain text")]
+    (.add_argument parser "action" ** :help "the action to execute"
+                   :choices (keys actions)
+                   :default "help")
+    (.add_argument parser  "-i" "--input" ** :help "the input of the action")
+    (.add_argument parser "-o" "--output" ** :help "the output of the action")
+    (.add_argument parser "-c" "--config" ** :help "the config file"
+                   :default "resources/config.yml")
+    (.add_argument parser "-s" "--save_words" ** :help "save word images"
+                   :action "store_true")
+    (.add_argument parser "-w" "--words_dir" ** :help "the temporary directory to save word images"
+                   :default "tmp/words")
+    (let [args   (.parse_args parser)
+          config (assoc (get-config args) "parser" parser)
+          action (get actions (get config "action"))]
+      (action config))))
+
+(comment
+
+  (def config (yml/parse_config "resources/config.yml"))
+
+  (first
+    (get config "translators"))
+  ;; => "freq"
+
+  ((get actions "list_config") config)
+
+  ;;
+  )
