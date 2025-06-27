@@ -4665,4 +4665,109 @@ min-refseq
 
 ** #21 Make translator system modular
 
-- reorganizez codul pentru ca translatorul sa fie modular
+- pun la punct cli
+  #+begin_src clojure
+  (comment
+
+  (def config (yml/parse_config "resources/config.yml"))
+
+  (first
+    (get config "translators"))
+  ;; => "freq"
+
+  ((get actions "list_config") config)
+
+  ;;
+  )
+  #+end_src
+
+* 2025-06-25
+
+** #21 Make translator system modular
+
+- reorganizez codul incepind cu converter:
+  #+begin_src clojure
+  (comment
+
+  (add-tap tap-topic (bound-fn* utl/print4tap))
+
+  (def imagefile "test/resources/templates/template-017.png")
+
+  (require '[steno.image-processor :as ip])
+
+  (def matrix (-> imagefile
+                  cv2/imread
+                  ip/process-image
+                  image-to-matrix))
+
+  (def word-lineseq (-> matrix
+                        matrix-to-lineseq))
+
+  (defn lineseq-to-lsign
+    [item]
+    (let [ltype (get-ltype item)
+          ls (if (zero? ltype) (normalize-loop item) (normalize-liniar item))]
+      {:ltype ltype
+       :lineseq ls}))
+
+  (defn format-wsign
+    [lineseq]
+    (let [{:keys [prev res modifs-count]} (reduce process-lineseq
+                                                  {:prev nil
+                                                   :res []
+                                                   :modifs-count 0}
+                                                  lineseq)
+          new-lineseq (filterv identity (conj res prev))]
+      (tap> tap-topic {:modifs modifs-count
+                       :lineseq new-lineseq})
+      (if (zero? modifs-count)
+        (mapv lineseq-to-lsign new-lineseq)
+        (format-wsign new-lineseq))))
+
+  (defn normalize1-lsign
+    "LSIGN lineseq should start with the cell closest to the origin."
+    [{:keys [lineseq] :as lsign}]
+    (if (= 1 (utl/compare-cell (first lineseq)  (last lineseq)))
+      (assoc lsign :lineseq (reverse lineseq))
+      lsign))
+
+  (def wsign (->> word-lineseq
+                  format-wsign
+                  (map normalize1-lsign)
+                  (sort-by #(first (:lineseq %)) utl/compare-cell)))
+
+  (defn normalize2-lsign
+    "Shift LSIGN lineseq to axe origin."
+    [{:keys [lineseq] :as lsign}]
+    (let [x-min (apply min (map first lineseq))
+          y-min (apply min (map second lineseq))
+          new-lineseq (mapv (fn [[x y n]] [(- x x-min) (- y y-min) n]) lineseq)]
+      (assoc lsign :lineseq new-lineseq)))
+  
+
+  (defn image-to-wsign
+    [image]
+    (->> image
+         ip/process-image
+         image-to-matrix
+         matrix-to-lineseq
+         format-wsign
+         (map normalize1-lsign)
+         (sort-by #(first (:lineseq %)) utl/compare-cell)
+         (mapv normalize2-lsign)))
+
+  (def wsign2 (image-to-wsign  (cv2/imread imagefile)))
+  
+  (utl/start-proc utl/show-matrix matrix)
+
+  (def mat2 (utl/lineseq-to-matrix (:lineseq (first wsign2))))
+  
+  (utl/start-proc utl/show-lsign (nth wsign2 2))
+
+  
+  ;;
+  )
+  #+end_src
+
+- reorganizez codul pentru ca translatorul sa fie modular, fiecare modul va contine functia de translatare a unui =cnumline=
+

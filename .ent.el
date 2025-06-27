@@ -7,7 +7,9 @@
 ;; project settings
 (setq ent-project-home (file-name-directory (if load-file-name load-file-name buffer-file-name)))
 (setq ent-project-name "cljproj")
-(setq ent-clean-regexp "~$\\|\\.tex$")
+(setq ent-clean-regexp "~$")
+(setq ent-dirclean-regexp "__pycache__" )
+
 
 
 (task :style '() "check code" "bb style")

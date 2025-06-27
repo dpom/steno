@@ -1,9 +1,8 @@
 (ns steno.core
   (:require
-   [basilisp-pprint.pprint :as p]
-   [basilisp.string :as str]
    [steno.extractor :as ext]
-   [steno.image-processor :as img])
+   [steno.imageprocessor :as img]
+   [steno.utils :as utl])
   (:import
    [argparse :as arg]
    [os :as os]
@@ -25,13 +24,17 @@
   [config]
   (println "Application config: " config))
 
-(defn action-extract-words
-  [config]
-  (let [in-filename (get config "input")
-        outdir (or (get config "output") (get config "words_dir"))]
-    (println "Extract and process word images from " in-filename)
-    (doall (ext/save-word-images! (map img/process_image (ext/extract-word-images in-filename)) outdir))
-    (println "Saved words in " outdir)))
+;; (defn action-extract-words
+;;   [config]
+;;   (let [in-filename (get config "input")
+;;         outdir (or (get config "output") (get config "words_dir"))]
+;;     (println "Extract and process word images from " in-filename)
+;;     (let [word-images (->> in-filename
+;;                            ext/extract-word-images
+;;                            (map img/process-image))
+;;           outname (utl/get-filename in-filename)]
+;;       (ext/save-word-images! word-images outname outdir)
+;;       (println "Saved words in " outdir))))
 
 (defn action-dummy
   [_config]
@@ -40,7 +43,7 @@
 (def actions
   {"help"          action-help
    "list_config"   action-list-config
-   "extract_words" action-extract-words
+   ;; "extract_words" action-extract-words
    "dummy"         action-dummy})
 
 (defn cli
@@ -67,7 +70,7 @@
   (def config (yml/parse_config "resources/config.yml"))
 
   (first
-    (get config "translators"))
+   (get config "translators"))
   ;; => "freq"
 
   ((get actions "list_config") config)
