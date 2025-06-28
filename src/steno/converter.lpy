@@ -1,8 +1,8 @@
 (ns steno.converter
   "Convert images in numeric sequences"
   (:require
-    [basilisp.set :as set]
-    [steno.utils :as utl])
+   [basilisp.set :as set]
+   [steno.utils :as utl])
   (:import [cv2 :as cv2]))
 
 (def directions
@@ -95,13 +95,13 @@
   "Return the cell that has the highest probability of being the beginning of the word."
   [start-cells]
   (first
-    (reduce (fn [[min-cell sum] cell]
-              (let [new-sum (apply + cell)]
-                (if (< new-sum sum)
-                  [cell new-sum]
-                  [min-cell sum])))
-            [dummy-cell (float "inf")]
-            start-cells)))
+   (reduce (fn [[min-cell sum] cell]
+             (let [new-sum (apply + cell)]
+               (if (< new-sum sum)
+                 [cell new-sum]
+                 [min-cell sum])))
+           [dummy-cell (float "inf")]
+           start-cells)))
 
 (defn- get-first-one
   "Return the first cell with the value one."
@@ -126,12 +126,6 @@
       0 (get-first-one mat)
       1 (first cells)
       (get-min-start-cell cells))))
-
-(defn- get-next-neighbors
-  [mat start-cell prev-cell]
-  (-> (get-cell-number-and-neighbors mat start-cell)
-      first
-      (disj prev-cell)))
 
 (defn- get-liniar-sequence
   "Return a liniar numeric sequence.
@@ -201,16 +195,6 @@
                                          start-cells)]
     (assoc state :line (parallel-to-liniar line))))
 
-(defn- extract-neighbors
-  "Extract neighbors cells from a cell number"
-  [num [x y]]
-  (set (filter identity
-               (map (fn [[dx dy] p]
-                      (if (zero? (bit-and num p))
-                        nil
-                        [(+ x dx) (+ y dy)]))
-                    directions pos))))
-
 (defn- neighbors?
   "True if the cells are adiacent"
   [[x1 y1 _] [x2 y2 _]]
@@ -226,11 +210,6 @@
   "Returns the line sequence type: loop (0) or liniar (1)"
   [lseq]
   (if (and (not (small-lineseq? lseq)) (neighbors? (first lseq) (last lseq))) 0 1))
-
-(defn- continuation?
-  "True if the 2 line sequences are adiacent"
-  [lseq1 lseq2]
-  (neighbors? (last lseq1) (first lseq2)))
 
 (defn- loop?
   "True if the 2 line sequences build a loop"
@@ -286,19 +265,6 @@
       {:prev lseq
        :res (filterv identity (conj res prev))
        :modifs-count modifs-count})))
-
-(defn- median
-  [coll]
-  (let [sorted (sort coll)
-        cnt (count sorted)
-        halfway (quot cnt 2)]
-    (nth sorted halfway)))
-
-(def normalize-bin-size 5)
-
-(defn- normalize-numseq
-  [numseq bin-size]
-  (mapv median (partition-all bin-size numseq)))
 
 (defn- get-loop-start
   [line]
@@ -395,28 +361,15 @@
 
   (def imagefile "test/resources/templates/template-017.png")
 
-  (require '[steno.image-processor :as ip])
+  (require '[steno.show :as show])
 
-  (def matrix (-> imagefile
-                  cv2/imread
-                  ip/process-image
-                  image-to-matrix))
+  (def image (cv2/imread imagefile))
 
-  (def word-lineseq (-> matrix
-                        matrix-to-lineseq))
+  (utl/start-proc show/show-image image)
 
-  (def wsign (->> word-lineseq
-                  format-wsign
-                  (map normalize1-lsign)
-                  (sort-by #(first (:lineseq %)) utl/compare-cell)))
+  (def wsign (image-to-wsign  (cv2/imread imagefile)))
 
-  (def wsign2 (image-to-wsign  (cv2/imread imagefile)))
-
-  (utl/start-proc utl/show-matrix matrix)
-
-  (def mat2 (utl/lineseq-to-matrix (:lineseq (first wsign2))))
-
-  (utl/start-proc utl/show-lsign (nth wsign2 2))
+  (utl/start-proc utl/show-lsign (nth wsign 1))
 
   ;;
   )

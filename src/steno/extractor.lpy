@@ -56,7 +56,7 @@
 
   (utl/start-proc show/show-image (nth word-images 17))
 
-  (save-word-images! (extract-word-images imagefile) (utl/get-filename imagefile) "test/resources/templates")
+  (save-word-images! word-images (utl/get-filename imagefile) "test/resources/templates")
 
   ;;
   )

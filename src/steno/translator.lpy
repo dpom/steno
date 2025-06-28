@@ -1,64 +1,12 @@
 (ns steno.translator
   (:require
-   [steno.converter :as cnv]
-   [steno.utils :as utl]
-   [steno.reference-sequences :as rs])
+    [steno.converter :as cnv]
+    [steno.utils :as utl])
   (:import [cv2 :as cv2]))
-
-(def ^{:doc "The length of the shortest reference sequence"} min-refseq
-  (let [{:keys [len len-tolerance]} (last rs/type-1-refsequences)]
-    (- len len-tolerance)))
 
 (def ^{:doc "The unknown letter indicator"} unknown-letter "*")
 
 (def tap-topic "translator")
-
-(defn get-freq-diff
-  "Compute the difference between a sequence frequencies and a reference one"
-  [current reference]
-  (reduce (fn [acc freq]
-            (+ acc (abs (- (get reference freq) (get current freq 0)))))
-          0
-          (keys reference)))
-
-(defn check-ref
-  "Check if a normalized sequence could be the reference sequence.
-
-   Params:
-   - nseq: (vector) the normalized sequence
-   - nseq-len: (int) the normalized sequence length
-   - result: (vector) the result if the nseq is not equal to refseq
-   - refseq: (map) the reference sequence
-
-   Returns: [letter <rest of nseq>] or result"
-  [nseq nseq-len result {:keys [letter len len-tolerance freq freq-tolerance] :as refseq}]
-  (tap> (select-keys refseq [:letter :len]))
-  (if (> nseq-len (- len len-tolerance))
-    (let [l (min nseq-len (+ len len-tolerance))
-          ns (take l nseq)
-          f (frequencies ns)
-          t (get-freq-diff f freq)]
-      (tap> {:l l :ns ns :f f :t t})
-      (if (<= t freq-tolerance)
-        (reduced [letter (drop l ns)])
-        result))
-    result))
-
-(defn translate-numseq
-  "Translate a normalized sequence"
-  [{:keys [numseq ltype]}]
-  (let [dict (if (zero? ltype) rs/type-0-refsequences rs/type-1-refsequences)]
-    (loop [s numseq
-           acc ""]
-      ;; (tap> tap-topic {:nseq s :acc acc})
-      (let [l (count s)]
-        (if (< l min-refseq)
-          acc
-          (let [[letter new-s] (reduce
-                                 #(check-ref s l %1 %2)
-                                 [unknown-letter []]
-                                 dict)]
-            (recur  new-s  (str acc letter))))))))
 
 (defn normalize-line
   "Line item line should start with the cell closest to the origin"
