@@ -4927,5 +4927,45 @@ min-refseq
 
 - implementez ~translate~ ca multimetoda:
   #+begin_src clojure
+  (comment
+
+(apply str
+       (map (fn [new old] (if (= new "*") old new)) "ab*" "acd"))
+;; => "abd"
+
+(select-char "abc" "defg")
+;; => "abc"
+
+(require
+  '[steno.converter :as cnv]
+  '[steno.show :as show]
+  '[steno.utils :as utl]
+  '[steno.translators.frequency :as freq])
+
+(import cv2)
+
+(def imagefile "test/resources/templates/template-017.png")
+
+(def wsign (cnv/image-to-wsign  (cv2/imread imagefile)))
+
+(utl/start-proc show/show-lsign (nth wsign 0))
+
+(def translators [freq/translate])
+
+(translate-lsign translators (first wsign))
+;; => {:text "p" :ltype 1 :lineseq [[0 0 32] [1 0 34] [2 0 34] [3 0 34] [4 0 34] [5 0 34] [6 0 34] [7 0 34] [8 0 34] [9 0 34] [10 0 34] [11 0 34] [12 0 66] [13 1 36] [14 1 34] [15 1 34] [16 1 34] [17 1 34] [18 1 34] [19 1 34] [20 1 34] [21 1 34] [22 1 18] [23 0 33] [24 0 34] [25 0 34] [26 0 34] [27 0 34] [28 0 34] [29 0 82]]}
+
+(translate-wsign [freq/translate] wsign)
+;; => "pat"
+
+
+;;
+)
+  #+end_src
+
+** #23 Improve freq translator
+
+- creez o actiune make-corpus:
+  #+begin_src clojure
   
   #+end_src

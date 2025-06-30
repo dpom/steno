@@ -103,12 +103,13 @@ SCHEDULED: <2025-06-19 Jo>
 :LOGBOOK:
 CLOCK: [2025-06-19 Jo 09:48]--[2025-06-19 Jo 11:32] =>  1:44
 :END:
-*** INPROGRESS #21 Make translator system modular
+*** DONE #21 Make translator system modular
 SCHEDULED: <2025-06-25 Mi>
 :LOGBOOK:
 CLOCK: [2025-06-25 Mi 14:21]--[2025-06-26 Jo 13:30] => 23:09
 :END:
-
+*** #23 Improve freq translator
+SCHEDULED: <2025-06-30 Lu>
 * References
 
 1. https://en.wikipedia.org/wiki/Duployan_shorthand
