@@ -45,6 +45,7 @@
             shellHook = ''
               uv sync
               source .venv/bin/activate
+              # export PYTHONPATH=$PYTHONPATH:src
             '';
           };
         };

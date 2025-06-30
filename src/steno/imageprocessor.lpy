@@ -1,7 +1,7 @@
 (ns steno.imageprocessor
   "Prepare the page image"
   (:import
-    [cv2 :as cv2]
+    cv2
     [numpy :as np]
     [skimage.morphology :as skim]
     [skimage.util :as skiu]))

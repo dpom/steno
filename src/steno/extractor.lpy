@@ -1,7 +1,6 @@
 (ns steno.extractor
   "Functions to extract word images from a page image"
-  (:import
-    [cv2 :as cv2]))
+  (:import cv2))
 
 (defn compare-img-position
   "Compare the position of 2 images in page."

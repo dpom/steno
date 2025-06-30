@@ -1,9 +1,8 @@
 (ns steno.converter
   "Convert images in numeric sequences"
   (:require
-   [basilisp.set :as set]
-   [steno.utils :as utl])
-  (:import [cv2 :as cv2]))
+    [basilisp.set :as set])
+  (:import cv2))
 
 (def directions
   [[0  1] ; E
@@ -145,17 +144,28 @@
           new-neighbors (set/difference neighbors prev)
           new-line (conj line (conj start val))
           new-prev (conj prev start)]
-      (tap> tap-topic {:cell start :val val :neighbors new-neighbors})
+      ;; (tap> tap-topic {:cell start :val val :neighbors new-neighbors})
       (if-not (= (count new-neighbors) 1)
         {:start-cells new-neighbors
          :prev-cells new-prev
          :line new-line}
         (recur (first new-neighbors) new-prev new-line)))))
 
+(defn nested-levels
+  "Return the depth level of a nested Vector."
+  [v]
+  (if (vector? v)
+    (if (empty? v)
+      1
+      (let [max-nested (apply max (map nested-levels v))]
+        (inc max-nested)))
+    0))
+
+
 (defn- parallel-lineseq?
   "True if line sequence is a loop"
   [lseq]
-  (= (utl/nested-levels lseq) 3))
+  (= (nested-levels lseq) 3))
 
 (defn- parallel-to-liniar
   "Transform a one line parallel sequence into a liniar sequence"
@@ -177,8 +187,8 @@
    Returns: state map updated + :line (the line sequence)  "
   [mat {:keys [start-cells prev-cells]}]
   (let [{:keys [line] :as state} (reduce (fn [acc cell]
-                                           (tap> tap-topic {:cell cell})
-                                           (tap> tap-topic acc)
+                                           ;; (tap> tap-topic {:cell cell})
+                                           ;; (tap> tap-topic acc)
                                            (if (get (:prev-cells acc) cell)
                                              acc
                                              (let [new-seq (get-liniar-sequence mat
@@ -187,7 +197,7 @@
                                                    new-acc  {:prev-cells (:prev-cells new-seq)
                                                              :line (conj (:line acc) (:line new-seq))
                                                              :start-cells (into (:start-cells acc) (:start-cells new-seq))}]
-                                               (tap> tap-topic new-acc)
+                                               ;; (tap> tap-topic new-acc)
                                                new-acc)))
                                          {:prev-cells prev-cells
                                           :line []
@@ -225,10 +235,10 @@
 
 (defn- process-lineseq
   [{:keys [prev res modifs-count]} lseq]
-  (tap> tap-topic {:lseq lseq})
-  (tap> tap-topic {:modifs-count modifs-count})
-  (tap> tap-topic {:prev prev})
-  (tap> tap-topic {:res res})
+  ;; (tap> tap-topic {:lseq lseq})
+  ;; (tap> tap-topic {:modifs-count modifs-count})
+  ;; (tap> tap-topic {:prev prev})
+  ;; (tap> tap-topic {:res res})
   (if (parallel-lineseq? lseq)
     (let [[lseq1 lseq2] lseq]
       (cond
@@ -282,9 +292,15 @@
   (let [pos (:min-pos (get-loop-start line))]
     (into (subvec line pos) (subvec line 0 pos))))
 
+(defn compare-cell
+  "Compare CELLs with the format [x y ...]."
+  [cell1 cell2]
+  (compare (+ (first cell1) (second cell1))
+           (+ (first cell2) (second cell2))))
+
 (defn- normalize-liniar
   [line]
-  (if (utl/compare-cell (first line) (last line))
+  (if (compare-cell (first line) (last line))
     (reverse line)
     line))
 
@@ -295,7 +311,7 @@
                 :prev-cells #{}
                 :line []}
          acc []]
-    (tap> tap-topic state)
+    ;; (tap> tap-topic state)
     (let [new-state (if (= (count (:start-cells state)) 1)
                       (get-liniar-sequence mat (assoc state :start-cell (first (:start-cells state))))
                       (get-parallel-sequence mat state))
@@ -321,8 +337,8 @@
                                                  :modifs-count 0}
                                                 lineseqs)
         new-lineseqs (filterv identity (conj res prev))]
-    (tap> tap-topic {:modifs modifs-count
-                     :lineseq new-lineseqs})
+    ;; (tap> tap-topic {:modifs modifs-count
+    ;;                  :lineseq new-lineseqs})
     (if (zero? modifs-count)
       (mapv lineseq-to-lsign new-lineseqs)
       (lineseqs-to-wsign new-lineseqs))))
@@ -330,7 +346,7 @@
 (defn- normalize1-lsign
   "LSIGN lineseq should start with the cell closest to the origin."
   [{:keys [lineseq] :as lsign}]
-  (if (= 1 (utl/compare-cell (first lineseq)  (last lineseq)))
+  (if (= 1 (compare-cell (first lineseq)  (last lineseq)))
     (assoc lsign :lineseq (reverse lineseq))
     lsign))
 
@@ -352,11 +368,22 @@
        matrix-to-lineseq
        lineseqs-to-wsign
        (map normalize1-lsign)
-       (sort-by #(first (:lineseq %)) utl/compare-cell)
+       (sort-by #(first (:lineseq %)) compare-cell)
        (mapv normalize2-lsign)))
 
 (comment
 
+  (nested-levels [1 2 3])               ; => 1
+  (nested-levels [[1 2] 3])             ; => 2
+  (nested-levels [[1 2] [3 [4 5]]])     ; => 3
+  (nested-levels [[[1]] [[2]]])         ; => 3
+  (nested-levels "not a vector")        ; => 0
+
+  (compare-cell [46 8] [22 9])
+  ;; => 1
+
+
+  
   (add-tap tap-topic (bound-fn* utl/print4tap))
 
   (def imagefile "test/resources/templates/template-017.png")
@@ -369,7 +396,7 @@
 
   (def wsign (image-to-wsign  (cv2/imread imagefile)))
 
-  (utl/start-proc utl/show-lsign (nth wsign 1))
+  (utl/start-proc show/show-lsign (nth wsign 1))
 
   ;;
   )

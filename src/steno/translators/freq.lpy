@@ -1,0 +1,223 @@
+(ns steno.translators.freq
+  "Implement a translator based on cnum frequency"
+  (:require
+    [steno.translator :as tran]))
+
+(def tap-topic "freq")
+
+(def type-0-refsequences
+  [{:letter "o"
+    :len 17
+    :len-tolerance 2
+    :freq {34 3, 36 1, 72 2, 136 5, 17 2, 18 1}
+    :freq-tolerance 5}
+   {:letter "a"
+    :len 10
+    :len-tolerance 2
+    :freq {34 2, 36 1, 68 1, 136 2, 17 2}
+    :freq-tolerance 6}])
+
+(def type-1-refsequences
+  [{:letter "n"
+    :len 17
+    :freq {33 1 34 3 36 1 132 1 72 1 136 8 17 2}
+    :freq-tolerance 5
+    :len-tolerance 2}
+   {:letter "j"
+    :len 15
+    :freq {33 1 34 1 66 3 36 1 68 1 132 1 136 3 144 1 17 2 18 1}
+    :freq-tolerance 10
+    :len-tolerance 2}
+   {:letter "v"
+    :len 14
+    :freq {66 6 36 2 68 6}
+    :freq-tolerance 4
+    :len-tolerance 4}
+   {:letter "m"
+    :len 14
+    :freq {33 1 34 4 132 1 136 4 17 3}
+    :freq-tolerance 5
+    :len-tolerance 3}
+   {:letter "r"
+    :len 14
+    :freq {136 7 73 1 17 6}
+    :freq-tolerance 2
+    :len-tolerance 2}
+   {:letter "s"
+    :len 14
+    :freq {33 1 34 2 66 1 68 1 136 3 17 1 18 2}
+    :freq-tolerance 6
+    :len-tolerance 2}
+   {:letter "d"
+    :len 14
+    :freq {136 14}
+    :freq-tolerance 4
+    :len-tolerance 4}
+   {:letter "g"
+    :len 12
+    :freq {33 2 17 2 18 8}
+    :freq-tolerance 4
+    :len-tolerance 4}
+   {:letter "b"
+    :len 12
+    :freq {34 12}
+    :freq-tolerance 4
+    :len-tolerance 4}
+   {:letter "l"
+    :len 10
+    :freq {136 7 9 2 144 1}
+    :freq-tolerance 5
+    :len-tolerance 2}
+   {:letter "f"
+    :len 7
+    :freq {66 3 36 1 68 3}
+    :freq-tolerance 2
+    :len-tolerance 2}
+   {:letter "i"
+    :len 7
+    :freq {34 3 68 1 132 1 136 1 17 1}
+    :freq-tolerance 2
+    :len-tolerance 2}
+   {:letter "t"
+    :len 7
+    :freq {136 7}
+    :freq-tolerance 2
+    :len-tolerance 2}
+   {:letter "c"
+    :len 6
+    :freq {33 1 17 1 18 4}
+    :freq-tolerance 2
+    :len-tolerance 2}
+   {:letter "e"
+    :len 6
+    :freq {33 1 66 1 36 1 136 2 18 1}
+    :freq-tolerance 2
+    :len-tolerance 2}
+   {:letter "p"
+    :len 6
+    :freq {34 6}
+    :freq-tolerance 2
+    :len-tolerance 2}])
+
+(def ^{:doc "The length of the shortest reference sequence"} min-refseq
+  (let [{:keys [len len-tolerance]} (last type-1-refsequences)]
+    (- len len-tolerance)))
+
+(defn- median
+  [coll]
+  (let [sorted (sort coll)
+        cnt (count sorted)
+        halfway (quot cnt 2)]
+    (nth sorted halfway)))
+
+(def normalize-bin-size 5)
+
+(defn- normalize-numseq
+  [numseq]
+  (mapv median (partition-all normalize-bin-size numseq)))
+
+(defn- get-freq-diff
+  "Compute the difference between a sequence frequencies and a reference one"
+  [current reference]
+  (reduce (fn [acc freq]
+            (+ acc (abs (- (get reference freq) (get current freq 0)))))
+          0
+          (keys reference)))
+
+(defn- check-ref
+  "Check if a normalized sequence could be the reference sequence.
+
+   Params:
+   - nseq: (vector) the normalized sequence
+   - nseq-len: (int) the normalized sequence length
+   - result: (vector) the result if the nseq is not equal to refseq
+   - refseq: (map) the reference sequence
+
+   Returns: [letter <rest of nseq>] or result"
+  [nseq nseq-len result {:keys [letter len len-tolerance freq freq-tolerance] :as refseq}]
+  (tap> (select-keys refseq [:letter :len]))
+  (if (> nseq-len (- len len-tolerance))
+    (let [l (min nseq-len (+ len len-tolerance))
+          ns (take l nseq)
+          f (frequencies ns)
+          t (get-freq-diff f freq)]
+      (tap> {:l l :ns ns :f f :t t})
+      (if (<= t freq-tolerance)
+        (reduced [letter (drop l ns)])
+        result))
+    result))
+
+(defn- translate-numseq
+  "Translate a normalized CNUMSEQ ot LTYPE."
+  [cnumseq ltype]
+  (let [dict (if (zero? ltype) type-0-refsequences type-1-refsequences)]
+    (loop [s cnumseq
+           acc ""]
+      ;; (tap> tap-topic {:nseq s :acc acc})
+      (let [l (count s)]
+        (if (< l min-refseq)
+          acc
+          (let [[letter new-s] (reduce
+                                 #(check-ref s l %1 %2)
+                                 [tran/unknown-letter []]
+                                 dict)]
+            (recur  new-s  (str acc letter))))))))
+
+;; entry point
+
+(defmethod tran/translate "freq"
+  [_ {:keys [ltype lineseq] :as lsign}]
+  (let [cnumseq (->> lineseq
+                     (map #(nth % 2))
+                     (normalize-numseq))]
+    (assoc lsign :text (translate-numseq cnumseq ltype))))
+
+
+(comment
+
+  (add-tap tap-topic (bound-fn* utl/print4tap))
+
+  (require
+    '[steno.converter :as cnv]
+    '[steno.show :as show])
+
+  (import cv2)
+
+  (def imagefile "test/resources/templates/template-017.png")
+
+  (def wsign (cnv/image-to-wsign  (cv2/imread imagefile)))
+
+  (utl/start-proc show/show-lsign (nth wsign 0))
+
+  (def lsign1 (first wsign))
+  (def lsign2 (second wsign))
+
+  (def lineseq (:lineseq lsign1))
+
+  (def cnumseq (->> lineseq
+                    (map #(nth % 2))
+                    (normalize-numseq)))
+  cnumseq
+  ;; => [34 34 34 34 34 34]
+
+  (def seq-len (count cnumseq))
+
+  (def freq (frequencies cnumseq))
+  ;; => {34 6}
+
+  (translate-numseq cnumseq 1)
+  ;; => "p"
+
+  (translate lsign2)
+  ;; => {:text "a" :ltype 0 :lineseq [[0 5 136] [0 4 144] [1 3 17] [2 2 33] [3 2 18] [4 1 33] [5 1 18] [6 0 33] [7 0 34] [8 0 34] [9 0 34] [10 0 66] [11 1 36] [12 1 34] [13 1 66] [14 2 68] [15 3 68] [16 4 68] [17 5 132] [17 6 136] [17 7 136] [17 8 136] [17 9 9] [16 10 18] [15 10 33] [14 11 17] [13 12 18] [12 12 34] [11 12 34] [10 12 34] [9 12 34] [8 12 34] [7 12 34] [6 12 34] [5 12 34] [4 12 33] [3 13 18] [2 13 35] [0 10 9] [0 9 136] [0 8 136] [0 7 136] [0 6 136]]}
+
+  (->> wsign
+       (map translate)
+       (map :text)
+       (apply str))
+  ;; => "pat"
+  
+  
+
+  ;;
+  )
