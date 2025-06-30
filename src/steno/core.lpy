@@ -1,23 +1,159 @@
 (ns steno.core
   (:require
-    [basilisp.string :as str]
+    [basilisp.io :as bio]
+    [clojure.string :as str]
+    [steno.converter :as cnv]
     [steno.extractor :as ext]
-    [steno.image-processor :as img])
+    [steno.imageprocessor :as img]
+    [steno.translator :as tra]
+    [steno.translators.freq])
   (:import
     [argparse :as arg]
-    [os :as os]
-    [cv2 :as cv2]))
+    cv2
+    os
+    [os.path :as path]
+    [pyaml_env :as yml]))
 
+
+(defn remove-nil-values
+  [dict]
+  (reduce (fn [acc k]
+            (if-let [v (get dict k)]
+              (assoc acc k v)
+              acc))
+          {}
+          dict))
+
+(defn get-config
+  [args]
+  (let [config-file (.- args config)
+        config (yml/parse_config config-file)
+        dict-args (remove-nil-values (.- args __dict__))
+        ;; map-args (zipmap (.keys dict-args) (.values dict-args))
+        ]
+    ;; (println (format "args: %s" map-args))
+    ;; (merge-with (fn [a b] (if (nil? b) a b)) config dict-args)
+    (merge config dict-args)
+    ))
+
+(defn action-help
+  [config]
+  (.print_help (get config "parser")))
+
+(defn action-list-config
+  [config]
+  (println "Application config: " config))
+
+(defn get-filename
+  "Extract the name of a file without extension from a full PATH."
+  [path]
+  (-> path
+      (path/basename)
+      (path/splitext)
+      (first)))
+
+(defn get-word-images
+  [infile]
+  (->> infile
+       ext/extract-word-images
+       (map img/process-image)))
+
+
+(defn action-extract-words
+  [config]
+  (let [infile (get config "input")
+        outdir (get config "output")]
+    (println "Extract and process word images from " infile)
+    (let [word-images (get-word-images infile)
+          outname (get-filename infile)]
+      (ext/save-word-images! word-images outname outdir)
+      (println "Saved words in " outdir))))
+
+(defn action-translate
+  [config]
+  (let [infile (get config "input")
+        outfile (get config "output")
+        translators (get config "translators")]
+    (println (format "Translate %s using %s" infile translators))
+    (let [traw (partial tra/translate-wsign translators)]
+      (->> infile
+           (get-word-images)
+           (map cnv/image-to-wsign)
+           (map traw)
+           (str/join " ")
+           (spit outfile)))))
+
+(def actions
+  {"extract_words" action-extract-words
+   "help"          action-help
+   "list_config"   action-list-config
+   "translate"     action-translate})
 
 (defn cli
   []
-  (let [parser (arg/ArgumentParser)]
-    (.add_argument parser "input_image_path" ** :help "the path of the input image")
-    (.add_argument parser "output_directory" ** :help "the output directory path")
-    (let [args (.parse_args parser)
-          page-filename (.- args input_image_path)
-          outdir (.- args output_directory)
-          _ (println "Extract and process word images from " page-filename)
-          words (map img/process_image (ext/extract-word-images page-filename))]
-      (doall (ext/save-word-images words outdir))
-      (println "Saved words in " outdir))))
+  (let [parser (arg/ArgumentParser ** :prog "steno" :description "Translate shorthand notes image in plain text")]
+    (.add_argument parser "action" ** :help "the action to execute"
+                   :choices (keys actions)
+                   :default "help")
+    (.add_argument parser  "-i" "--input" ** :help "the input of the action")
+    (.add_argument parser "-o" "--output" ** :help "the output of the action")
+    (.add_argument parser "-c" "--config" ** :help "the config file"
+                   :default "resources/config.yml")
+    (.add_argument parser "-t" "--translators" ** :help "the translators used"
+                   :choices (keys (methods tra/translate))
+                   :action "append")
+    (let [args   (.parse_args parser)
+          config (assoc (get-config args) "parser" parser)
+          action (get actions (get config "action"))]
+      (action config))))
+
+(comment
+
+  (get-filename "test/resources/template.png")
+  ;; => "template"
+
+
+  (def config (yml/parse_config "resources/config.yml"))
+
+  (first
+    (get config "translators"))
+  ;; => "freq"
+
+  ((get actions "list_config") config)
+
+  (def test-dict
+    (python/dict {"a" nil "b" 2}))
+  ;; => #py {"a" nil "b" 2}
+
+  (filter identity test-dict)
+  ;; => ("a" "b")
+
+  (reduce (fn [acc [k v]]
+            (assoc acc k v))
+          {}
+          test-dict)
+  
+  ;; (require '[basilisp.pprint :as pprint])
+
+  ;; (pprint/pprint (range 30))
+  
+  (reduce (fn [acc k]
+            (if-let [v (get test-dict k)]
+              (assoc acc k v)
+              acc))
+          {}
+          test-dict)
+  ;; => {"b" 2}
+  
+  (def translators (python/list ["freq"]))
+
+
+  (keys (methods tra/translate ))
+  ;; => ("freq")
+  
+  ;; => {"freq" <function __lisp_fn_205 at 0x7f15764f7e20>}
+  
+
+
+
+  )

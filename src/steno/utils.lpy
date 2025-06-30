@@ -1,32 +1,9 @@
 (ns steno.utils
   (:import
     [basilisp-pprint.pprint :as p]
-    [matplotlib :as matp]
-    [matplotlib.pyplot :as plt]
     [multiprocessing :as mp]
-    [mpld3 :as mpld3]
-    [numpy :as np]))
-
-(defn show-image
-  "Display an image using pyplot."
-  [img]
-  (plt/imshow img ** :cmap "gray")
-  (mpld3/show))
-
-(defn show-matrix
-  "Display a binary matrix."
-  [mat]
-  (plt/imshow mat ** :cmap "gray" :interpolation "nearest")
-  (mpld3/show))
-
-(defn show-two-matrices
-  "Display two matrices side by side."
-  [[img1 img2]]
-  (let [[_ axs] (plt/subplots 1 2 ** :figsize [100 100])]
-    (.imshow (first axs) img1 ** :cmap "gray" :vmin 0 :vmax 1)
-    (.imshow (second axs) img2 ** :cmap "gray" :vmin 0 :vmax 1)
-    ;; (plt/tight_layout)
-    (mpld3/show)))
+    [numpy :as np]
+    ))
 
 (defn start-proc
   "Start FUNC with ARG in a thread process and return its id."
@@ -36,11 +13,11 @@
     p))
 
 (defn print4tap
-  "Print function for tap>, useful in REPL"
+  "Print function for tap>, useful in REPL."
   [map]
   (p/print-table (keys map) [map]))
 
-(defn cells2matrix
+(defn cells-to-matrix
   "Transform a sequence of CELLS ([x y]) into a matrix of dimensions SIZE ([x y])"
   [size cells]
   (let [mat (np/zeros size ** :dtype "int")]
@@ -48,35 +25,21 @@
       (aset mat x y 1))
     mat))
 
-(defn nested-levels
-  "Return the depth level of a nested vector"
-  [v]
-  (if (vector? v)
-    (if (empty? v)
-      1
-      (let [max-nested (apply max (map nested-levels v))]
-        (inc max-nested)))
-    0))
+(defn lineseq-to-matrix
+  [lineseq]
+  (let [x-max (inc (apply max (map first lineseq)))
+        y-max (inc (apply max (map second lineseq)))
+        mat (np/zeros [x-max y-max] ** :dtype "int")]
+    (doseq [[x y _] lineseq]
+      (aset mat x y 1))
+    mat))
 
-(defn compare-cell
-  "Cells ([x y ...]) comparator"
-  [cell1 cell2]
-  (compare (+ (first cell1) (second cell1))
-           (+ (first cell2) (second cell2))))
 
 (comment
 
   (add-tap (bound-fn* print4tap))
 
   (tap> {:a 2 :b 5})
-
-  (nested-levels [1 2 3])               ; => 1
-  (nested-levels [[1 2] [3 [4 5]]])     ; => 2
-  (nested-levels [[[1]] [[2]]])         ; => 3
-  (nested-levels "not a vector")        ; => 0
-
-  (compare-cell [46 8] [22 9])
-  ;; => 1
 
   ;;
   )

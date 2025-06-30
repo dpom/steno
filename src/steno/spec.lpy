@@ -1,0 +1,24 @@
+(ns steno.spec
+  "Defines the entities of this application (documentation only)")
+
+(def LOOP 0)
+(def LINE 1)
+
+(def LTYPE [:enum LOOP LINE])
+
+(def X nat-int?)
+(def Y nat-int?)
+
+(def CNUM [:and int? #(< % 127)  #(> % -128)])
+
+(def CELL [:tuple X Y CNUM])
+
+(def LSEQ [:sequential CELL])
+
+(def LSIGN
+  [:map
+   [:ltype LTYPE]
+   [:lineseq LSEQ]
+   [:text string?]])
+
+(def WSIGN [:sequential LSIGN])

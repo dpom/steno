@@ -3,7 +3,7 @@
 
   inputs = {
     flake-parts.url = "github:hercules-ci/flake-parts";
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
     mynixpkgs.url = "git+https://github.com/dpom/mynixpkgs";
   };
 
@@ -25,29 +25,30 @@
           python = pkgs.python312Full;
           tkinter = pkgs.python312Packages.tkinter;
         in
-          {
-            devShells.default = pkgs.mkShell {
-              packages = [
-                pkgs.babashka
-                pkgs.clj-kondo
-                pkgs.cljfmt
-                pkgs.uv
-                python
-                tkinter
-              ];
-              LD_LIBRARY_PATH = lib.makeLibraryPath [
-                pkgs.stdenv.cc.cc
-                pkgs.libgcc.lib
-                pkgs.zlib
-                pkgs.libGL
-                pkgs.glib.out
-              ];
-              shellHook = ''
+        {
+          devShells.default = pkgs.mkShell {
+            packages = [
+              pkgs.babashka
+              pkgs.clj-kondo
+              pkgs.cljfmt
+              pkgs.uv
+              python
+              tkinter
+            ];
+            LD_LIBRARY_PATH = lib.makeLibraryPath [
+              pkgs.stdenv.cc.cc
+              pkgs.libgcc.lib
+              pkgs.zlib
+              pkgs.libGL
+              pkgs.glib.out
+            ];
+            shellHook = ''
               uv sync
               source .venv/bin/activate
+              # export PYTHONPATH=$PYTHONPATH:src
             '';
-            };
           };
+        };
 
       systems = [
         "x86_64-linux"

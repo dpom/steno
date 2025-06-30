@@ -1,7 +1,6 @@
 (ns steno.extractor
   "Functions to extract word images from a page image"
-  (:import
-    [cv2 :as cv2]))
+  (:import cv2))
 
 (defn compare-img-position
   "Compare the position of 2 images in page."
@@ -33,17 +32,30 @@
         cip (partial compare-img-position h-max)]
     (->> words
          (sort cip)
-         (map :image))))
+         (mapv :image))))
 
 (defn save-word-images!
-  "Save the WORDS images vector in files in OUTDIR folder. The filename format is wordXXX.png where XXX is the index of the word in the vector."
-  [words outdir]
-  (map-indexed #(cv2/imwrite (format "%s/word%03d.png" outdir %1) %2)  words))
+  "Save the WORDS images vector in files in OUTDIR folder. The filename format is NAME-XXX.png where XXX is the index of the word in the vector."
+  [words name outdir]
+  (doseq [[idx image] (map-indexed (fn [idx image] [idx image]) words)]
+    (cv2/imwrite (format "%s/%s-%03d.png" outdir name idx) image)))
 
 (comment
 
+  (require
+    '[steno.utils :as utl]
+    '[steno.show :as show]
+    '[steno.imageprocessor :as img])
+
   (def imagefile "test/resources/template.png")
 
-  (save-word-images! (extract-word-images imagefile) "tmp/templates")
+  (def word-images (->> imagefile
+                        extract-word-images
+                        (map img/process-image)))
+
+  (utl/start-proc show/show-image (nth word-images 17))
+
+  (save-word-images! word-images (utl/get-filename imagefile) "test/resources/templates")
+
   ;;
   )
