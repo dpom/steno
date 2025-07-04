@@ -50,7 +50,7 @@
     '[steno.converter :as cnv]
     '[steno.show :as show]
     '[steno.utils :as utl]
-    '[steno.translators.frequency :as freq])
+    '[steno.translators.freq :as freq])
 
   (import cv2)
 

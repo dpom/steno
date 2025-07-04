@@ -1,20 +1,20 @@
 (ns steno.core
   (:require
-   [basilisp.edn :as edn]
-   [basilisp.io :as bio]
-   [clojure.string :as str]
-   [steno.converter :as cnv]
-   [steno.extractor :as ext]
-   [steno.imageprocessor :as img]
-   [steno.translator :as tra]
-   [steno.translators.freq])
+    [basilisp.edn :as edn]
+    [basilisp.io :as bio]
+    [clojure.string :as str]
+    [steno.converter :as cnv]
+    [steno.extractor :as ext]
+    [steno.imageprocessor :as img]
+    [steno.translator :as tra]
+    [steno.translators.freq])
   (:import
-   [argparse :as arg]
-   cv2
-   os
-   [os.path :as path]
-   [pyaml_env :as yml]
-   uuid))
+    [argparse :as arg]
+    cv2
+    os
+    [os.path :as path]
+    [pyaml_env :as yml]
+    uuid))
 
 (defn remove-nil-values
   [dict]
@@ -144,42 +144,6 @@
 (comment
 
   (def infile "test/resources/template.png")
-
-  (def corpus0
-    (->> infile
-         (get-word-images)
-         (map cnv/image-to-wsign)))
-
-  (count corpus0)
-  ;; => 27
-  ;; => 27
-
-  (count (concat corpus0))
-  ;; => 27
-
-  (count
-   (mapcat identity corpus0))
-  ;; => 47
-
-  (def translators ["freq"])
-
-  (def corpus1
-    (let [tral (partial tra/translate-lsign translators)]
-      (->> infile
-           (get-word-images)
-           (map cnv/image-to-wsign)
-           (mapcat identity)
-           (mapv tral))))
-
-  (import uuid)
-
-  (def corpus2
-    (mapv #(assoc % :id (uuid/uuid4)) corpus1))
-
-  (require '[basilisp.edn :as edn])
-
-  (with-open [w (bio/writer "corpus-template.edn")]
-    (edn/write corpus2 w))
 
   ;;
   )

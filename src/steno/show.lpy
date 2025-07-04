@@ -3,7 +3,10 @@
   (:require
    [steno.utils :as utl])
   (:import
+   [matplotlib :as matp]
    [matplotlib.pyplot :as plt]))
+
+(matp/use "tkagg")
 
 (defn show-image
   "Display an image using pyplot."

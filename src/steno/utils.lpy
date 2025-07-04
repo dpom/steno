@@ -1,9 +1,9 @@
 (ns steno.utils
   (:import
-    [basilisp-pprint.pprint :as p]
+    ;; [basilisp-pprint.pprint :as p]
+    [basilisp.core :as core]
     [multiprocessing :as mp]
-    [numpy :as np]
-    ))
+    [numpy :as np]))
 
 (defn start-proc
   "Start FUNC with ARG in a thread process and return its id."
@@ -12,10 +12,10 @@
     (.start p)
     p))
 
-(defn print4tap
-  "Print function for tap>, useful in REPL."
-  [map]
-  (p/print-table (keys map) [map]))
+;; (defn print4tap
+;;   "Print function for tap>, useful in REPL."
+;;   [map]
+;;   (p/print-table (keys map) [map]))
 
 (defn cells-to-matrix
   "Transform a sequence of CELLS ([x y]) into a matrix of dimensions SIZE ([x y])"
@@ -33,7 +33,6 @@
     (doseq [[x y _] lineseq]
       (aset mat x y 1))
     mat))
-
 
 (comment
 

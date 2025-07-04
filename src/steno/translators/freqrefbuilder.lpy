@@ -1,0 +1,87 @@
+(ns steno.translators.freqrefbuilder
+  "Build refernces for frequency translator"
+  (:require
+   [basilisp.io :as bio]
+   [basilisp.edn :as edn]
+   [steno.translators.freq :as freq])
+  (:import
+   [statistics :as st]))
+
+(defn load-corpus
+  [filename]
+  (with-open [r (bio/reader filename)]
+    (edn/read r)))
+
+(defn add-freq
+  [{:keys [lineseq] :as lsign}]
+  (let [numseq (mapv last lineseq)
+        nnumseq (freq/normalize-numseq numseq)]
+    (assoc lsign
+           :numseq numseq
+           :nnumseq nnumseq
+           :len (count nnumseq)
+           :freq (frequencies nnumseq))))
+
+(defn compute-mean-and-tolerance
+  [nums]
+  (let [mean-v (round (st/mean nums))
+        max-v (apply max nums)
+        min-v (apply min nums)]
+    {:mean mean-v
+     :tolerance (max (- max-v mean-v) (- mean-v min-v))}))
+
+(defn get-freq-keys
+  [corpus]
+  (->> corpus
+       (mapcat #(keys (:freq %)))
+       (frequencies)
+       (filter (fn [[k v]] (> v (/ (count corpus) 2))))
+       (map first)
+       (sort)))
+
+(defn normalize-freq
+  [freq-keys freq]
+  (reduce (fn [acc k]
+            (assoc acc k (get freq k 0)))
+          {}
+          freq-keys))
+
+;; entry point
+
+(defn compute-reference
+  [corpus]
+  (let [corpus* (map add-freq corpus)
+        {len :mean len-tolerance :tolerance} (compute-mean-and-tolerance (map :len corpus*))
+        freq-keys (get-freq-keys corpus*)
+        freqs* (->> corpus*
+                    (map :freq)
+                    (map #(normalize-freq freq-keys %)))
+        ref-freqs (map
+                   (fn [x]
+                     (assoc (compute-mean-and-tolerance
+                             (map #(get % x) freqs*))
+                            :key x))
+
+                   freq-keys)
+        freq-ref (reduce (fn [{:keys [freq freq-tolerance]} {:keys [key tolerance mean]}]
+                           {:freq (assoc freq key mean)
+                            :freq-tolerance (+ tolerance freq-tolerance)})
+                         {:freq {} :freq-tolerance 0}
+                         ref-freqs)]
+    (assoc freq-ref
+           :letter (:text (first corpus))
+           :len len
+           :len-tolerance len-tolerance)))
+
+(comment
+
+  (def tcorpus (load-corpus "test/resources/corpus-template.edn"))
+
+  (def a-corp (filter #(= (:text %) "a") tcorpus))
+
+  (count a-corp)
+  ;; => 7
+
+  (compute-reference a-corp)
+  ;; => {:letter "a" :freq-tolerance 18 :freq {33 1 34 3 66 1 36 2 68 1 132 1 72 1 136 5 17 1 18 1} :len 17 :len-tolerance 6}
+  )
