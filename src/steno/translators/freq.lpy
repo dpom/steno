@@ -1,107 +1,14 @@
 (ns steno.translators.freq
   "Implement a translator based on cnum frequency"
   (:require
+   [basilisp.edn :as edn]
+   [basilisp.io :as bio]
    [steno.translator :as tra]))
 
 (def tap-topic "freq")
 
-(def type-0-refsequences
-  [{:letter "o"
-    :len 17
-    :len-tolerance 2
-    :freq {34 3, 36 1, 72 2, 136 5, 17 2, 18 1}
-    :freq-tolerance 5}
-   {:letter "a"
-    :len 10
-    :len-tolerance 2
-    :freq {34 2, 36 1, 68 1, 136 2, 17 2}
-    :freq-tolerance 6}])
-
-(def type-1-refsequences
-  [{:letter "n"
-    :len 17
-    :freq {33 1 34 3 36 1 132 1 72 1 136 8 17 2}
-    :freq-tolerance 5
-    :len-tolerance 2}
-   {:letter "j"
-    :len 15
-    :freq {33 1 34 1 66 3 36 1 68 1 132 1 136 3 144 1 17 2 18 1}
-    :freq-tolerance 10
-    :len-tolerance 2}
-   {:letter "v"
-    :len 14
-    :freq {66 6 36 2 68 6}
-    :freq-tolerance 4
-    :len-tolerance 4}
-   {:letter "m"
-    :len 14
-    :freq {33 1 34 4 132 1 136 4 17 3}
-    :freq-tolerance 5
-    :len-tolerance 3}
-   {:letter "r"
-    :len 14
-    :freq {136 7 73 1 17 6}
-    :freq-tolerance 2
-    :len-tolerance 2}
-   {:letter "s"
-    :len 14
-    :freq {33 1 34 2 66 1 68 1 136 3 17 1 18 2}
-    :freq-tolerance 6
-    :len-tolerance 2}
-   {:letter "d"
-    :len 14
-    :freq {136 14}
-    :freq-tolerance 4
-    :len-tolerance 4}
-   {:letter "g"
-    :len 12
-    :freq {33 2 17 2 18 8}
-    :freq-tolerance 4
-    :len-tolerance 4}
-   {:letter "b"
-    :len 12
-    :freq {34 12}
-    :freq-tolerance 4
-    :len-tolerance 4}
-   {:letter "l"
-    :len 10
-    :freq {136 7 9 2 144 1}
-    :freq-tolerance 5
-    :len-tolerance 2}
-   {:letter "f"
-    :len 7
-    :freq {66 3 36 1 68 3}
-    :freq-tolerance 2
-    :len-tolerance 2}
-   {:letter "i"
-    :len 7
-    :freq {34 3 68 1 132 1 136 1 17 1}
-    :freq-tolerance 2
-    :len-tolerance 2}
-   {:letter "t"
-    :len 7
-    :freq {136 7}
-    :freq-tolerance 2
-    :len-tolerance 2}
-   {:letter "c"
-    :len 6
-    :freq {33 1 17 1 18 4}
-    :freq-tolerance 2
-    :len-tolerance 2}
-   {:letter "e"
-    :len 6
-    :freq {33 1 66 1 36 1 136 2 18 1}
-    :freq-tolerance 2
-    :len-tolerance 2}
-   {:letter "p"
-    :len 6
-    :freq {34 6}
-    :freq-tolerance 2
-    :len-tolerance 2}])
-
-(def ^{:doc "The length of the shortest reference sequence"} min-refseq
-  (let [{:keys [len len-tolerance]} (last type-1-refsequences)]
-    (- len len-tolerance)))
+(def ctx-key :freq-refseqs)
+(def min-key :min-refseq)
 
 (defn- median
   [coll]
@@ -116,7 +23,7 @@
   [numseq]
   (mapv median (partition-all normalize-bin-size numseq)))
 
-(defn- get-freq-diff
+(defn get-freq-diff
   "Compute the difference between a sequence frequencies and a reference one"
   [current reference]
   (reduce (fn [acc freq]
@@ -148,9 +55,10 @@
     result))
 
 (defn- translate-numseq
-  "Translate a normalized CNUMSEQ ot LTYPE."
-  [cnumseq ltype]
-  (let [dict (if (zero? ltype) type-0-refsequences type-1-refsequences)]
+  "Translate a normalized CNUMSEQ of LTYPE."
+  [ref-sequences cnumseq ltype]
+  (let [dict (get ref-sequences (if (zero? ltype) :type-0 :type-1))
+        min-refseq (get ref-sequences min-key)]
     (loop [s cnumseq
            acc ""]
       ;; (tap> tap-topic {:nseq s :acc acc})
@@ -163,27 +71,40 @@
                                 dict)]
             (recur  new-s  (str acc letter))))))))
 
-;; entry point
+(defn- get-min-refseq
+  "The length of the shortest type-1 reference sequence."
+  [refsequences]
+  (let [{:keys [len len-tolerance]} (last (:type-1 refsequences))]
+    (- len len-tolerance)))
+
+(defn load-edn
+  "Load an entity from a edn file with FILENAME."
+  [filename]
+  (with-open [r (bio/reader filename)]
+    (edn/read r)))
+
+;; entry points
+
+(defmethod tra/prepare-translation "freq"
+  [_ config]
+  (let [filename (get config "freq_refseqs")
+        refseqs (load-edn filename)
+        min-refseq (get-min-refseq refseqs)]
+    (assoc config ctx-key (assoc refseqs min-key min-refseq))))
 
 (defmethod tra/translate "freq"
-  [_ {:keys [ltype lineseq] :as lsign}]
-  (let [cnumseq (->> lineseq
+  [_ ctx {:keys [ltype lineseq] :as lsign}]
+  (let [refsequences (ctx-key ctx)
+        cnumseq (->> lineseq
                      (map #(nth % 2))
                      (normalize-numseq))]
-    (assoc lsign :text (translate-numseq cnumseq ltype))))
+    (assoc lsign :text (translate-numseq refsequences cnumseq ltype))))
 
 (comment
 
   (require
-   '[basilisp.io :as bio]
-   '[basilisp.edn :as edn]
    '[steno.utils :as utl]
    '[steno.show :as show])
-
-  (defn load-corpus
-    [filename]
-    (with-open [r (bio/reader filename)]
-      (edn/read r)))
 
   (def tcorpus (load-corpus "test/resources/corpus-template.edn"))
 

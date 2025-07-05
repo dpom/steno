@@ -1,9 +1,9 @@
 (ns steno.utils
   (:import
     ;; [basilisp-pprint.pprint :as p]
-    [basilisp.core :as core]
-    [multiprocessing :as mp]
-    [numpy :as np]))
+   [basilisp.core :as core]
+   [multiprocessing :as mp]
+   [numpy :as np]))
 
 (defn start-proc
   "Start FUNC with ARG in a thread process and return its id."

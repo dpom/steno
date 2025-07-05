@@ -4,8 +4,13 @@
 
 (def tap-topic "translator")
 
+;; Create the necessary context for the translation using the application configuration
+(defmulti prepare-translation
+  (fn [name _config] name))
+
+;; The translation function, receives a context and a lsign and returns a lsign to which the :text key is added with the lsign translation
 (defmulti translate
-  (fn [name _lsign] name))
+  (fn [name _ctx _lsign] name))
 
 (defn select-char
   [new-text old-text]
@@ -13,25 +18,30 @@
                   new-text old-text)))
 
 (defn apply-translator
-  [{old-text :text :as lsign} translator-name]
-  (let [new-lsign (translate translator-name lsign)]
+  [ctx {old-text :text :as lsign} translator-name]
+  (let [new-lsign (translate translator-name ctx lsign)]
     (assoc new-lsign :text (select-char (:text new-lsign) old-text))))
 
 ;; entry points
+
+(defn prepare-translations
+  "Create the context for all translators"
+  [config translators]
+  (reduce #(prepare-translation %2 %1) config translators))
 
 (defn translate-lsign
   "Translate to LSIGN  using TRANSLATORS functions, returns the lsign augmented with the translation in :text.
 
   Each translator is a function which receive a lsign and returns the same lsign with :text modified (possibly)."
-  [translators lsign]
+  [ctx translators lsign]
   (if [(= (count translators) 1)]
-    (translate (first translators) lsign)
-    (reduce apply-translator lsign translators)))
+    (translate (first translators) ctx lsign)
+    (reduce (fn [acc x] (apply-translator ctx acc x)) lsign translators)))
 
 (defn translate-wsign
   "Translate a wsign, returns the equivalent text."
-  [translators wsign]
-  (let [tr (partial translate-lsign translators)]
+  [ctx translators wsign]
+  (let [tr (partial translate-lsign ctx translators)]
     (->> wsign
          (map tr)
          (map :text)
@@ -47,10 +57,10 @@
   ;; => "abc"
 
   (require
-    '[steno.converter :as cnv]
-    '[steno.show :as show]
-    '[steno.utils :as utl]
-    '[steno.translators.freq :as freq])
+   '[steno.converter :as cnv]
+   '[steno.show :as show]
+   '[steno.utils :as utl]
+   '[steno.translators.freq :as freq])
 
   (import cv2)
 

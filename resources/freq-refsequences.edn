@@ -1,0 +1,93 @@
+  {:type-0
+   [{:letter "o"
+     :freq-tolerance 14
+     :freq {33 2 34 5 36 2 68 2 132 2 72 2 136 7 9 1 144 1 17 4}
+     :len 28
+     :len-tolerance 4}
+    {:letter "a"
+     :freq-tolerance 11
+     :freq {33 1 34 2 66 1 36 2 68 1 132 1 72 1 136 5 17 1 18 1}
+     :len 16
+     :len-tolerance 3}]
+
+   :type-1
+   [{:letter "n"
+     :len 17
+     :freq {33 1 34 3 36 1 132 1 72 1 136 8 17 2}
+     :freq-tolerance 5
+     :len-tolerance 2}
+    {:letter "j"
+     :len 15
+     :freq {33 1 34 1 66 3 36 1 68 1 132 1 136 3 144 1 17 2 18 1}
+     :freq-tolerance 10
+     :len-tolerance 2}
+    {:letter "v"
+     :len 14
+     :freq {66 6 36 2 68 6}
+     :freq-tolerance 4
+     :len-tolerance 4}
+    {:letter "m"
+     :len 14
+     :freq {33 1 34 4 132 1 136 4 17 3}
+     :freq-tolerance 5
+     :len-tolerance 3}
+    {:letter "r"
+     :len 14
+     :freq {136 7 73 1 17 6}
+     :freq-tolerance 2
+     :len-tolerance 2}
+    {:letter "s"
+     :len 14
+     :freq {33 1 34 2 66 1 68 1 136 3 17 1 18 2}
+     :freq-tolerance 6
+     :len-tolerance 2}
+    {:letter "d"
+     :len 14
+     :freq {136 14}
+     :freq-tolerance 4
+     :len-tolerance 4}
+    {:letter "g"
+     :len 12
+     :freq {33 2 17 2 18 8}
+     :freq-tolerance 4
+     :len-tolerance 4}
+    {:letter "b"
+     :len 12
+     :freq {34 12}
+     :freq-tolerance 4
+     :len-tolerance 4}
+    {:letter "l"
+     :len 10
+     :freq {136 7 9 2 144 1}
+     :freq-tolerance 5
+     :len-tolerance 2}
+    {:letter "f"
+     :len 7
+     :freq {66 3 36 1 68 3}
+     :freq-tolerance 2
+     :len-tolerance 2}
+    {:letter "i"
+     :len 7
+     :freq {34 3 68 1 132 1 136 1 17 1}
+     :freq-tolerance 2
+     :len-tolerance 2}
+    {:letter "t"
+     :len 7
+     :freq {136 7}
+     :freq-tolerance 2
+     :len-tolerance 2}
+    {:letter "c"
+     :len 6
+     :freq {33 1 17 1 18 4}
+     :freq-tolerance 2
+     :len-tolerance 2}
+    {:letter "e"
+     :len 6
+     :freq {33 1 66 1 36 1 136 2 18 1}
+     :freq-tolerance 2
+     :len-tolerance 2}
+    {:letter "p"
+     :len 6
+     :freq {34 6}
+     :freq-tolerance 2
+     :len-tolerance 2}]}
