@@ -1,0 +1,105 @@
+(ns steno.translators.freqrefbuilder
+  "Build refernces for frequency translator"
+  (:require
+   [basilisp.io :as bio]
+   [basilisp.edn :as edn]
+   [steno.translators.freq :as freq])
+  (:import
+   [statistics :as st]))
+
+(defn load-corpus
+  [filename]
+  (with-open [r (bio/reader filename)]
+    (edn/read r)))
+
+(defn add-freq
+  [{:keys [lineseq] :as lsign}]
+  (let [numseq (mapv last lineseq)
+        nnumseq (freq/normalize-numseq numseq)]
+    (assoc lsign
+           :numseq numseq
+           :nnumseq nnumseq
+           :len (count nnumseq)
+           :freq (frequencies nnumseq))))
+
+(defn compute-mean-and-tolerance
+  [nums]
+  (let [mean-v (round (st/mean nums))
+        max-v (apply max nums)
+        min-v (apply min nums)]
+    {:mean mean-v
+     :tolerance (max (- max-v mean-v) (- mean-v min-v))}))
+
+(defn get-freq-keys
+  [corpus]
+  (->> corpus
+       (mapcat #(keys (:freq %)))
+       (frequencies)
+       (filter (fn [[k v]] (> v (/ (count corpus) 2))))
+       (map first)
+       (sort)))
+
+(defn normalize-freq
+  [freq-keys freq]
+  (reduce (fn [acc k]
+            (assoc acc k (get freq k 0)))
+          {}
+          freq-keys))
+
+;; entry point
+
+(defn compute-reference
+  [corpus]
+  (let [corpus* (map add-freq corpus)
+        {len :mean len-tolerance :tolerance} (compute-mean-and-tolerance (map :len corpus*))
+        freq-keys (get-freq-keys corpus*)
+        freqs* (->> corpus*
+                    (map :freq)
+                    (map #(normalize-freq freq-keys %)))
+        ref-freqs (map
+                   (fn [x]
+                     (assoc (compute-mean-and-tolerance
+                             (map #(get % x) freqs*))
+                            :key x))
+
+                   freq-keys)
+        freqs (reduce (fn [acc {:keys [key mean]}]
+                        (assoc acc key mean))
+                      {}
+                      ref-freqs)
+        freq-tolerance (apply max (map #(freq/get-freq-diff % freqs) (map :freq corpus*)))]
+    {:letter (:text (first corpus))
+     :len len
+     :len-tolerance len-tolerance
+     :freq freqs
+     :freq-tolerance freq-tolerance}))
+
+(comment
+
+  (require
+    '[steno.utils :as utl]
+    '[steno.show :as show])
+
+  (def corpus-orig (utl/load-edn "test/resources/corpus-orig.edn"))
+
+  (utl/start-proc  show/show-lsign (nth corpus-orig 663))
+
+  ;; compute ref
+  (def corpus (utl/load-edn "test/resources/corpus.edn"))
+
+  (count corpus)
+
+  (def corp (filter #(= (:text %) "p") corpus))
+
+  (count corp)
+
+  (compute-reference corp)
+  ;; => 
+
+  ;;
+  (def ref)
+
+  (utl/start-proc  show/show-lsign ref)
+
+  ;;
+  )

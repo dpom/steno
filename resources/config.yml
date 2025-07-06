@@ -1,1 +1,2 @@
 translators: ["freq"]
+freq_refseqs: "resources/freq-refsequences.edn"

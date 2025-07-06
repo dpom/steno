@@ -21,3 +21,4 @@ wheels/
 .nrepl-port
 /.stfolder/
 /tmp/
+#*

@@ -22,3 +22,13 @@
    [:text string?]])
 
 (def WSIGN [:sequential LSIGN])
+
+(def FREQ [:map-of :int :int])
+
+(def FREQ-REFERENCE
+  [:map
+   [:letter string?]
+   [:len nat-int?]
+   [:len-tolerance [:and int? pos?]]
+   [:freq FREQ]
+   [:freq-tolerance [:and int? pos?]]])

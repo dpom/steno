@@ -1,19 +1,20 @@
 (ns steno.core
   (:require
-    [basilisp.io :as bio]
-    [clojure.string :as str]
-    [steno.converter :as cnv]
-    [steno.extractor :as ext]
-    [steno.imageprocessor :as img]
-    [steno.translator :as tra]
-    [steno.translators.freq])
+   [basilisp.edn :as edn]
+   [basilisp.io :as bio]
+   [clojure.string :as str]
+   [steno.converter :as cnv]
+   [steno.extractor :as ext]
+   [steno.imageprocessor :as img]
+   [steno.translator :as tra]
+   [steno.translators.freq])
   (:import
-    [argparse :as arg]
-    cv2
-    os
-    [os.path :as path]
-    [pyaml_env :as yml]))
-
+   [argparse :as arg]
+   cv2
+   os
+   [os.path :as path]
+   [pyaml_env :as yml]
+   uuid))
 
 (defn remove-nil-values
   [dict]
@@ -33,8 +34,7 @@
         ]
     ;; (println (format "args: %s" map-args))
     ;; (merge-with (fn [a b] (if (nil? b) a b)) config dict-args)
-    (merge config dict-args)
-    ))
+    (merge config dict-args)))
 
 (defn action-help
   [config]
@@ -54,10 +54,10 @@
 
 (defn get-word-images
   [infile]
+  (println "- extract word images")
   (->> infile
        ext/extract-word-images
        (map img/process-image)))
-
 
 (defn action-extract-words
   [config]
@@ -69,24 +69,60 @@
       (ext/save-word-images! word-images outname outdir)
       (println "Saved words in " outdir))))
 
+(defn display-message
+  [msg obj]
+  (println msg)
+  obj)
+
 (defn action-translate
   [config]
   (let [infile (get config "input")
         outfile (get config "output")
         translators (get config "translators")]
     (println (format "Translate %s using %s" infile translators))
-    (let [traw (partial tra/translate-wsign translators)]
+    (let [ctx (tra/prepare-translations config translators)
+          traw (partial tra/translate-wsign ctx translators)]
       (->> infile
            (get-word-images)
+           (display-message "- convert to wsign")
            (map cnv/image-to-wsign)
+           (display-message "- translate wsigns")
            (map traw)
            (str/join " ")
-           (spit outfile)))))
+           (spit outfile)))
+    (println "Saved in " outfile)))
+
+(defn save-corpus
+  [filename corpus]
+  (with-open [w (bio/writer filename)]
+    (edn/write corpus w)))
+
+(defn action-make-corpus
+  [config]
+  (let [infile (get config "input")
+        outfile (get config "output")
+        translators (get config "translators")]
+    (printf "Make corpus %s using %s\n" infile translators)
+    (let [ctx (tra/prepare-translations config translators)
+          tral (partial tra/translate-lsign ctx translators)]
+      (->> infile
+           (get-word-images)
+           (display-message "- convert to wsign")
+           (map cnv/image-to-wsign)
+           (display-message "- create corpus")
+           (mapcat identity)
+           (display-message "- translate lsigns")
+           (map tral)
+           (display-message "- add uuid")
+           (mapv #(assoc % :id (uuid/uuid4)))
+           (save-corpus outfile)))
+    (println "Saved in " outfile)))
 
 (def actions
-  {"extract_words" action-extract-words
+  {"extract-words" action-extract-words
    "help"          action-help
-   "list_config"   action-list-config
+   "list-config"   action-list-config
+   "make-corpus"   action-make-corpus
    "translate"     action-translate})
 
 (defn cli
@@ -99,6 +135,7 @@
     (.add_argument parser "-o" "--output" ** :help "the output of the action")
     (.add_argument parser "-c" "--config" ** :help "the config file"
                    :default "resources/config.yml")
+    (.add_argument parser "-f" "--freq_refseqs" ** :help "the reference sequences file for freq translators")
     (.add_argument parser "-t" "--translators" ** :help "the translators used"
                    :choices (keys (methods tra/translate))
                    :action "append")
@@ -107,53 +144,3 @@
           action (get actions (get config "action"))]
       (action config))))
 
-(comment
-
-  (get-filename "test/resources/template.png")
-  ;; => "template"
-
-
-  (def config (yml/parse_config "resources/config.yml"))
-
-  (first
-    (get config "translators"))
-  ;; => "freq"
-
-  ((get actions "list_config") config)
-
-  (def test-dict
-    (python/dict {"a" nil "b" 2}))
-  ;; => #py {"a" nil "b" 2}
-
-  (filter identity test-dict)
-  ;; => ("a" "b")
-
-  (reduce (fn [acc [k v]]
-            (assoc acc k v))
-          {}
-          test-dict)
-  
-  ;; (require '[basilisp.pprint :as pprint])
-
-  ;; (pprint/pprint (range 30))
-  
-  (reduce (fn [acc k]
-            (if-let [v (get test-dict k)]
-              (assoc acc k v)
-              acc))
-          {}
-          test-dict)
-  ;; => {"b" 2}
-  
-  (def translators (python/list ["freq"]))
-
-
-  (keys (methods tra/translate ))
-  ;; => ("freq")
-  
-  ;; => {"freq" <function __lisp_fn_205 at 0x7f15764f7e20>}
-  
-
-
-
-  )
