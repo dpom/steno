@@ -108,7 +108,7 @@ SCHEDULED: <2025-06-25 Mi>
 :LOGBOOK:
 CLOCK: [2025-06-25 Mi 14:21]--[2025-06-26 Jo 13:30] => 23:09
 :END:
-*** INPROGRESS #23 Improve freq translator
+*** DONE #23 Improve freq translator
 SCHEDULED: <2025-06-30 Lu>
 :LOGBOOK:
 CLOCK: [2025-07-04 Vi 06:33]

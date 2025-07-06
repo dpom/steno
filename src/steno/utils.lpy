@@ -1,6 +1,8 @@
 (ns steno.utils
   (:import
     ;; [basilisp-pprint.pprint :as p]
+   [basilisp.edn :as edn]
+   [basilisp.io :as bio]
    [basilisp.core :as core]
    [multiprocessing :as mp]
    [numpy :as np]))
@@ -33,6 +35,16 @@
     (doseq [[x y _] lineseq]
       (aset mat x y 1))
     mat))
+
+(defn save-edn
+  [filename entity]
+  (with-open [w (bio/writer filename)]
+    (edn/write entity w)))
+
+(defn load-edn
+  [filename]
+  (with-open [r (bio/reader filename)]
+    (edn/read r)))
 
 (comment
 

@@ -5303,5 +5303,33 @@ min-refseq
 
 - Refactorizez =core=, =translator= si =freq= pentru a scoate refseqs din cod si stocat intr-un fiser ~resources/freq-refsequences~:
   #+begin_src clojure
-  
+  (comment
+
+  (require
+    '[steno.utils :as utl]
+    '[steno.show :as show])
+
+  (def corpus-orig (utl/load-edn "test/resources/corpus-orig.edn"))
+
+  (utl/start-proc  show/show-lsign (nth corpus-orig 663))
+
+  ;; compute ref
+  (def corpus (utl/load-edn "test/resources/corpus.edn"))
+
+  (count corpus)
+
+  (def corp (filter #(= (:text %) "p") corpus))
+
+  (count corp)
+
+  (compute-reference corp)
+  ;; => 
+
+  ;;
+  (def ref)
+
+  (utl/start-proc  show/show-lsign ref)
+
+  ;;
+  )
   #+end_src

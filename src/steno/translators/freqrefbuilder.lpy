@@ -77,34 +77,29 @@
 (comment
 
   (require
-   '[steno.utils :as utl]
-   '[steno.show :as show])
+    '[steno.utils :as utl]
+    '[steno.show :as show])
 
-  (def tcorpus (load-corpus "test/resources/corpus-template.edn"))
+  (def corpus-orig (utl/load-edn "test/resources/corpus-orig.edn"))
 
-  (count tcorpus)
+  (utl/start-proc  show/show-lsign (nth corpus-orig 663))
 
-  (utl/start-proc  show/show-lsign (nth tcorpus 44))
+  ;; compute ref
+  (def corpus (utl/load-edn "test/resources/corpus.edn"))
 
-  (def a-corp (filter #(= (:text %) "a") tcorpus))
+  (count corpus)
 
-  (count a-corp)
-  ;; => 7
+  (def corp (filter #(= (:text %) "p") corpus))
 
-  (def a-corp* (mapv add-freq a-corp))
+  (count corp)
 
-  (map :len a-corp*)
-  ;; => (18 16 18 15 19 13 14)
+  (compute-reference corp)
+  ;; => 
 
-  (utl/start-proc  show/show-lsign (nth a-corp 4))
+  ;;
+  (def ref)
 
-  (compute-reference a-corp)
-  ;; => {:letter "a" :freq-tolerance 11 :freq {33 1 34 2 66 1 36 2 68 1 132 1 72 1 136 5 17 1 18 1} :len 16 :len-tolerance 3}
+  (utl/start-proc  show/show-lsign ref)
 
-  (def o-corp (filter #(= (:text %) "o") tcorpus))
-
-  (compute-reference o-corp)
-  ;; => {:letter "o" :freq-tolerance 14 :freq {33 2 34 5 36 2 68 2 132 2 72 2 136 7 9 1 144 1 17 4} :len 28 :len-tolerance 4}
-
-;;
+  ;;
   )
