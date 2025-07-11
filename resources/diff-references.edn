@@ -1,0 +1,65 @@
+[{:letter "j"
+  :min-len 24
+  :max-len 26
+  :max-match 192
+  :reference [34 34 34 33 33 33 144 136 17 144 144 136 136 136 136 136 136 72 136 72 72 68 68 66]}
+
+ {:letter "s"
+  :min-len 23
+  :max-len 25
+  :max-match 184
+  :reference [34 68 66 36 66 66 68 132 72 132 136 136 136 136 17 136 18 17 18 33 33 33 34]}
+
+ {:letter "m"
+  :min-len 19
+  :max-len 33
+  :max-match 152
+  :reference [136 136 136 136 18 34 34 34 33 33 33 34 34 34 34 36 68 72 72]}
+
+ {:letter "n"
+  :min-len 17
+  :max-len 28
+  :max-match 136
+  :reference [136 136 132 72 72 72 132 68 68 34 36 33 18 34 136 136 136]}
+
+ {:letter "l"
+  :min-len 12
+  :max-len 18
+  :max-match 96
+  :reference [136 136 136 136 136 136 136 136 136 136 136 136]}
+
+ {:letter "f"
+  :min-len 11
+  :max-len 11
+  :max-match 88
+  :reference [66 68 68 68 66 66 66 66 66 66 66]}
+
+ {:letter "t"
+  :min-len 10
+  :max-len 15
+  :max-match 80
+  :reference [136 136 136 136 136 136 136 136 136 136]}
+
+ {:letter "p"
+  :min-len 9
+  :max-len 12
+  :max-match 72
+  :reference [34 34 34 34 34 34 34 34 34]}
+
+ {:letter "e"
+  :min-len 9
+  :max-len 12
+  :max-match 72
+  :reference [33 33 18 136 136 136 68 36 36]}
+
+ {:letter "i"
+  :min-len 9
+  :max-len 12
+  :max-match 72
+  :reference [34 68 72 136 136 136 17 18 33]}
+
+ {:letter "c"
+  :min-len 8
+  :max-len 11
+  :max-match 64
+  :reference [18 33 18 33 18 33 18 18]}]

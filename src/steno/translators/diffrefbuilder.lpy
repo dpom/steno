@@ -1,0 +1,134 @@
+(ns steno.translators.diffrefbuilder
+  "Build the references for bit difference translator"
+  (:require
+   [steno.translator :as tra]
+   [steno.translators.diff :as diff])
+  (:import
+   [statistics :as st]))
+
+(defn add-numseq
+  [{:keys [lineseq] :as lsign}]
+  (let [numseq (tra/normalize-numseq (mapv last lineseq))
+        len (count numseq)]
+    (assoc lsign
+           :numseq numseq
+           :len len)))
+
+(defn get-best-match
+  [reference numseq]
+  (let [ref-len (count reference)
+        numseq-len (count numseq)]
+    (if (= ref-len numseq-len)
+      {:best numseq
+       :diff (diff/get-diff reference numseq)}
+      (reduce (fn [{:keys [diff] :as acc} pos]
+                (let [new-best (aslice numseq (+ pos ref-len))
+                      new-diff (diff/get-diff reference new-best)]
+                  (if (> new-diff diff)
+                    {:diff new-diff
+                     :best new-best}
+                    acc)))
+              {:diff 0
+               :best []}
+              (range (- numseq-len ref-len))))))
+
+(defn make-median-numseq
+  [numseqs]
+  (let [len (count (first numseqs))]
+    (reduce (fn [acc pos]
+              (conj acc (st/median_high (map #(nth % pos) numseqs))))
+            []
+            (range len))))
+
+(defn build-reference
+  [corpus]
+  (let [corpus* (map add-numseq corpus)
+        min-len (apply min (map :len corpus*))
+        max-len (apply max (map :len corpus*))
+        ref-numseqs (->> corpus*
+                         (filter #(= (:len %) min-len))
+                         (map :numseq))
+        ref-numseq* (if (= (count ref-numseqs) 1)
+                      (first ref-numseqs)
+                      (make-median-numseq ref-numseqs))
+        ref-numseq (->> corpus*
+                        (map :numseq)
+                        (map #(get-best-match ref-numseq* %))
+                        (map :best)
+                        (make-median-numseq))]
+    {:letter (:text (first corpus))
+     :min-len min-len
+     :max-len max-len
+     :reference ref-numseq
+     :max-match (* 8 min-len)}))
+
+(comment
+
+  (def corpus (tra/load-edn "test/resources/corpus.edn"))
+
+  (count corpus)
+
+  (def p-corp (filter #(= (:text %) "p") corpus))
+
+  (count p-corp)
+
+  (def corpus* (mapv add-numseq p-corp))
+
+  (def min-len (apply min (map :len corpus*)))
+
+  (def ref-numseqs (->> corpus*
+                        (filter #(= (:len %) min-len))
+                        (map :numseq)))
+
+  (def ref-numseq (first ref-numseqs))
+
+  (def numseqs (->> corpus*
+                    (map :numseq)
+                    (map #(get-best-match ref-numseq %))
+                    (map :best)))
+
+  (defn make-median-numseq
+    [numseqs]
+    (let [len (count (first numseqs))]
+      (reduce (fn [acc pos]
+                (conj acc (st/median_high (map #(nth % pos) numseqs))))
+              []
+              (range len))))
+
+  (make-median-numseq numseqs)
+    ;; => [34 34 34 34 34 34 34 34 34]
+  (build-reference  p-corp)
+  ;; => {:letter "p" :max-match 72 :min-len 9 :max-len 12 :reference [34 34 34 34 34 34 34 34 34]}
+
+  (build-reference (filter #(= (:text %) "t") corpus))
+;; => {:letter "t" :max-match 80 :min-len 10 :max-len 15 :reference [136 136 136 136 136 136 136 136 136 136]}
+
+  (build-reference (filter #(= (:text %) "c") corpus))
+;; => {:letter "c" :max-match 64 :min-len 8 :max-len 11 :reference [18 33 18 33 18 33 18 18]}
+
+  (build-reference (filter #(= (:text %) "f") corpus))
+;; => {:letter "f" :max-match 88 :min-len 11 :max-len 11 :reference [66 68 68 68 66 66 66 66 66 66 66]}
+
+  (build-reference (filter #(= (:text %) "l") corpus))
+;; => {:letter "l" :max-match 96 :min-len 12 :max-len 18 :reference [136 136 136 136 136 136 136 136 136 136 136 136]}
+
+  (build-reference (filter #(= (:text %) "m") corpus))
+;; => {:letter "m" :max-match 152 :min-len 19 :max-len 33 :reference [136 136 136 136 18 34 34 34 33 33 33 34 34 34 34 36 68 72 72]}
+
+  (build-reference (filter #(= (:text %) "n") corpus))
+;; => {:letter "n" :max-match 136 :min-len 17 :max-len 28 :reference [136 136 132 72 72 72 132 68 68 34 36 33 18 34 136 136 136]}
+
+  (build-reference (filter #(= (:text %) "j") corpus))
+;; => {:letter "j" :max-match 192 :min-len 24 :max-len 26 :reference [34 34 34 33 33 33 144 136 17 144 144 136 136 136 136 136 136 72 136 72 72 68 68 66]}
+
+  (build-reference (filter #(= (:text %) "s") corpus))
+;; => {:letter "s" :max-match 184 :min-len 23 :max-len 25 :reference [34 68 66 36 66 66 68 132 72 132 136 136 136 136 17 136 18 17 18 33 33 33 34]}
+
+  (build-reference (filter #(= (:text %) "e") corpus))
+;; => {:letter "e" :max-match 72 :min-len 9 :max-len 12 :reference [33 33 18 136 136 136 68 36 36]}
+
+  (build-reference (filter #(= (:text %) "i") corpus))
+    ;; => {:letter "i" :max-match 72 :min-len 9 :max-len 12 :reference [34 68 72 136 136 136 17 18 33]}
+
+;;
+  )

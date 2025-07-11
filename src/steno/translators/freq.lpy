@@ -1,27 +1,12 @@
 (ns steno.translators.freq
   "Implement a translator based on cnum frequency"
   (:require
-   [basilisp.edn :as edn]
-   [basilisp.io :as bio]
    [steno.translator :as tra]))
 
 (def tap-topic "freq")
 
 (def ctx-key :freq-refseqs)
-(def min-key :min-refseq)
-
-(defn- median
-  [coll]
-  (let [sorted (sort coll)
-        cnt (count sorted)
-        halfway (quot cnt 2)]
-    (nth sorted halfway)))
-
-(def normalize-bin-size 3)
-
-(defn normalize-numseq
-  [numseq]
-  (mapv median (partition-all normalize-bin-size numseq)))
+(def min-len-key :min-refseq)
 
 (defn get-freq-diff
   "Compute the difference between a sequence frequencies and a reference one"
@@ -58,7 +43,7 @@
   "Translate a normalized CNUMSEQ of LTYPE."
   [ref-sequences cnumseq ltype]
   (let [dict (get ref-sequences (if (zero? ltype) :type-0 :type-1))
-        min-refseq (get ref-sequences min-key)]
+        min-refseq (get ref-sequences min-len-key)]
     (loop [s cnumseq
            acc ""]
       ;; (tap> tap-topic {:nseq s :acc acc})
@@ -77,27 +62,21 @@
   (let [{:keys [len len-tolerance]} (last (:type-1 refsequences))]
     (- len len-tolerance)))
 
-(defn load-edn
-  "Load an entity from a edn file with FILENAME."
-  [filename]
-  (with-open [r (bio/reader filename)]
-    (edn/read r)))
-
 ;; entry points
 
 (defmethod tra/prepare-translation "freq"
   [_ config]
   (let [filename (get config "freq_refseqs")
-        refseqs (load-edn filename)
+        refseqs (tra/load-edn filename)
         min-refseq (get-min-refseq refseqs)]
-    (assoc config ctx-key (assoc refseqs min-key min-refseq))))
+    (assoc config ctx-key (assoc refseqs min-len-key min-refseq))))
 
 (defmethod tra/translate "freq"
   [_ ctx {:keys [ltype lineseq] :as lsign}]
   (let [refsequences (ctx-key ctx)
         cnumseq (->> lineseq
                      (map #(nth % 2))
-                     (normalize-numseq))]
+                     (tra/normalize-numseq))]
     (assoc lsign :text (translate-numseq refsequences cnumseq ltype))))
 
 (comment

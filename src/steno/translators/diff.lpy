@@ -1,0 +1,39 @@
+(ns steno.translators.diff
+  "Implement a translator based on cnum difference"
+  (:require
+   [basilisp.edn :as edn]
+   [basilisp.io :as bio]
+   [steno.translator :as tra]))
+
+(def one-bit-num
+  [0 1 1 2 1 2 2 3 1 2 2 3 2 3 3 4
+   1 2 2 3 2 3 3 4 2 3 3 4 3 4 4 5
+   1 2 2 3 2 3 3 4 2 3 3 4 3 4 4 5
+   2 3 3 4 3 4 4 5 3 4 4 5 4 5 5 6
+   1 2 2 3 2 3 3 4 2 3 3 4 3 4 4 5
+   2 3 3 4 3 4 4 5 3 4 4 5 4 5 5 6
+   2 3 3 4 3 4 4 5 3 4 4 5 4 5 5 6
+   3 4 4 5 4 5 5 6 4 5 5 6 5 6 6 7
+   1 2 2 3 2 3 3 4 2 3 3 4 3 4 4 5
+   2 3 3 4 3 4 4 5 3 4 4 5 4 5 5 6
+   2 3 3 4 3 4 4 5 3 4 4 5 4 5 5 6
+   3 4 4 5 4 5 5 6 4 5 5 6 5 6 6 7
+   2 3 3 4 3 4 4 5 3 4 4 5 4 5 5 6
+   3 4 4 5 4 5 5 6 4 5 5 6 5 6 6 7
+   3 4 4 5 4 5 5 6 4 5 5 6 5 6 6 7
+   4 5 5 6 5 6 6 7 5 6 6 7 6 7 7 8])
+
+(defn get-diff
+  "Get the number of diff bits between NUMSEQ1 and NUMSEQ2."
+  [numseq1 numseq2]
+  (apply + (mapv #(nth one-bit-num (bit-not (bit-xor %1 %2))) numseq1 numseq2)))
+
+(comment
+
+  (get-diff [1 2 3 4] [1 2 4 5])
+
+  2r00000011
+  2r00000100
+  2r00000111
+  ;;
+  )

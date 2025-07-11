@@ -5333,3 +5333,142 @@ min-refseq
   ;;
   )
   #+end_src
+
+* 2025-07-09
+
+** #25 Build a diff translator
+
+- ca si freq si diff translator va avea 2 fisiere: =diff= si =diffrefbuilder=
+- stockez numarul de biti pentru byte:
+  #+begin_src clojure
+  (comment
+  (bit-xor 2r1100 2r1001)
+  ;; => 5
+
+  (def bit-mask 2r00000001)
+
+  (map #(bit-shift-left bit-mask %) (range 8))
+  ;; => (1 2 4 8 16 32 64 128)
+
+  (defn check-bit
+    [num bit-mask]
+    (if (zero? (bit-and num bit-mask)) 0 1))
+
+  (defn count-bits
+    [cnum]
+    (let [bit-masks (map #(bit-shift-left bit-mask %) (range 8))
+          cb (partial check-bit cnum)]
+
+      (apply + (map cb bit-masks))))
+
+  (count-bits 2r00001101)
+  ;; => 3
+
+  (mapv #(count-bits %) (range 256))
+
+  (def one-bit-num [0 1 1 2 1 2 2 3 1 2 2 3 2 3 3 4 1 2 2 3 2 3 3 4 2 3 3 4 3 4 4 5 1 2 2 3 2 3 3 4 2 3 3 4 3 4 4 5 2 3 3 4 3 4 4 5 3 4 4 5 4 5 5 6 1 2 2 3 2 3 3 4 2 3 3 4 3 4 4 5 2 3 3 4 3 4 4 5 3 4 4 5 4 5 5 6 2 3 3 4 3 4 4 5 3 4 4 5 4 5 5 6 3 4 4 5 4 5 5 6 4 5 5 6 5 6 6 7 1 2 2 3 2 3 3 4 2 3 3 4 3 4 4 5 2 3 3 4 3 4 4 5 3 4 4 5 4 5 5 6 2 3 3 4 3 4 4 5 3 4 4 5 4 5 5 6 3 4 4 5 4 5 5 6 4 5 5 6 5 6 6 7 2 3 3 4 3 4 4 5 3 4 4 5 4 5 5 6 3 4 4 5 4 5 5 6 4 5 5 6 5 6 6 7 3 4 4 5 4 5 5 6 4 5 5 6 5 6 6 7 4 5 5 6 5 6 6 7 5 6 6 7 6 7 7 8])
+
+;;
+  )
+  #+end_src
+
+
+- implementez =diffrefbuilder=:
+  #+begin_src clojure
+  (comment
+
+  (def corpus (tra/load-edn "test/resources/corpus.edn"))
+
+  (count corpus)
+
+  (def p-corp (filter #(= (:text %) "p") corpus))
+
+  (count p-corp)
+
+  (defn add-numseq
+    [{:keys [lineseq] :as lsign}]
+    (let [numseq (tra/normalize-numseq (mapv last lineseq))
+          len (count numseq)]
+      (assoc lsign
+             :numseq numseq
+             :len len)))
+
+  (def p-corp* (mapv add-numseq p-corp))
+
+  (mapv (juxt :len :numseq) p-corp*)
+  [[12 [18 34 34 34 34 36 34 34 34 34 34 2]]
+   [9 [33 34 34 34 34 34 34 36 2]]
+   [10 [34 34 34 34 36 34 34 33 34 34]]
+   [12 [34 34 34 34 34 34 36 34 34 34 34 114]]
+   [11 [34 34 36 34 34 34 36 36 34 66 148]]]
+
+  (def p-ref [34 34 34 34 34 34 34 34])
+
+  (def p0 (:numseq (first p-corp*)))
+;; => [18 34 34 34 34 36 34 34 34 34 34 2]
+
+  (range 0 3)
+;; => (0 1 2)
+
+  (aslice p0 2 4)
+
+  (defn get-best-match
+    [reference numseq]
+    (let [ref-len (count reference)
+          numseq-len (count numseq)]
+      (reduce (fn [{:keys [diff] :as acc} pos]
+                (let [new-best (aslice numseq (+ pos ref-len))
+                      new-diff (diff/get-diff reference new-best)]
+                  (if (< new-diff diff)
+                    {:diff new-diff
+                     :best new-best}
+                    acc)))
+              {:diff 100
+               :best []}
+              (range (- numseq-len ref-len)))))
+
+  (get-best-match p-ref p0)
+  ;; => {:diff 4 :best [18 34 34 34 34 36 34 34]}
+
+  (def max-diff (* (count p-ref) 8))
+
+  (python/float (/ 4 max-diff))
+  ;; => 0.0625
+
+  ;; => 1/16
+
+  (st/median_high [1 3 2])
+  ;; => 2
+
+  (def t-corp (filter #(= (:text %) "t") corpus))
+  (count t-corp)
+
+  (def t-corp* (mapv add-numseq t-corp))
+
+  (mapv (juxt :len :numseq) t-corp*)
+  [[13 [136 136 136 136 136 136 136 136 136 136 136 136 8]]
+   [15 [136 17 136 136 136 136 136 136 136 136 136 136 136 136 145]]
+   [11 [152 136 136 136 136 136 136 136 136 136 8]]
+   [12 [156 136 136 136 136 136 136 132 132 136 136 8]]
+   [10 [17 136 136 136 136 136 136 136 136 136]]]
+
+  (def t-ref [136 136 136 136 136 136 136 136 136])
+
+  (require
+   '[steno.utils :as utl]
+   '[steno.show :as show])
+
+  (utl/start-proc  show/show-lsign (nth corp 5))
+
+;;
+  )
+  #+end_src
+
+* 2025-07-10
+
+** #25 Build a diff translator
+
+- continui =diffrefbuilder=:
+  #+begin_src clojure
+  
+  #+end_src

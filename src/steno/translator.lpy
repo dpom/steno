@@ -1,4 +1,9 @@
-(ns steno.translator)
+(ns steno.translator
+  (:require
+   [basilisp.edn :as edn]
+   [basilisp.io :as bio])
+  (:import
+   [statistics :as st]))
 
 (def ^{:doc "The unknown letter indicator"} unknown-letter "*")
 
@@ -12,6 +17,12 @@
 (defmulti translate
   (fn [name _ctx _lsign] name))
 
+(def normalize-bin-size 3)
+
+(defn normalize-numseq
+  [numseq]
+  (mapv st/median_high (partition-all normalize-bin-size numseq)))
+
 (defn select-char
   [new-text old-text]
   (apply str (map (fn [new old] (if (= new unknown-letter) old new))
@@ -21,6 +32,12 @@
   [ctx {old-text :text :as lsign} translator-name]
   (let [new-lsign (translate translator-name ctx lsign)]
     (assoc new-lsign :text (select-char (:text new-lsign) old-text))))
+
+(defn load-edn
+  "Load an entity from a edn file with FILENAME."
+  [filename]
+  (with-open [r (bio/reader filename)]
+    (edn/read r)))
 
 ;; entry points
 

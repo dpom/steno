@@ -1,21 +1,15 @@
 (ns steno.translators.freqrefbuilder
-  "Build refernces for frequency translator"
+  "Build the references for frequency translator"
   (:require
-   [basilisp.io :as bio]
-   [basilisp.edn :as edn]
+   [steno.translator :as tra]
    [steno.translators.freq :as freq])
   (:import
    [statistics :as st]))
 
-(defn load-corpus
-  [filename]
-  (with-open [r (bio/reader filename)]
-    (edn/read r)))
-
 (defn add-freq
   [{:keys [lineseq] :as lsign}]
   (let [numseq (mapv last lineseq)
-        nnumseq (freq/normalize-numseq numseq)]
+        nnumseq (tra/normalize-numseq numseq)]
     (assoc lsign
            :numseq numseq
            :nnumseq nnumseq
@@ -77,8 +71,8 @@
 (comment
 
   (require
-    '[steno.utils :as utl]
-    '[steno.show :as show])
+   '[steno.utils :as utl]
+   '[steno.show :as show])
 
   (def corpus-orig (utl/load-edn "test/resources/corpus-orig.edn"))
 
@@ -95,9 +89,6 @@
 
   (compute-reference corp)
   ;; => 
-
-  ;;
-  (def ref)
 
   (utl/start-proc  show/show-lsign ref)
 

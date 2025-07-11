@@ -11,6 +11,8 @@
 
 (def CNUM [:and int? #(< % 127)  #(> % -128)])
 
+(def CNUMSEQ [:sequential CNUM])
+
 (def CELL [:tuple X Y CNUM])
 
 (def LSEQ [:sequential CELL])
@@ -32,3 +34,11 @@
    [:len-tolerance [:and int? pos?]]
    [:freq FREQ]
    [:freq-tolerance [:and int? pos?]]])
+
+(def DIFF-REFERENCE
+  [:map
+   [:letter string?]
+   [:min-len nat-int?]
+   [:max-len nat-int?]
+   [:reference CNUMSEQ]
+   [:max-match nat-int?]])
