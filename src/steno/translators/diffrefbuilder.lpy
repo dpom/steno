@@ -14,24 +14,6 @@
            :numseq numseq
            :len len)))
 
-(defn get-best-match
-  [reference numseq]
-  (let [ref-len (count reference)
-        numseq-len (count numseq)]
-    (if (= ref-len numseq-len)
-      {:best numseq
-       :diff (diff/get-diff reference numseq)}
-      (reduce (fn [{:keys [diff] :as acc} pos]
-                (let [new-best (aslice numseq (+ pos ref-len))
-                      new-diff (diff/get-diff reference new-best)]
-                  (if (> new-diff diff)
-                    {:diff new-diff
-                     :best new-best}
-                    acc)))
-              {:diff 0
-               :best []}
-              (range (- numseq-len ref-len))))))
-
 (defn make-median-numseq
   [numseqs]
   (let [len (count (first numseqs))]
@@ -53,7 +35,7 @@
                       (make-median-numseq ref-numseqs))
         ref-numseq (->> corpus*
                         (map :numseq)
-                        (map #(get-best-match ref-numseq* %))
+                        (map #(diff/get-best-match ref-numseq* %))
                         (map :best)
                         (make-median-numseq))]
     {:letter (:text (first corpus))
@@ -70,33 +52,6 @@
 
   (def p-corp (filter #(= (:text %) "p") corpus))
 
-  (count p-corp)
-
-  (def corpus* (mapv add-numseq p-corp))
-
-  (def min-len (apply min (map :len corpus*)))
-
-  (def ref-numseqs (->> corpus*
-                        (filter #(= (:len %) min-len))
-                        (map :numseq)))
-
-  (def ref-numseq (first ref-numseqs))
-
-  (def numseqs (->> corpus*
-                    (map :numseq)
-                    (map #(get-best-match ref-numseq %))
-                    (map :best)))
-
-  (defn make-median-numseq
-    [numseqs]
-    (let [len (count (first numseqs))]
-      (reduce (fn [acc pos]
-                (conj acc (st/median_high (map #(nth % pos) numseqs))))
-              []
-              (range len))))
-
-  (make-median-numseq numseqs)
-    ;; => [34 34 34 34 34 34 34 34 34]
   (build-reference  p-corp)
   ;; => {:letter "p" :max-match 72 :min-len 9 :max-len 12 :reference [34 34 34 34 34 34 34 34 34]}
 

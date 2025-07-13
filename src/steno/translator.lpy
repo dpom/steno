@@ -23,6 +23,12 @@
   [numseq]
   (mapv st/median_high (partition-all normalize-bin-size numseq)))
 
+(defn get-numseq
+  [lineseq]
+  (->> lineseq
+       (map #(nth % 2))
+       (normalize-numseq)))
+
 (defn select-char
   [new-text old-text]
   (apply str (map (fn [new old] (if (= new unknown-letter) old new))
@@ -38,6 +44,11 @@
   [filename]
   (with-open [r (bio/reader filename)]
     (edn/read r)))
+
+(defn compute-match
+  "Compute the MATCH probability using MAX-MATCH value."
+  [max-match match]
+  (python/float (* (/ match max-match))))
 
 ;; entry points
 

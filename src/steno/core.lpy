@@ -7,6 +7,7 @@
    [steno.extractor :as ext]
    [steno.imageprocessor :as img]
    [steno.translator :as tra]
+   [steno.translators.diff]
    [steno.translators.freq])
   (:import
    [argparse :as arg]
@@ -135,8 +136,9 @@
     (.add_argument parser "-o" "--output" ** :help "the output of the action")
     (.add_argument parser "-c" "--config" ** :help "the config file"
                    :default "resources/config.yml")
-    (.add_argument parser "-f" "--freq_refseqs" ** :help "the reference sequences file for freq translators")
-    (.add_argument parser "-t" "--translators" ** :help "the translators used"
+    (.add_argument parser "-f" "--freq_refseqs" ** :help "the reference sequences file for the freq translator")
+    (.add_argument parser "-d" "--diff_references" ** :help "the reference sequences file for the diff translator")
+    (.add_argument parser "-t" "--translators" ** :help "the translators to use"
                    :choices (keys (methods tra/translate))
                    :action "append")
     (let [args   (.parse_args parser)

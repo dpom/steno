@@ -74,9 +74,7 @@
 (defmethod tra/translate "freq"
   [_ ctx {:keys [ltype lineseq] :as lsign}]
   (let [refsequences (ctx-key ctx)
-        cnumseq (->> lineseq
-                     (map #(nth % 2))
-                     (tra/normalize-numseq))]
+        cnumseq (tra/get-numseq lineseq)]
     (assoc lsign :text (translate-numseq refsequences cnumseq ltype))))
 
 (comment
