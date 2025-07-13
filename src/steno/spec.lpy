@@ -43,10 +43,10 @@
 (def FREQ-REFERENCE
   [:map
    [:letter string?]
-   [:len nat-int?]
-   [:len-tolerance [:and int? pos?]]
+   [:min-len nat-int?]
+   [:max-len nat-int?]
    [:freq FREQ]
-   [:freq-tolerance [:and int? pos?]]])
+   [:max-match nat-int?]])
 
 (def DIFF-REFERENCE
   [:map

@@ -56,34 +56,35 @@
   ;; => {:letter "p" :max-match 72 :min-len 9 :max-len 12 :reference [34 34 34 34 34 34 34 34 34]}
 
   (build-reference (filter #(= (:text %) "t") corpus))
-;; => {:letter "t" :max-match 80 :min-len 10 :max-len 15 :reference [136 136 136 136 136 136 136 136 136 136]}
+  ;; => {:letter "t" :max-match 80 :min-len 10 :max-len 15 :reference [136 136 136 136 136 136 136 136 136 136]}
 
   (build-reference (filter #(= (:text %) "c") corpus))
-;; => {:letter "c" :max-match 64 :min-len 8 :max-len 11 :reference [18 33 18 33 18 33 18 18]}
+  ;; => {:letter "c" :max-match 64 :min-len 8 :max-len 11 :reference [33 18 18 18 33 18 18 18]}
 
   (build-reference (filter #(= (:text %) "f") corpus))
-;; => {:letter "f" :max-match 88 :min-len 11 :max-len 11 :reference [66 68 68 68 66 66 66 66 66 66 66]}
+  ;; => {:letter "f" :max-match 88 :min-len 11 :max-len 11 :reference [66 68 68 68 66 66 66 66 66 66 66]}
 
   (build-reference (filter #(= (:text %) "l") corpus))
+  ;; => {:letter "l" :max-match 96 :min-len 12 :max-len 18 :reference [136 136 136 136 136 136 136 136 17 136 17 136]}
 ;; => {:letter "l" :max-match 96 :min-len 12 :max-len 18 :reference [136 136 136 136 136 136 136 136 136 136 136 136]}
 
   (build-reference (filter #(= (:text %) "m") corpus))
-;; => {:letter "m" :max-match 152 :min-len 19 :max-len 33 :reference [136 136 136 136 18 34 34 34 33 33 33 34 34 34 34 36 68 72 72]}
+  ;; => {:letter "m" :max-match 152 :min-len 19 :max-len 33 :reference [33 17 18 33 33 34 34 34 34 34 36 66 66 68 72 132 136 136 136]}
 
   (build-reference (filter #(= (:text %) "n") corpus))
-;; => {:letter "n" :max-match 136 :min-len 17 :max-len 28 :reference [136 136 132 72 72 72 132 68 68 34 36 33 18 34 136 136 136]}
+  ;; => {:letter "n" :max-match 136 :min-len 17 :max-len 28 :reference [132 68 68 36 36 34 34 34 34 33 18 17 17 136 136 136 136]}
 
   (build-reference (filter #(= (:text %) "j") corpus))
-;; => {:letter "j" :max-match 192 :min-len 24 :max-len 26 :reference [34 34 34 33 33 33 144 136 17 144 144 136 136 136 136 136 136 72 136 72 72 68 68 66]}
+  ;; => {:letter "j" :max-match 192 :min-len 24 :max-len 26 :reference [34 34 18 33 33 18 144 136 17 144 136 136 136 136 136 136 72 136 72 72 68 68 66 68]}
 
   (build-reference (filter #(= (:text %) "s") corpus))
-;; => {:letter "s" :max-match 184 :min-len 23 :max-len 25 :reference [34 68 66 36 66 66 68 132 72 132 136 136 136 136 17 136 18 17 18 33 33 33 34]}
+  ;; => {:letter "s" :max-match 184 :min-len 23 :max-len 25 :reference [34 68 66 36 66 66 68 132 72 132 136 136 136 136 17 136 18 17 18 33 33 33 34]}
 
   (build-reference (filter #(= (:text %) "e") corpus))
-;; => {:letter "e" :max-match 72 :min-len 9 :max-len 12 :reference [33 33 18 136 136 136 68 36 36]}
+  ;; => {:letter "e" :max-match 72 :min-len 9 :max-len 12 :reference [33 18 136 136 136 72 66 36 36]}
 
   (build-reference (filter #(= (:text %) "i") corpus))
-    ;; => {:letter "i" :max-match 72 :min-len 9 :max-len 12 :reference [34 68 72 136 136 136 17 18 33]}
+  ;; => {:letter "i" :max-match 72 :min-len 9 :max-len 12 :reference [34 68 72 136 136 136 17 18 33]}
 
 ;;
   )

@@ -65,6 +65,7 @@
                                 (conj acc [letter match len])))))
                         []
                         references)
+        _ (printf "matches: %s\n" matches)
         [letter match len] (->> matches
                                 (sort-by second)
                                 (last))]
