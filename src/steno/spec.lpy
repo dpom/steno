@@ -18,6 +18,7 @@
 (def LSEQ [:sequential CELL])
 
 (def MATCH [:and float? #(< 0 %) #(> 1 %)])
+
 (def LETTER
   [:touple
    [:string {:min 1 :max 1}]
@@ -46,7 +47,7 @@
    [:min-len nat-int?]
    [:max-len nat-int?]
    [:freq FREQ]
-   [:max-match nat-int?]])
+   [:min-match MATCH]])
 
 (def DIFF-REFERENCE
   [:map
@@ -54,4 +55,5 @@
    [:min-len nat-int?]
    [:max-len nat-int?]
    [:reference CNUMSEQ]
-   [:max-match nat-int?]])
+   [:max-bits nat-int?]
+   [:min-match MATCH]])

@@ -5614,3 +5614,306 @@ min-refseq
 ;;
   )
   #+end_src
+* 2025-07-13
+
+** #25 Build a diff translator
+
+- refac references pentru diff:
+  #+begin_src clojure
+  (comment
+
+  (def corpus (tra/load-edn "test/resources/corpus.edn"))
+
+  (count corpus)
+
+  (def p-corp (filter #(= (:text %) "p") corpus))
+
+  (build-reference  p-corp)
+  ;; => {:letter "p" :max-match 72 :min-len 9 :max-len 12 :reference [34 34 34 34 34 34 34 34 34]}
+
+  (build-reference (filter #(= (:text %) "t") corpus))
+  ;; => {:letter "t" :max-match 80 :min-len 10 :max-len 15 :reference [136 136 136 136 136 136 136 136 136 136]}
+
+  (build-reference (filter #(= (:text %) "c") corpus))
+  ;; => {:letter "c" :max-match 64 :min-len 8 :max-len 11 :reference [33 18 18 18 33 18 18 18]}
+
+  (build-reference (filter #(= (:text %) "f") corpus))
+  ;; => {:letter "f" :max-match 88 :min-len 11 :max-len 11 :reference [66 68 68 68 66 66 66 66 66 66 66]}
+
+  (build-reference (filter #(= (:text %) "l") corpus))
+  ;; => {:letter "l" :max-match 96 :min-len 12 :max-len 18 :reference [136 136 136 136 136 136 136 136 17 136 17 136]}
+;; => {:letter "l" :max-match 96 :min-len 12 :max-len 18 :reference [136 136 136 136 136 136 136 136 136 136 136 136]}
+
+  (build-reference (filter #(= (:text %) "m") corpus))
+  ;; => {:letter "m" :max-match 152 :min-len 19 :max-len 33 :reference [33 17 18 33 33 34 34 34 34 34 36 66 66 68 72 132 136 136 136]}
+
+  (build-reference (filter #(= (:text %) "n") corpus))
+  ;; => {:letter "n" :max-match 136 :min-len 17 :max-len 28 :reference [132 68 68 36 36 34 34 34 34 33 18 17 17 136 136 136 136]}
+
+  (build-reference (filter #(= (:text %) "j") corpus))
+  ;; => {:letter "j" :max-match 192 :min-len 24 :max-len 26 :reference [34 34 18 33 33 18 144 136 17 144 136 136 136 136 136 136 72 136 72 72 68 68 66 68]}
+
+  (build-reference (filter #(= (:text %) "s") corpus))
+  ;; => {:letter "s" :max-match 184 :min-len 23 :max-len 25 :reference [34 68 66 36 66 66 68 132 72 132 136 136 136 136 17 136 18 17 18 33 33 33 34]}
+
+  (build-reference (filter #(= (:text %) "e") corpus))
+  ;; => {:letter "e" :max-match 72 :min-len 9 :max-len 12 :reference [33 18 136 136 136 72 66 36 36]}
+
+  (build-reference (filter #(= (:text %) "i") corpus))
+  ;; => {:letter "i" :max-match 72 :min-len 9 :max-len 12 :reference [34 68 72 136 136 136 17 18 33]}
+
+;;
+  )
+  #+end_src
+- este o pb cu =j= care are probabilitatea mai mica decat =t= si translate diff traduce =j= ca fiind =tp= 
+- Refactorizez freq pentru a fi compatibil cu noua abordare cu probabilitati.
+  #+begin_src clojure
+  (comment
+
+  (def corpus (tra/load-edn "test/resources/corpus.edn"))
+
+  (count corpus)
+
+  (def corp (filter #(= (:text %) "o") corpus))
+
+  (count corp)
+
+  (def reference {33 1 34 6 36 2 68 1 132 2 72 2 136 8 9 1 144 1 17 4})
+
+  (def numseq
+    (tra/get-numseq (:lineseq (first corp))))
+  ;; => [136 17 9 17 17 33 34 34 34 66 68 72 72 136 136 136 136 17 17 17 33 33 34 33 34 34 68 136 136 136 136 136]
+
+  (def freq (frequencies numseq))
+  ;; => {33 4 34 6 66 1 68 2 72 2 136 10 9 1 17 6}
+
+  (defn match-freq
+    [reference freq]
+    (let [ref-keys (keys reference)
+          sum (reduce (fn [acc k]
+                        (let [r (get reference k)
+                              v (get freq k 0)]
+                          (+ acc (- 1 (python/float (/ (abs (- r v)) r))))))
+                      0
+                      ref-keys)]
+      (/ sum (count ref-keys))))
+
+  (match-freq reference freq)
+  ;; => 0.225
+
+;;
+  )
+  #+end_src
+
+
+* 2025-07-16
+
+** #25 Build a diff translator
+
+- rescriu algoritmul de calcul pentru freq, am 2 variante:
+  - chitest (sugerat de Cristi)
+  - ad-hoc (generat de ChatGPT):
+  #+begin_src clojure
+  (comment
+
+  (def corpus (tra/load-edn "test/resources/corpus.edn"))
+
+  (count corpus)
+
+  (def corp (filter #(= (:text %) "o") corpus))
+
+  (count corp)
+
+  (def reference {33 1 34 6 36 2 68 1 132 2 72 2 136 8 9 1 144 1 17 4})
+
+  (def numseq
+    (tra/get-numseq (:lineseq (first corp))))
+  ;; => [136 17 9 17 17 33 34 34 34 66 68 72 72 136 136 136 136 17 17 17 33 33 34 33 34 34 68 136 136 136 136 136]
+
+  (def freq (frequencies numseq))
+  ;; => {33 4 34 6 66 1 68 2 72 2 136 10 9 1 17 6}
+
+  (defn match-freq
+    [reference freq]
+    (let [ref-keys (keys reference)
+          [sum total] (reduce (fn [[sum total] k]
+                                (let [r (get reference k)
+                                      v (get freq k 0)]
+                                  [(+ sum (abs (- r v)))
+                                   (+ total r v)]))
+                              [0 0]
+                              ref-keys)]
+      (- 1 (python/float (/ sum total)))))
+  
+
+  (match-freq reference freq)
+  ;; => 0.7796610169491526
+
+  ;;
+  )
+  #+end_src
+
+* 2025-07-17
+
+** #25 Build a diff translator
+
+- implementez o functie pentru generat fisierul de referinte pt =freq=:
+  #+begin_src clojure
+  (comment
+
+  (def corpus (tra/load-edn "test/resources/corpus.edn"))
+
+  (count corpus)
+
+  (def corp (filter #(= (:text %) "p") corpus))
+
+  (count corp)
+
+  (def corp* (map add-freq corp))
+
+  (def freq-keys (get-freq-keys corp*))
+  ;; => (34 36)
+
+  (def freqs* (->> corp*
+                   (map :freq)
+                   (map #(normalize-freq freq-keys %))))
+  ;; => ({34 9 36 1} {34 6 36 1} {34 8 36 1} {34 10 36 1} {34 6 36 3})
+
+  (zipmap freq-keys
+          (map (fn [k] (st/median_high (map #(get % k) freqs*))) freq-keys))
+  ;; => {34 8 36 1}
+
+  (build-reference corp)
+  ;; => {:letter "p" :min-len 9 :max-len 12 :match-level 0.7777777777777778 :reference {34 8 36 1}}
+
+  (build-reference (filter #(= (:text %) "o") corpus))
+  ;; => {:letter "o" :min-match 0.7796610169491526 :min-len 25 :max-len 32 :reference {33 1 34 6 36 2 68 1 132 2 72 2 136 8 9 1 144 1 17 4}}
+
+  (build-reference (filter #(= (:text %) "a") corpus))
+  ;; => {:letter "a" :min-match 0.625 :min-len 13 :max-len 19 :reference {33 1 34 2 66 1 36 2 68 1 132 1 72 1 136 5 17 2 18 1}}
+
+  (build-reference (filter #(= (:text %) "m") corpus))
+  ;; => {:letter "m" :min-match 0.7636363636363637 :min-len 19 :max-len 33 :reference {33 2 34 5 66 1 36 1 68 1 132 1 72 1 136 7 144 1 17 2 18 1}}
+
+  (build-reference (filter #(= (:text %) "j") corpus))
+  ;; => {:letter "j" :min-match 0.8 :min-len 24 :max-len 26 :reference {33 2 34 3 66 2 68 3 72 3 136 7 144 2 17 2 18 3}}
+
+  (build-reference (filter #(= (:text %) "s") corpus))
+  ;; => {:letter "s" :min-match 0.88 :min-len 23 :max-len 25 :reference {33 2 34 4 66 2 36 1 68 2 132 2 72 1 136 5 144 1 17 2 18 3}}
+
+  (def type-0-letters ["o" "a"])
+
+  (def type-1-letters ["p" "t" "c" "f" "l" "m" "n" "j" "s" "e" "i"])
+
+  (defn build-references
+    [corpus-file references-file]
+    (let [corpus (tra/load-edn corpus-file)
+          brf (fn [c] (build-reference (filter #(= (:text %) c) corpus)))
+          type-1 (->> type-1-letters
+                      (map brf)
+                      (sort-by :min-len >)
+                      vec)
+          references {:type-0 (mapv brf type-0-letters)
+                      :type-1 type-1
+                      :min-refseq (:min-len (last type-1))}]
+      (tra/save-edn references-file references)))
+
+  (build-references "test/resources/corpus.edn" "resources/freq-references2.edn")
+
+  ;;
+  )
+  #+end_src
+- acelasi lucru pentru =diff=:
+  #+begin_src clojure
+  (comment
+
+  (def corpus (tra/load-edn "test/resources/corpus.edn"))
+
+  (count corpus)
+
+  (def p-corp (filter #(= (:text %) "p") corpus))
+
+  (def corpus* (map add-numseq p-corp))
+
+  (def min-len (apply min (map :len corpus*)))
+  (def max-len (apply max (map :len corpus*)))
+
+  (def ref-numseqs (->> corpus*
+                        (filter #(= (:len %) min-len))
+                        (map :numseq)))
+
+  (def ref-numseq* (if (= (count ref-numseqs) 1)
+                     (first ref-numseqs)
+                     (make-median-numseq ref-numseqs)))
+
+  (def ref-numseq (->> corpus*
+                       (map :numseq)
+                       (map #(diff/get-best-match ref-numseq* %))
+                       (map :best)
+                       (make-median-numseq)))
+
+  (def reference {:letter (:text (first corpus))
+                  :min-len min-len
+                  :max-len max-len
+                  :reference ref-numseq
+                  :max-bits (* 8 min-len)})
+
+  (def numseqs (map :numseq corpus*))
+
+  (def numseq (first numseqs))
+  
+  (diff/check-letter reference (first numseqs))
+
+  (def numseq-len (count numseq))
+  
+  (diff/get-best-match (:reference reference) (aslice numseq (min numseq-len max-len)))
+  ;; => {:len 10 :diff 70 :best [34 34 34 34 36 34 34 34 34]}
+  
+  
+  (apply min (mapv #(diff/check-letter reference %) )))
+
+
+
+(build-reference  p-corp)
+;; => {:letter "p" :min-match ["p" 0.9166666666666666 9] :min-len 9 :max-len 12 :max-bits 72 :reference [34 34 34 34 34 34 34 34 34]}
+
+(build-reference (filter #(= (:text %) "t") corpus))
+  ;; => {:letter "t" :max-match 80 :min-len 10 :max-len 15 :reference [136 136 136 136 136 136 136 136 136 136]}
+
+  (build-reference (filter #(= (:text %) "c") corpus))
+  ;; => {:letter "c" :max-match 64 :min-len 8 :max-len 11 :reference [33 18 18 18 33 18 18 18]}
+
+  (build-reference (filter #(= (:text %) "f") corpus))
+  ;; => {:letter "f" :max-match 88 :min-len 11 :max-len 11 :reference [66 68 68 68 66 66 66 66 66 66 66]}
+
+  (build-reference (filter #(= (:text %) "l") corpus))
+  ;; => {:letter "l" :max-match 96 :min-len 12 :max-len 18 :reference [136 136 136 136 136 136 136 136 17 136 17 136]}
+  ;; => {:letter "l" :max-match 96 :min-len 12 :max-len 18 :reference [136 136 136 136 136 136 136 136 136 136 136 136]}
+
+  (build-reference (filter #(= (:text %) "m") corpus))
+  ;; => {:letter "m" :max-match 152 :min-len 19 :max-len 33 :reference [33 17 18 33 33 34 34 34 34 34 36 66 66 68 72 132 136 136 136]}
+
+  (build-reference (filter #(= (:text %) "n") corpus))
+  ;; => {:letter "n" :max-match 136 :min-len 17 :max-len 28 :reference [132 68 68 36 36 34 34 34 34 33 18 17 17 136 136 136 136]}
+
+  (build-reference (filter #(= (:text %) "j") corpus))
+  ;; => {:letter "j" :max-match 192 :min-len 24 :max-len 26 :reference [34 34 18 33 33 18 144 136 17 144 136 136 136 136 136 136 72 136 72 72 68 68 66 68]}
+
+  (build-reference (filter #(= (:text %) "s") corpus))
+  ;; => {:letter "s" :max-match 184 :min-len 23 :max-len 25 :reference [34 68 66 36 66 66 68 132 72 132 136 136 136 136 17 136 18 17 18 33 33 33 34]}
+
+  (build-reference (filter #(= (:text %) "e") corpus))
+  ;; => {:letter "e" :max-match 72 :min-len 9 :max-len 12 :reference [33 18 136 136 136 72 66 36 36]}
+
+  (build-reference (filter #(= (:text %) "i") corpus))
+  ;; => {:letter "i" :max-match 72 :min-len 9 :max-len 12 :reference [34 68 72 136 136 136 17 18 33]}
+
+
+  #+end_src
+  
+  
+* 2025-07-18
+
+** #25 Build a diff translator
+
+- am ajuns la concluzia ca nu se justifica fisiere separate pentru reference builders, in plus functia =build-references= ar trebui sa fie o multimetoda

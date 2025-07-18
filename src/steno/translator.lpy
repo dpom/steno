@@ -7,6 +7,10 @@
 
 (def ^{:doc "The unknown letter indicator"} unknown-letter "*")
 
+(def type-0-letters ["o" "a"])
+
+(def type-1-letters ["p" "t" "c" "f" "l" "m" "n" "j" "s" "e" "i"])
+
 (def tap-topic "translator")
 
 ;; Create the necessary context for the translation using the application configuration
@@ -16,6 +20,10 @@
 ;; The translation function, receives a context and a lsign and returns a lsign to which the :text key is added with the lsign translation
 (defmulti translate
   (fn [name _ctx _lsign] name))
+
+;; The function for references building, receive a corpus and returns a references map
+(defmulti build-references
+  (fn [name _corpus] name))
 
 (def normalize-bin-size 3)
 
@@ -44,6 +52,12 @@
   [filename]
   (with-open [r (bio/reader filename)]
     (edn/read r)))
+
+(defn save-edn
+  "Sava an entity in a edn file."
+  [filename entity]
+  (with-open [w (bio/writer filename)]
+    (edn/write entity w)))
 
 (defn compute-match
   "Compute the MATCH probability using MAX-MATCH value."
