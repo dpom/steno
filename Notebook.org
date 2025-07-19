@@ -5917,3 +5917,58 @@ min-refseq
 ** #25 Build a diff translator
 
 - am ajuns la concluzia ca nu se justifica fisiere separate pentru reference builders, in plus functia =build-references= ar trebui sa fie o multimetoda
+  #+begin_src clojure
+  (comment
+
+  (def corpus (tra/load-edn "test/resources/corpus.edn"))
+
+  (count corpus)
+
+  (def references (tra/build-references "freq" corpus))
+
+  (def ctx {ctx-key references})
+
+  (def lsign (dissoc (first corpus) :text))
+
+  (def cnumseq (tra/get-numseq (:lineseq lsign)))
+  cnumseq
+  ;; => [18 34 34 34 34 36 34 34 34 34 34 2]
+
+  (def freq (frequencies cnumseq))
+
+  (defn check-letter
+    [references cnumseq]
+    (let [seq-len (count cnumseq)
+          results (reduce (fn [acc {:keys [min-len max-len reference letter min-match]}]
+                            (if (< seq-len min-len)
+                              acc
+                              (let [len (min seq-len max-len)
+                                    freq (frequencies (aslice cnumseq len))
+                                    match (match-freq reference freq)]
+                                (if (< match min-match)
+                                  acc
+                                  (conj acc [letter match (if (> seq-len max-len) (aslice cnumseq (- seq-len max-len) seq-len) [])])))))
+                          []
+                          references)]
+      (case (count results)
+        0 [tra/unknown-letter 0 []]
+        1 (first results)
+        (-> results
+            (sort-by second)
+            (last)))))
+
+  (check-letter (:type-1 references) cnumseq)
+  ;; => ["p" 0.9473684210526316 []]
+
+  (tra/translate "freq" ctx lsign)
+  ;; => {:text [[["p" 0.9473684210526316]]] :id #uuid "23e402a2-f146-4762-ac6b-1791f32e855a" :ltype 1 :lineseq [[0 3 16] [1 2 33] [2 2 18] [3 1 33] [4 1 34] [5 1 34] [6 1 34] [7 1 34] [8 1 18] [9 0 33] [10 0 34] [11 0 34] [12 0 34] [13 0 34] [14 0 34] [15 0 66] [16 1 36] [17 1 18] [18 0 33] [19 0 34] [20 0 34] [21 0 34] [22 0 34] [23 0 66] [24 1 36] [25 1 34] [26 1 34] [27 1 34] [28 1 34] [29 1 34] [30 1 34] [31 1 34] [32 1 34] [33 1 2]]}
+
+  (tra/translate "freq" ctx (dissoc (nth corpus 9) :text))
+  ;; => {:text [[["a" 0.8823529411764706]]] :id #uuid "10bcddd7-6603-4f62-99a5-9e5558a9fe31" :ltype 0 :lineseq [[1 10 9] [1 9 136] [1 8 136] [1 7 144] [2 6 9] [2 5 144] [3 4 17] [4 3 17] [5 2 17] [6 1 17] [7 0 33] [8 0 34] [9 0 34] [10 0 34] [11 0 66] [12 1 68] [13 2 36] [14 2 66] [15 3 68] [16 4 68] [17 5 132] [17 6 72] [18 7 132] [18 8 9] [17 9 144] [17 10 136] [17 11 136] [17 12 136] [17 13 9] [16 14 144] [16 15 9] [15 16 17] [14 17 17] [13 18 18] [12 18 33] [11 19 18] [10 19 34] [9 19 33] [8 20 18] [7 20 34] [6 20 34] [5 20 36] [4 19 66] [3 19 34] [2 19 36] [1 18 68] [0 17 72] [0 16 136] [0 15 136] [0 14 136] [0 13 136] [0 12 136]]}
+
+  (tra/translate "freq" ctx (dissoc (nth corpus 41) :text))
+  ;; => {:text [[["p" 0.8421052631578947] ["*" 0]]] :id #uuid "2bd0b153-929c-4264-8ab0-1993bf422436" :ltype 1 :lineseq [[0 1 32] [1 1 34] [2 1 18] [3 0 33] [4 0 34] [5 0 34] [6 0 34] [7 0 34] [8 0 34] [9 0 34] [10 0 34] [11 0 34] [12 0 34] [13 0 34] [14 0 66] [15 1 36] [16 1 34] [17 1 34] [18 1 34] [19 1 18] [20 0 33] [21 0 34] [22 0 34] [23 0 34] [24 0 34] [25 0 34] [26 0 34] [27 0 34] [28 0 34] [29 0 66] [30 1 36] [31 1 34] [32 1 34] [33 1 34] [34 1 34] [35 1 34] [36 1 34] [37 1 34] [38 1 34] [39 1 66] [40 2 68] [41 3 132] [41 4 72] [42 5 132] [42 6 72] [43 7 132] [43 8 136] [43 9 136] [43 10 136] [43 11 9] [42 12 144] [42 13 9] [41 14 144] [41 15 9] [40 16 17] [39 17 18] [38 17 34] [37 17 33] [36 18 18] [35 18 34] [34 18 34] [33 18 34] [32 18 33] [31 19 18] [30 19 34] [29 19 32]]}
+
+;;
+  )
+  #+end_src
