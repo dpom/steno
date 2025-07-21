@@ -1,10 +1,9 @@
 (ns steno.translators.diff
   "Implement a translator based on cnum difference"
   (:require
-   [steno.translator :as tra]
-   [steno.translators.diff :as diff])
+    [steno.translator :as tra])
   (:import
-   [statistics :as st]))
+    [statistics :as st]))
 
 (def ctx-key :diff-references)
 
@@ -122,7 +121,7 @@
                       (make-median-numseq ref-numseqs))
         ref-numseq (->> corpus*
                         (map :numseq)
-                        (map #(diff/get-best-match ref-numseq* %))
+                        (map #(get-best-match ref-numseq* %))
                         (map :best)
                         (make-median-numseq))
         letter-reference {:letter (:text (first corpus))
@@ -134,7 +133,7 @@
            (apply min
                   (->> corpus*
                        (map :numseq)
-                       (map #(diff/check-letter letter-reference %))
+                       (map #(check-letter letter-reference %))
                        (mapv second))))))
 
 ;; entry points

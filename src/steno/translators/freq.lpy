@@ -1,10 +1,9 @@
 (ns steno.translators.freq
   "Implement a translator based on cnum frequency"
   (:require
-   [steno.translator :as tra]
-   [steno.translators.freq :as freq])
+    [steno.translator :as tra])
   (:import
-   [statistics :as st]))
+    [statistics :as st]))
 
 (def tap-topic "freq")
 
@@ -18,29 +17,6 @@
             (+ acc (abs (- (get reference freq) (get current freq 0)))))
           0
           (keys reference)))
-
-(defn- check-ref
-  "Check if a normalized sequence could be the reference sequence.
-
-   Params:
-   - nseq: (vector) the normalized sequence
-   - nseq-len: (int) the normalized sequence length
-   - result: (vector) the result if the nseq is not equal to refseq
-   - refseq: (map) the reference sequence
-
-   Returns: [letter <rest of nseq>] or result"
-  [nseq nseq-len result {:keys [letter len len-tolerance freq freq-tolerance] :as refseq}]
-  (tap> (select-keys refseq [:letter :len]))
-  (if (> nseq-len (- len len-tolerance))
-    (let [l (min nseq-len (+ len len-tolerance))
-          ns (take l nseq)
-          f (frequencies ns)
-          t (get-freq-diff f freq)]
-      (tap> {:l l :ns ns :f f :t t})
-      (if (<= t freq-tolerance)
-        (reduced [letter (drop l ns)])
-        result))
-    result))
 
 (defn- match-freq
   [reference freq]
@@ -128,7 +104,7 @@
      :min-len (apply min len-seq)
      :max-len (apply max len-seq)
      :reference reference
-     :min-match (apply min (map #(freq/match-freq reference %) freqs*))}))
+     :min-match (apply min (map #(match-freq reference %) freqs*))}))
 
 ;; entry points
 

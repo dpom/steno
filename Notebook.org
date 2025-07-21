@@ -6024,3 +6024,9 @@ min-refseq
   ;;
   )
   #+end_src
+
+* 2025-07-21
+
+** #25 Build a diff translator
+
+- adaptez =translate= la refactorizari 

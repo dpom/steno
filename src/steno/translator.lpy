@@ -42,19 +42,14 @@
   (apply str (map (fn [new old] (if (= new unknown-letter) old new))
                   new-text old-text)))
 
-(defn apply-translator
-  [ctx {old-text :text :as lsign} translator-name]
-  (let [new-lsign (translate translator-name ctx lsign)]
-    (assoc new-lsign :text (select-char (:text new-lsign) old-text))))
-
 (defn load-edn
-  "Load an entity from a edn file with FILENAME."
+  "Load an entity from an edn file with FILENAME."
   [filename]
   (with-open [r (bio/reader filename)]
     (edn/read r)))
 
 (defn save-edn
-  "Sava an entity in a edn file."
+  "Save an entity in an edn file."
   [filename entity]
   (with-open [w (bio/writer filename)]
     (edn/write entity w)))
@@ -76,9 +71,7 @@
 
   Each translator is a function which receive a lsign and returns the same lsign with :text modified (possibly)."
   [ctx translators lsign]
-  (if [(= (count translators) 1)]
-    (translate (first translators) ctx lsign)
-    (reduce (fn [acc x] (apply-translator ctx acc x)) lsign translators)))
+  (reduce (fn [acc x] (translate x ctx acc)) lsign translators))
 
 (defn translate-wsign
   "Translate a wsign, returns the equivalent text."
@@ -89,36 +82,4 @@
          (map :text)
          (apply str))))
 
-(comment
 
-  (apply str
-         (map (fn [new old] (if (= new "*") old new)) "ab*" "acd"))
-  ;; => "abd"
-
-  (select-char "abc" "defg")
-  ;; => "abc"
-
-  (require
-   '[steno.converter :as cnv]
-   '[steno.show :as show]
-   '[steno.utils :as utl]
-   '[steno.translators.freq :as freq])
-
-  (import cv2)
-
-  (def imagefile "test/resources/templates/template-017.png")
-
-  (def wsign (cnv/image-to-wsign  (cv2/imread imagefile)))
-
-  (utl/start-proc show/show-lsign (nth wsign 0))
-
-  (def translators [freq/translate])
-
-  (translate-lsign translators (first wsign))
-  ;; => {:text "p" :ltype 1 :lineseq [[0 0 32] [1 0 34] [2 0 34] [3 0 34] [4 0 34] [5 0 34] [6 0 34] [7 0 34] [8 0 34] [9 0 34] [10 0 34] [11 0 34] [12 0 66] [13 1 36] [14 1 34] [15 1 34] [16 1 34] [17 1 34] [18 1 34] [19 1 34] [20 1 34] [21 1 34] [22 1 18] [23 0 33] [24 0 34] [25 0 34] [26 0 34] [27 0 34] [28 0 34] [29 0 82]]}
-
-  (translate-wsign [freq/translate] wsign)
-  ;; => "pat"
-
-  ;;
-  )

@@ -146,3 +146,9 @@
           action (get actions (get config "action"))]
       (action config))))
 
+(comment
+
+  (def config {})
+
+  ;;
+  )
