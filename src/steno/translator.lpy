@@ -11,8 +11,6 @@
 
 (def type-1-letters ["p" "t" "c" "f" "l" "m" "n" "j" "s" "e" "i"])
 
-(def tap-topic "translator")
-
 ;; Create the necessary context for the translation using the application configuration
 (defmulti prepare-translation
   (fn [name _config] name))
@@ -62,16 +60,36 @@
 ;; entry points
 
 (defn prepare-translations
-  "Create the context for all translators"
+  "Create the context for all translators."
   [config translators]
   (reduce #(prepare-translation %2 %1) config translators))
+
+(defn compare-letters
+  "Letters comparator, best match first."
+  [l1 l2]
+  (let [p1 (if (= 1 (count l1)) (second (first l1)) (apply * (mapv second l1)))
+        p2 (if (= 1 (count l2)) (second (first l2)) (apply * (mapv second l2)))]
+    (compare p2 p1)))
+
+(defn get-best-match
+  "Convert best match LETTERS in string."
+  [letters]
+  (printf "letters: %s\n" letters)
+  (->> letters
+       (sort compare-letters)
+       (first)
+       (map first)
+       (apply str)))
 
 (defn translate-lsign
   "Translate to LSIGN  using TRANSLATORS functions, returns the lsign augmented with the translation in :text.
 
   Each translator is a function which receive a lsign and returns the same lsign with :text modified (possibly)."
   [ctx translators lsign]
-  (reduce (fn [acc x] (translate x ctx acc)) lsign translators))
+  (let [res (reduce (fn [acc x] (translate x ctx acc)) lsign translators)
+        text (get-best-match (:letters res))]
+    (printf "text: %s\n" text)
+    (assoc res :text text)))
 
 (defn translate-wsign
   "Translate a wsign, returns the equivalent text."
@@ -79,7 +97,7 @@
   (let [tr (partial translate-lsign ctx translators)]
     (->> wsign
          (map tr)
-         (map :text)
+         (mapv :text)
          (apply str))))
 
 
