@@ -19,9 +19,9 @@
 (defmulti translate
   (fn [name _ctx _lsign] name))
 
-;; The function for references building, receive a corpus and returns a references map
+;; The function for references building, receives a context and a corpus and returns a references map
 (defmulti build-references
-  (fn [name _corpus] name))
+  (fn [name _ctx _corpus] name))
 
 (def normalize-bin-size 3)
 
@@ -74,7 +74,6 @@
 (defn get-best-match
   "Convert best match LETTERS in string."
   [letters]
-  (printf "letters: %s\n" letters)
   (->> letters
        (sort compare-letters)
        (first)
@@ -85,10 +84,11 @@
   "Translate to LSIGN  using TRANSLATORS functions, returns the lsign augmented with the translation in :text.
 
   Each translator is a function which receive a lsign and returns the same lsign with :text modified (possibly)."
-  [ctx translators lsign]
+  [{:keys [logger] :as ctx} translators lsign]
   (let [res (reduce (fn [acc x] (translate x ctx acc)) lsign translators)
+        _ (.debug logger "letters: %s" (:letters res))
         text (get-best-match (:letters res))]
-    (printf "text: %s\n" text)
+    (.debug logger "text: %s" text)
     (assoc res :text text)))
 
 (defn translate-wsign

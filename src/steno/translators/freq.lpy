@@ -112,7 +112,7 @@
     (assoc lsign :letters (conj letters (translate-numseq references cnumseq ltype)))))
 
 (defmethod tra/build-references "freq"
-  [_ corpus]
+  [_ _ctx corpus]
   (let [brf (fn [c] (build-reference (filter #(= (:text %) c) corpus)))
         type-1 (->> tra/type-1-letters
                     (map brf)
