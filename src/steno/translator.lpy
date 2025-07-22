@@ -1,8 +1,15 @@
-(ns steno.translator)
+(ns steno.translator
+  (:require
+   [basilisp.edn :as edn]
+   [basilisp.io :as bio])
+  (:import
+   [statistics :as st]))
 
 (def ^{:doc "The unknown letter indicator"} unknown-letter "*")
 
-(def tap-topic "translator")
+(def type-0-letters ["o" "a"])
+
+(def type-1-letters ["p" "t" "c" "f" "l" "m" "n" "j" "s" "e" "i"])
 
 ;; Create the necessary context for the translation using the application configuration
 (defmulti prepare-translation
@@ -12,31 +19,77 @@
 (defmulti translate
   (fn [name _ctx _lsign] name))
 
+;; The function for references building, receive a corpus and returns a references map
+(defmulti build-references
+  (fn [name _corpus] name))
+
+(def normalize-bin-size 3)
+
+(defn normalize-numseq
+  [numseq]
+  (mapv st/median_high (partition-all normalize-bin-size numseq)))
+
+(defn get-numseq
+  [lineseq]
+  (->> lineseq
+       (map #(nth % 2))
+       (normalize-numseq)))
+
 (defn select-char
   [new-text old-text]
   (apply str (map (fn [new old] (if (= new unknown-letter) old new))
                   new-text old-text)))
 
-(defn apply-translator
-  [ctx {old-text :text :as lsign} translator-name]
-  (let [new-lsign (translate translator-name ctx lsign)]
-    (assoc new-lsign :text (select-char (:text new-lsign) old-text))))
+(defn load-edn
+  "Load an entity from an edn file with FILENAME."
+  [filename]
+  (with-open [r (bio/reader filename)]
+    (edn/read r)))
+
+(defn save-edn
+  "Save an entity in an edn file."
+  [filename entity]
+  (with-open [w (bio/writer filename)]
+    (edn/write entity w)))
+
+(defn compute-match
+  "Compute the MATCH probability using MAX-MATCH value."
+  [max-match match]
+  (python/float (* (/ match max-match))))
 
 ;; entry points
 
 (defn prepare-translations
-  "Create the context for all translators"
+  "Create the context for all translators."
   [config translators]
   (reduce #(prepare-translation %2 %1) config translators))
+
+(defn compare-letters
+  "Letters comparator, best match first."
+  [l1 l2]
+  (let [p1 (if (= 1 (count l1)) (second (first l1)) (apply * (mapv second l1)))
+        p2 (if (= 1 (count l2)) (second (first l2)) (apply * (mapv second l2)))]
+    (compare p2 p1)))
+
+(defn get-best-match
+  "Convert best match LETTERS in string."
+  [letters]
+  (printf "letters: %s\n" letters)
+  (->> letters
+       (sort compare-letters)
+       (first)
+       (map first)
+       (apply str)))
 
 (defn translate-lsign
   "Translate to LSIGN  using TRANSLATORS functions, returns the lsign augmented with the translation in :text.
 
   Each translator is a function which receive a lsign and returns the same lsign with :text modified (possibly)."
   [ctx translators lsign]
-  (if [(= (count translators) 1)]
-    (translate (first translators) ctx lsign)
-    (reduce (fn [acc x] (apply-translator ctx acc x)) lsign translators)))
+  (let [res (reduce (fn [acc x] (translate x ctx acc)) lsign translators)
+        text (get-best-match (:letters res))]
+    (printf "text: %s\n" text)
+    (assoc res :text text)))
 
 (defn translate-wsign
   "Translate a wsign, returns the equivalent text."
@@ -44,39 +97,7 @@
   (let [tr (partial translate-lsign ctx translators)]
     (->> wsign
          (map tr)
-         (map :text)
+         (mapv :text)
          (apply str))))
 
-(comment
 
-  (apply str
-         (map (fn [new old] (if (= new "*") old new)) "ab*" "acd"))
-  ;; => "abd"
-
-  (select-char "abc" "defg")
-  ;; => "abc"
-
-  (require
-   '[steno.converter :as cnv]
-   '[steno.show :as show]
-   '[steno.utils :as utl]
-   '[steno.translators.freq :as freq])
-
-  (import cv2)
-
-  (def imagefile "test/resources/templates/template-017.png")
-
-  (def wsign (cnv/image-to-wsign  (cv2/imread imagefile)))
-
-  (utl/start-proc show/show-lsign (nth wsign 0))
-
-  (def translators [freq/translate])
-
-  (translate-lsign translators (first wsign))
-  ;; => {:text "p" :ltype 1 :lineseq [[0 0 32] [1 0 34] [2 0 34] [3 0 34] [4 0 34] [5 0 34] [6 0 34] [7 0 34] [8 0 34] [9 0 34] [10 0 34] [11 0 34] [12 0 66] [13 1 36] [14 1 34] [15 1 34] [16 1 34] [17 1 34] [18 1 34] [19 1 34] [20 1 34] [21 1 34] [22 1 18] [23 0 33] [24 0 34] [25 0 34] [26 0 34] [27 0 34] [28 0 34] [29 0 82]]}
-
-  (translate-wsign [freq/translate] wsign)
-  ;; => "pat"
-
-  ;;
-  )

@@ -11,14 +11,26 @@
 
 (def CNUM [:and int? #(< % 127)  #(> % -128)])
 
+(def CNUMSEQ [:sequential CNUM])
+
 (def CELL [:tuple X Y CNUM])
 
 (def LSEQ [:sequential CELL])
+
+(def MATCH [:and float? #(< 0 %) #(> 1 %)])
+
+(def LETTER
+  [:touple
+   [:string {:min 1 :max 1}]
+   MATCH])
+
+(def LETTERS [:sequential LETTER])
 
 (def LSIGN
   [:map
    [:ltype LTYPE]
    [:lineseq LSEQ]
+   [:letters [:sequential LETTERS]]
    [:text string?]])
 
 (def WSIGN [:sequential LSIGN])
@@ -28,7 +40,24 @@
 (def FREQ-REFERENCE
   [:map
    [:letter string?]
-   [:len nat-int?]
-   [:len-tolerance [:and int? pos?]]
-   [:freq FREQ]
-   [:freq-tolerance [:and int? pos?]]])
+   [:min-len nat-int?]
+   [:max-len nat-int?]
+   [:reference FREQ]
+   [:min-match MATCH]])
+
+(def DIFF-REFERENCE
+  [:map
+   [:letter string?]
+   [:min-len nat-int?]
+   [:max-len nat-int?]
+   [:reference CNUMSEQ]
+   [:max-bits nat-int?]
+   [:min-match MATCH]])
+
+(def REFERENCE [:or FREQ-REFERENCE DIFF-REFERENCE])
+
+(def REFERENCES
+  [:map
+   [:type-0 [:sequential REFERENCE]]
+   [:type-1 [:sequential REFERENCE]]
+   [:min-refseq nat-int?]])
