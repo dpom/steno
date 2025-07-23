@@ -121,12 +121,26 @@
            (save-corpus outfile)))
     (.info logger "Saved in %s" outfile)))
 
+(defn action-make-references
+  [config]
+  (let [corpus (tra/load-edn (get config "input"))
+        outdir (get config "output")
+        translators (get config "translators")
+        logger (:logger config)]
+    (doseq [tr translators]
+      (.info logger "Make references for %s" tr)
+      (let [references (tra/build-references tr config corpus)
+            outfile (bio/path outdir (str tr "-references.edn"))]
+        (tra/save-edn outfile references)
+        (.info logger "saved in %s" outfile)))))
+
 (def actions
-  {"extract-words" action-extract-words
-   "help"          action-help
-   "list-config"   action-list-config
-   "make-corpus"   action-make-corpus
-   "translate"     action-translate})
+  {"extract-words"   action-extract-words
+   "help"            action-help
+   "list-config"     action-list-config
+   "make-corpus"     action-make-corpus
+   "make-references" action-make-references
+   "translate"       action-translate})
 
 (defn cli
   []
