@@ -116,6 +116,8 @@
            (mapcat identity)
            (display-message logger "  translate lsigns")
            (map tral)
+           (display-message logger "  remove letters")
+           (map #(dissoc % :letters))
            (display-message logger "  add uuid")
            (mapv #(assoc % :id (uuid/uuid4)))
            (save-corpus outfile)))
