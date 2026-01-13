@@ -6072,3 +6072,7 @@ min-refseq
   ;;
   )
   #+end_src
+
+* 2025-07-24
+
+** #31 Improve references for freq and diff translators enhancement

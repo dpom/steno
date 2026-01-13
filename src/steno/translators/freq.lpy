@@ -1,9 +1,9 @@
 (ns steno.translators.freq
   "Implement a translator based on cnum frequency"
   (:require
-    [steno.translator :as tra])
+   [steno.translator :as tra])
   (:import
-    [statistics :as st]))
+   [statistics :as st]))
 
 (def ctx-key :freq-references)
 

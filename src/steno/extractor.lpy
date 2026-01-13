@@ -43,9 +43,9 @@
 (comment
 
   (require
-    '[steno.utils :as utl]
-    '[steno.show :as show]
-    '[steno.imageprocessor :as img])
+   '[steno.utils :as utl]
+   '[steno.show :as show]
+   '[steno.imageprocessor :as img])
 
   (def imagefile "test/resources/template.png")
 

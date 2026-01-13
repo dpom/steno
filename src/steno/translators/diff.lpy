@@ -1,9 +1,9 @@
 (ns steno.translators.diff
   "Implement a translator based on cnum difference"
   (:require
-    [steno.translator :as tra])
+   [steno.translator :as tra])
   (:import
-    [statistics :as st]))
+   [statistics :as st]))
 
 (def ctx-key :diff-references)
 
