@@ -1,10 +1,10 @@
 (ns steno.imageprocessor
   "Prepare the page image"
   (:import
-    cv2
-    [numpy :as np]
-    [skimage.morphology :as skim]
-    [skimage.util :as skiu]))
+   cv2
+   [numpy :as np]
+   [skimage.morphology :as skim]
+   [skimage.util :as skiu]))
 
 (defn process-image
   "Process the image in order to obtain a clear 1 pixel thick stenogram."
@@ -18,8 +18,8 @@
 (comment
 
   (require
-    '[steno.utils :as utl]
-    '[steno.show :as show])
+   '[steno.utils :as utl]
+   '[steno.show :as show])
 
   (def fileimage "test/resources/template.png")
 

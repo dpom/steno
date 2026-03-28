@@ -1,7 +1,7 @@
 (ns steno.converter
   "Convert images in numeric sequences"
   (:require
-    [basilisp.set :as set])
+   [basilisp.set :as set])
   (:import cv2))
 
 (def directions
@@ -16,13 +16,13 @@
    ])
 
 (def ^{:doc "Direction position in the cell number"} pos
-  [2r10000000 ; E  
-   2r01000000 ; SE 
-   2r00100000 ; S  
-   2r00010000 ; SV 
-   2r00001000 ; V  
+  [2r10000000 ; E
+   2r01000000 ; SE
+   2r00100000 ; S
+   2r00010000 ; SV
+   2r00001000 ; V
    2r00000100  ; NV
-   2r00000010  ; N 
+   2r00000010  ; N
    2r00000001] ; NE
   )
 
@@ -161,7 +161,6 @@
         (inc max-nested)))
     0))
 
-
 (defn- parallel-lineseq?
   "True if line sequence is a loop"
   [lseq]
@@ -183,7 +182,7 @@
    - status: (map) status of the extracting process
       - start-cells : (set) cells to process
       - prev-cells : (set) previous cells with value 1
-  
+
    Returns: state map updated + :line (the line sequence)  "
   [mat {:keys [start-cells prev-cells]}]
   (let [{:keys [line] :as state} (reduce (fn [acc cell]
@@ -382,8 +381,6 @@
   (compare-cell [46 8] [22 9])
   ;; => 1
 
-
-  
   (add-tap tap-topic (bound-fn* utl/print4tap))
 
   (def imagefile "test/resources/templates/template-017.png")
