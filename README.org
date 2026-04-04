@@ -24,7 +24,6 @@ The application should be a simple pipe:
 - converter :: convert the word image in a sequence of numbers
 - translator :: convert the number sequence in a string of chars
 
-  
 ** Getting Started
 
 *** Linux, MacOS, and Windows (WSL2)
@@ -46,7 +45,7 @@ direnv allow
    - uv (https://docs.astral.sh/uv/getting-started/installation/)
    - babashka
    - cljfmt
-   - kondo 
+   - kondo
 2. Create manually the user variables defined in  ~.envrc.local.example~.
 3. In the project folder run:
    #+begin_src shell
@@ -114,7 +113,8 @@ SCHEDULED: <2025-06-30 Lu>
 CLOCK: [2025-07-04 Vi 06:33]
 CLOCK: [2025-07-01 Ma 07:03]--[2025-07-01 Ma 17:41] => 10:38
 :END:
-* References
+
+** References
 
 1. https://en.wikipedia.org/wiki/Duployan_shorthand
 2. https://opencv.org/

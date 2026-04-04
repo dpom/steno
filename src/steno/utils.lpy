@@ -1,23 +1,29 @@
 (ns steno.utils
-  (:import
-    ;; [basilisp-pprint.pprint :as p]
+  (:require
+   [basilisp.pprint :as p]
    [basilisp.edn :as edn]
    [basilisp.io :as bio]
-   [basilisp.core :as core]
-   [multiprocessing :as mp]
+   [basilisp.core :as core])
+  (:import
+   [multiprocessing :refer [Process]]
    [numpy :as np]))
 
 (defn start-proc
   "Start FUNC with ARG in a thread process and return its id."
   [func arg]
-  (let [p (mp/Process ** :target func :args [arg])]
+  (let [p (Process ** :target func :args [arg])]
     (.start p)
     p))
 
-;; (defn print4tap
-;;   "Print function for tap>, useful in REPL."
-;;   [map]
-;;   (p/print-table (keys map) [map]))
+(defmacro mget
+  "Get a cell of a matrix"
+  [m r1 r2 c1 c2]
+  `(aget ~m (python/tuple [(python/slice ~r1 ~r2) (python/slice ~c1 ~c2)])))
+
+(defn print4tap
+  "Print function for tap>, useful in REPL."
+  [map]
+  (p/print-table (keys map) [map]))
 
 (defn cells-to-matrix
   "Transform a sequence of CELLS ([x y]) into a matrix of dimensions SIZE ([x y])"

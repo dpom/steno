@@ -18,7 +18,7 @@ wheels = [
 
 [[package]]
 name = "basilisp"
-version = "0.4.0"
+version = "0.5.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "attrs" },
@@ -27,9 +27,9 @@ dependencies = [
     { name = "pyrsistent" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/80/fd/317606f32530148e5313cb4b7bb723f28b775d4ff9fd756dee6a4373a69b/basilisp-0.4.0.tar.gz", hash = "sha256:fbd5330d1979d30a502f53f2caa8c94b9d4698200fb0e19551ac0379080ac278", size = 281094, upload-time = "2025-06-07T20:59:40.62Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/15/52/b0ad0d8c16d962337b9da5d1e5f2161edd7e4d27dd03ed41135b5e19b686/basilisp-0.5.0.tar.gz", hash = "sha256:c6b491d4dbf3dc88808bab3ed0ca7db7c1587b30b8259abd3cb8ad87562e4b12", size = 286154, upload-time = "2026-01-24T18:27:30.021Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e0/c5/5a3cb7ca78d259dd79bd4bf174c6b5301e6fc39463cf7c45ebbb5e395c4b/basilisp-0.4.0-py3-none-any.whl", hash = "sha256:1bb1aceb6aa93c9f222017e337844138afafeb1d24e0e4f391769d18d01d1d1a", size = 308861, upload-time = "2025-06-07T20:59:38.432Z" },
+    { url = "https://files.pythonhosted.org/packages/52/7f/8d6cde2296d25c7de9a93ea3080ef494070cb46d71e3a0c274a14a9eab86/basilisp-0.5.0-py3-none-any.whl", hash = "sha256:6c58e4e7d921448353f5fd62a5e530c7b9311fcdf01bc153b0acfc29843e8038", size = 313940, upload-time = "2026-01-24T18:27:28.758Z" },
 ]
 
 [[package]]
@@ -566,7 +566,7 @@ wheels = [
 
 [[package]]
 name = "steno"
-version = "1.0"
+version = "1.1"
 source = { editable = "." }
 dependencies = [
     { name = "basilisp" },
@@ -579,7 +579,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "basilisp", specifier = ">=0.4.0" },
+    { name = "basilisp", specifier = ">=0.5.0" },
     { name = "matplotlib", specifier = ">=3.10.0" },
     { name = "opencv-python", specifier = ">=4.10.0.84" },
     { name = "pyaml-env", specifier = ">=1.2.2" },

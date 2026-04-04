@@ -6,22 +6,29 @@
 
 ;; project settings
 (setq ent-project-home (file-name-directory (if load-file-name load-file-name buffer-file-name)))
-(setq ent-project-name "cljproj")
+(setq ent-project-name "steno")
 (setq ent-clean-regexp "~$")
 (setq ent-dirclean-regexp "__pycache__" )
 
+(ent-load-default-tasks)
 
+;; tasks
 
-(task :style '() "check code" "bb style")
+(task "style"
+      :doc "check code"
+      :action "bb style")
 
-(task :format '() "format code" "bb format")
+(task "format"
+      :doc "format code"
+      :action "bb format")
 
-(task :kondo '() "lint with kondo" "bb kondo")
+(task "kondo"
+      :doc "lint with kondo"
+      :action "bb kondo")
 
-(task :libupdate '() "search for new libs versions" "bb libupdate" )
-
-(task :tests '() "run tests" "bb test")
-
+(task "tests"
+      :doc "run tests"
+      :action "bb test")
 
 (provide '.ent)
 ;;; .ent.el ends here

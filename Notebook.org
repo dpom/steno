@@ -171,7 +171,7 @@
 (show img)
 (show edges)
 ;; Valuerror: 'gtkagg' is not a valid value for backend; supported values are ['gtk3agg', 'gtk3cairo', 'gtk4agg', 'gtk4cairo', 'macosx', 'nbagg', 'notebook', 'qtagg', 'qtcairo', 'qt5agg', 'qt5cairo', 'tkagg', 'tkcairo', 'webagg', 'wx', 'wxagg', 'wxcairo', 'agg', 'cairo', 'pdf', 'pgf', 'ps', 'svg', 'template']
-  #+end_src 
+  #+end_src
 
 * 2025-01-02
 
@@ -255,7 +255,7 @@
 
 (utl/show invert)
 
-;; incerc o filtrare intai 
+;; incerc o filtrare intai
 
 kernel = np.ones((5,5),np.float32)/25
 dst = cv.filter2D(img,-1,kernel)
@@ -519,7 +519,7 @@ dst = cv.filter2D(img,-1,kernel)
 (mapv #(get-neighbor mat1 [2 1] %) directions)
 ;; => [2 0 0 0 4 5 0 1]
   #+end_src
-  
+
 * 2025-01-14
 
 
@@ -607,7 +607,7 @@ dst = cv.filter2D(img,-1,kernel)
 
 (get-liniar-sequence word010 [42 6] [-1 -1] [])
 ;; => [[34 150] [35 149] [64 128 136 9 144 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 9 144 136 136 72 132 9 144 136 136 136 136 136 136 136 136 136 136 136 136 136 72 132 136 72 132 136 136 136 136 136 136 136 136 72 132 136 136 136 9 144 136 136 136 136 72 132 136 72 68 68 68 68 36 66 132 136 136 136 136 136 136 136 136 9 144 9 144 136 9 144 9 144 136 136 136 136 9 144 136 136 9 144 136 136 136 9 144 136 136 9 144 136 136 136 9 17 17 144 136 136 9 144 136 136 9 144 9 17 18 33]]
-  #+end_#+begin_src  
+  #+end_#+begin_src
 
   #+end_src
 
@@ -621,7 +621,7 @@ dst = cv.filter2D(img,-1,kernel)
         first
         (disj [35 149])))
   ;; => #{[33 149] [34 151]}
-  
+
   (def seq1 (get-liniar-sequence word010 [33 149] [34 150] []))
   ;; => [[29 177] [28 177] [66 34 36 66 36 68 68 68 66 34 34 34 34 34 36 66 34 34 33 18 33 17 17 17 144 136 9 144 136 136 136 136 136 136 136 136 136 72 132 136 136 136 136 136 136 72 132 72 68 68 68 68 36 34 34 34 34 66 36 18 33 34 66 36 34 34]]
 
@@ -649,8 +649,8 @@ dst = cv.filter2D(img,-1,kernel)
   (def start-cell [34 150])
 
   (def prev-cell [35 149])
-  
-  
+
+
   (def neighbors (get-next-neighbors word010 start-cell prev-cell))
   ;; => #{[33 149] [34 151]}
 
@@ -663,7 +663,7 @@ dst = cv.filter2D(img,-1,kernel)
   ;; => [[66 34 36 66 36 68 68 68 66 34 34 34 34 34 36 66 34 34 33 18 33 17 17 17 144 136 9 144 136 136 136 136 136 136 136 136 136 72 132 136 136 136 136 136 136 72 132 72 68 68 68 68 36 34 34 34 34 66 36 18 33 34 66 36 34 34] [136 136 136 136 136 136 136 72 5 144 136 136 136 136 136 136 136 9 17 144 136 136 9 144 9]]
 
   (def new-prevs (set (map first res)))
-  
+
   (def next-neighbors
     (->> res
          (map (fn [[start prev _]]
@@ -673,14 +673,14 @@ dst = cv.filter2D(img,-1,kernel)
   ;; => #{[30 177] [30 176] [29 177]}
 
   (def next (first (set/difference next-neighbors new-prevs)))
-  
+
   (def next-res (get-cell-number-and-neighbors word010 next))
   ;; => [#{[30 176] [31 178] [29 177]} 74]
 
   (def new-start-cell (-> (first next-res)
                           (set/difference next-neighbors)
                           first))
-  
+
   (defn get-parallel-sequence
     [mat start prev]
     (let [neighbors (get-next-neighbors mat start prev)
@@ -701,7 +701,7 @@ dst = cv.filter2D(img,-1,kernel)
                         first)]
       [new-start new-prev seqs]))
 
-  
+
   (defn matrix->numseq
     [mat start-cell]
     (loop [start start-cell
@@ -781,7 +781,7 @@ t-symbol
 (def d-symbol (cnv/matrix->numseq d-template))
 d-symbol
 ;; => [[128 9 144 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 9 144 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 8]]
-  #+end_src 
+  #+end_src
 
 * 2025-01-22
 
@@ -851,7 +851,7 @@ f-symbol
 pat-symbol
 ;; => [[] [[18 33 18 33 17 144 136 136 136 136 136 9] [34 34 34 66 36 34 66 68 68 68 132 136 136 136 9 18 33 17 18 34 34 34 34 34 34 34 34 33 18]] [] [[9 136 136 136 136 136 144 17 33 18 33 18 33 34 34 34 66 36 34 66 68 68 68 132 136 136 136 9 18 33 17 18 34 34 34 34 34 34 34 34 33 18] [68]] [9 144 136 136 136 136 136 136 136 136 136 136 9 144 136 136 136 136 136 136 136 136 136 136 136 136 136 8]]
 
-  #+end_src 
+  #+end_src
 
 * 2025-02-19
 
@@ -913,7 +913,7 @@ bb app test/resources/template.png tmp/templates/
   (require '[steno.utils :as utl])
 
   (def p-template (image->matrix (cv2/imread "tmp/templates/word023.png")))
-  
+
   (utl/show-matrix p-template)
 
   (count p-template)
@@ -921,12 +921,12 @@ bb app test/resources/template.png tmp/templates/
 
   (get-start-cell p-template true)
   ;; => [8 6]
-  
+
   (def t [[1 2 3]
           [4 5 6]
           [7 8 9]])
-  
-  
+
+
   (aget t 0 2)
   ;; => 3
 
@@ -935,7 +935,7 @@ bb app test/resources/template.png tmp/templates/
 
   (get-cell-value t 0 2)
   ;; => 3
-  
+
   (get-cell-value t 1 0)
   ;; => 4
 
@@ -954,7 +954,7 @@ bb app test/resources/template.png tmp/templates/
 
   (get-cell-number-and-neighbors t1 [1 1])
   ;; => [#{[1 2] [2 2] [1 0] [0 2] [2 0] [0 1] [0 0] [2 1]} 255]
-  
+
   (def t2 [[0 0 0]
            [0 1 1]
            [0 0 0]])
@@ -974,7 +974,7 @@ bb app test/resources/template.png tmp/templates/
 
   (count (first p-template))
   ;; => 13
-  
+
   (get-start-cell p-template true)
   ;; => [14 5]
 
@@ -988,10 +988,10 @@ bb app test/resources/template.png tmp/templates/
   ;; => [#{[7 7] [5 8]} 33]
 
   (get-cell-number-and-neighbors p-template [5 8])
-  
+
   (get-start-cells t-template)
   ;; => [[5 42] [7 6]]
-  
+
   (utl/show-matrix t-template)
 
   (defn get-min-start-cell [cells]
@@ -1006,7 +1006,7 @@ bb app test/resources/template.png tmp/templates/
 
   (get-min-start-cell (get-start-cells t-template))
   ;; => [7 6]
-  
+
   (get-min-start-cell (get-start-cells p-template))
   ;; => [5 8]
 
@@ -1020,7 +1020,7 @@ bb app test/resources/template.png tmp/templates/
           (let [new-col (inc col)
                 new-row (if (= new-col max-col) (inc row) row)
                 new-col (if (= new-row row) new-col 0)]
-            (if (= new-row max-row) 
+            (if (= new-row max-row)
               dummy-cell
               (recur new-row new-col)))))))
 
@@ -1040,8 +1040,8 @@ bb app test/resources/template.png tmp/templates/
 
   (get-start-cell p-template)
   ;; => [5 8]
-  
-  
+
+
   ;;
   )
   #+end_src
@@ -1054,7 +1054,7 @@ bb app test/resources/template.png tmp/templates/
   '[steno.converter :as cnv])
 
 (def p-template (cnv/image->matrix (cv2/imread "tmp/templates/word023.png")))
-  
+
 (def t-template (cnv/image->matrix (cv2/imread "tmp/templates/word022.png")))
 
 (def c-template (cnv/image->matrix (cv2/imread "tmp/templates/word026.png")))
@@ -1127,7 +1127,7 @@ bb app test/resources/template.png tmp/templates/
   (require '[steno.utils :as utl])
 
   (def p-template (image->matrix (cv2/imread "tmp/templates/word023.png")))
-  
+
   (def t-template (image->matrix (cv2/imread "tmp/templates/word022.png")))
 
   (def c-template (image->matrix (cv2/imread "tmp/templates/word026.png")))
@@ -1135,14 +1135,14 @@ bb app test/resources/template.png tmp/templates/
   (def p-seq (matrix->numseq p-template))
   ;; => [[16 33 18 33 34 34 34 34 18 33 34 34 34 34 34 66 36 18 33 34 34 34 34 66 36 34 34 34 34 34 34 34 34 2]]
 
-  
-  
+
+
   (def t-seq (matrix->numseq t-template))
   ;; => [[128 136 136 136 136 9 144 136 136 9 144 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 136 8]]
 
   (def c-seq  (matrix->numseq c-template))
   ;; => [[16 33 18 33 18 33 18 17 33 18 33 18 17 33 18 33 18 33 18 33 18 17 33 18 17 33 18 17 17 1]]
-  
+
 
   (utl/show-matrix c-template)
 
@@ -1166,7 +1166,7 @@ bb app test/resources/template.png tmp/templates/
   (defn print
     [map]
     (p/print-table (keys map) [map]))
-  
+
 
   (print {:a 2 :b {:a 1 :b "cucu"}})
 
@@ -1556,9 +1556,9 @@ def create_array_from_cells(cells, array_size):
 if __name__ == "__main__":
     cells = [(1, 2), (3, 4), (0, 0), (2, 1)]
     array_size = (5, 5)  # Size of the output array (5 rows, 5 columns)
-    
+
     result_array = create_array_from_cells(cells, array_size)
-    
+
     print("The 2D array is:")
     print(result_array)
 
@@ -1615,7 +1615,7 @@ def douglas_peucker(points, epsilon):
     line_vec = line_vec / np.linalg.norm(line_vec)  # Normalize
     points_vec = points - start
     projection = np.dot(points_vec, line_vec)
-    
+
     # Get the perpendicular distance to the line
     # Distance = ||points_vec - projection * line_vec||
     perpendicular_distances = np.linalg.norm(points_vec - np.outer(projection, line_vec), axis=1)
@@ -1633,7 +1633,7 @@ def douglas_peucker(points, epsilon):
         return np.vstack((left_simplified[:-1], right_simplified))
     else:
         return np.array([start, end])
-    
+
 
 def extract_contours(binary_image):
     """
@@ -1644,7 +1644,7 @@ def extract_contours(binary_image):
     """
     # Convert the binary image to uint8
     binary_image = (binary_image * 255).astype(np.uint8)
-    
+
     # Find contours
     contours, _ = cv2.findContours(binary_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     return [contour.squeeze() for contour in contours]
@@ -1656,16 +1656,16 @@ def main():
 
     # Extract contours
     contours = extract_contours(binary_image)
-    
+
     # Simplify each contour using Douglas-Peucker
     epsilon = 5.0  # Tolerance for simplification
     simplified_contours = [douglas_peucker(contour, epsilon) for contour in contours]
-    
+
     # Visualize results
     for contour in simplified_contours:
         contour = np.int32(contour)  # Convert to int32 for drawing
         cv2.polylines(binary_image, [contour], isClosed=False, color=2, thickness=1)
-    
+
     cv2.imshow("Original Binary Image", binary_image)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
@@ -1683,21 +1683,21 @@ import numpy as np
 def image_to_binary_matrix(image_path):
     # Open the image
     img = Image.open(image_path)
-    
+
     # Convert the image to grayscale
     gray_img = img.convert('L')
-    
+
     # Convert the grayscale image to binary (0 and 255)
     # You can adjust the threshold as needed
     threshold = 128
     binary_img = gray_img.point(lambda p: 255 if p > threshold else 0)
-    
+
     # Convert binary image to a numpy array
     binary_data = np.array(binary_img)
 
     # Convert the binary data to a binary matrix (0s and 1s)
     binary_matrix = (binary_data / 255).astype(int)
-    
+
     return binary_matrix
 
 # Example usage
@@ -1715,11 +1715,11 @@ from scipy.ndimage import gaussian_filter
 def loess_smoothing(binary_image, bandwidth=1.0):
     """
     Apply LOESS smoothing to a binary image.
-    
+
     Parameters:
         binary_image (numpy.ndarray): Input binary image (2D array with values 0 and 1).
         bandwidth (float): The bandwidth (size of neighborhood) for the LOESS fitting.
-        
+
     Returns:
         numpy.ndarray: Smoothed image.
     """
@@ -1798,7 +1798,7 @@ def loess_smoothing(image, bandwidth):
         for j in range(cols):
             weights = []
             values = []
-            
+
             # Gathering weights and values within bandwidth
             for k in range(max(0, i - int(bandwidth)): min(rows, i + int(bandwidth + 1))):
                 for l in range(max(0, j - int(bandwidth)): min(cols, j + int(bandwidth + 1))):
@@ -2117,13 +2117,13 @@ joc-numseq*
           lineseq* (matrix2lineseq mat*)]
       {:mat* mat*
        :lineseq* lineseq*}))
-  
+
   (def o-model (build-model "tmp/templates/word021.png"))
-  
+
   (:lineseq* o-model)
   [[[6 20 144]]
    [[[7 19 17] [8 18 17] [9 17 9] [9 16 144] [10 15 9] [10 14 144] [11 13 9] [11 12 144] [12 11 17] [13 10 17] [14 9 17] [15 8 17] [16 7 17] [17 6 33] [18 6 18] [19 5 33] [20 5 34] [21 5 34] [22 5 34] [23 5 34] [24 5 34] [25 5 66] [26 6 36] [27 6 34] [28 6 34] [29 6 34] [30 6 66] [31 7 68] [32 8 68] [33 9 68] [34 10 68] [35 11 68] [36 12 132] [36 13 72] [37 14 132] [37 15 72] [38 16 5] [37 17 144] [37 18 136] [37 19 136] [37 20 9] [36 21 144] [36 22 136] [36 23 136] [36 24 9] [35 25 144] [35 26 136] [35 27 9] [34 28 144] [34 29 9] [33 30 17] [32 31 144] [32 32 9] [31 33 17] [30 34 17] [29 35 17] [28 36 17] [27 37 18] [26 37 33] [25 38 18] [24 38 34] [23 38 34] [22 38 33] [21 39 18] [20 39 34] [19 39 34] [18 39 34] [17 39 33] [16 40 18] [15 40 34] [14 40 34] [13 40 34] [12 40 34] [11 40 34] [10 40 34] [9 40 36] [8 39 68] [7 38 68] [6 37 72] [6 36 136] [6 35 136] [6 34 136] [6 33 136] [6 32 136] [6 31 136] [6 30 136] [6 29 136] [6 28 136] [6 27 136] [6 26 136] [6 25 136] [6 24 136] [6 23 136] [6 22 136] [6 21 136]]]]
-  
+
   (def a-model (build-model "tmp/templates/word015.png"))
 
   (:lineseq* a-model)
@@ -2138,13 +2138,13 @@ joc-numseq*
     [[25 64 38] [26 64 34] [27 64 34] [28 64 66] [29 65 36] [30 65 82]]]
    [[[31 66 132] [31 67 72] [32 68 68] [33 69 132] [33 70 72] [34 71 132] [34 72 136] [34 73 72] [35 74 68] [36 75 132] [36 76 72] [37 77 132] [37 78 136] [37 79 136] [37 80 136] [37 81 72] [38 82 132] [38 83 9] [37 84 144] [37 85 136] [37 86 9] [36 87 144] [36 88 136] [36 89 9] [35 90 144] [35 91 9] [34 92 17] [33 93 17] [32 94 17] [31 95 17] [30 96 17] [29 97 18] [28 97 34] [27 97 34] [26 97 34] [25 97 34] [24 97 34] [23 97 36] [22 96 66] [21 96 34] [20 96 34] [19 96 34] [18 96 36] [17 95 68] [16 94 68] [15 93 72] [15 92 136] [15 91 132] [14 90 72] [14 89 136] [14 88 136] [14 87 136] [14 86 136] [14 85 136] [14 84 136] [14 83 136] [14 82 136] [14 81 136] [14 80 136] [14 79 136] [14 78 136] [14 77 144] [15 76 17] [16 75 9] [16 74 144] [17 73 17] [18 72 17] [19 71 17] [20 70 9] [20 69 144] [21 68 17] [22 67 17] [23 66 9] [23 65 144]]
     [[31 64 9] [31 63 144] [32 62 17] [33 61 33] [34 61 18] [35 60 17] [36 59 17] [37 58 33] [38 58 18] [39 57 17] [40 56 17] [41 55 33] [42 55 18] [43 54 17] [44 53 33] [45 53 18] [46 52 33] [47 52 18] [48 51 33] [49 51 18] [50 50 17] [51 49 33] [52 49 18] [53 48 17] [54 47 17] [55 46 33] [56 46 18] [57 45 17] [58 44 33] [59 44 34] [60 44 2]]]]
-  
+
   (def ale-model (build-model "tmp/templates/word000.png"))
 
   (:lineseq* ale-model)
   [[[8 73 1] [7 74 17] [6 75 144] [6 76 136] [6 77 136] [6 78 136] [6 79 136] [6 80 136] [6 81 72] [7 82 132] [7 83 136] [7 84 72] [8 85 68] [9 86 68] [10 87 36] [11 87 66] [12 88 68] [13 89 36] [14 89 34] [15 89 34] [16 89 34] [17 89 18] [18 88 33] [19 88 18] [20 87 9] [20 86 144] [21 85 17] [22 84 9] [22 83 136] [22 82 136] [22 81 144] [23 80 17] [24 79 9] [24 78 136] [24 77 144] [25 76 9] [25 75 136] [25 74 144] [26 73 9] [26 72 136] [26 71 136] [26 70 144] [27 69 9] [27 68 136] [27 67 136] [27 66 136] [27 65 144] [28 64 9] [28 63 144] [29 62 9] [29 61 144] [30 60 9] [30 59 136] [30 58 144] [31 57 9] [31 56 136] [31 55 136] [31 54 144] [32 53 9] [32 52 144] [33 51 9] [33 50 136] [33 49 136] [33 48 144] [34 47 9] [34 46 136] [34 45 136] [34 44 144] [35 43 17] [36 42 9] [36 41 136] [36 40 136] [36 39 144] [37 38 9] [37 37 136] [37 36 144] [38 35 9] [38 34 144] [39 33 9] [39 32 144] [40 31 9] [40 30 136] [40 29 144] [41 28 9] [41 27 144] [42 26 9] [42 25 136] [42 24 132] [41 23 84]]
    [[[42 22 17] [43 21 9] [43 20 144] [44 19 17] [45 18 9] [45 17 136] [45 16 144] [46 15 9] [46 14 136] [46 13 136] [46 12 144] [47 11 5] [46 10 72] [46 9 132] [45 8 68] [44 7 66] [43 7 36] [42 6 66] [41 6 34] [40 6 34] [39 6 34] [38 6 34] [37 6 33] [36 7 17] [35 8 17] [34 9 17] [33 10 144] [33 11 136] [33 12 9] [32 13 144] [32 14 136] [32 15 136] [32 16 72] [33 17 132] [33 18 72] [34 19 68] [35 20 68] [36 21 36] [37 21 34] [38 21 66] [39 22 36] [40 22 66]]]]
-  
+
   (def pi-model (build-model "tmp/templates/word001.png"))
 
   (def sat-model (build-model "tmp/templates/word005.png"))
@@ -2178,7 +2178,7 @@ joc-numseq*
   ;;
   )
 
-      
+
 
   #+end_src
 
@@ -2192,7 +2192,7 @@ joc-numseq*
   (defn neighbors?
     [[x1 y1 _] [x2 y2 _]]
     (<= (+ (abs (- x1 x2))  (abs (- y1 y2))) 2))
-  
+
 
   (neighbors? [41 23 84] [42 22 17])
   ;; => true
@@ -2206,7 +2206,7 @@ joc-numseq*
     [lseq1 lseq2]
     (and (= (get-ltype lseq1) 1)
          (neighbors? (last lseq1) (first lseq2))))
-  
+
   (defn loop?
     [lseq1 lseq2]
     (and (= (get-ltype lseq1) 1)
@@ -2225,9 +2225,9 @@ joc-numseq*
 
   (add-tap (bound-fn* utl/print4tap))
 
-  
+
   (def o-model (build-model "tmp/templates/word021.png"))
-  
+
   (def a-model (build-model "tmp/templates/word015.png"))
 
   (def joc-model (build-model "tmp/templates/word002.png"))
@@ -2269,7 +2269,7 @@ joc-numseq*
   (defn neighbors?
     [[x1 y1 _] [x2 y2 _]]
     (<= (+ (abs (- x1 x2))  (abs (- y1 y2))) 2))
-  
+
 
   (neighbors? [41 23 84] [42 22 17])
   ;; => true
@@ -2282,7 +2282,7 @@ joc-numseq*
   (defn continuation?
     [lseq1 lseq2]
     (neighbors? (last lseq1) (first lseq2)))
-  
+
   (defn loop?
     [lseq1 lseq2]
     (and (neighbors? (first lseq1) (first lseq2))
@@ -2295,10 +2295,10 @@ joc-numseq*
 
   (count (first lineseqs))
   ;; => 76
-  
+
   (count (second lineseqs))
   ;; => 2
-  
+
   (defn nested-levels [v]
     (if (vector? v)
       (if (empty? v)
@@ -2400,13 +2400,13 @@ joc-numseq*
       (doseq [ls lineseq]
         (utl/show-matrix (utl/cells2matrix [100 100] (:line ls))))
       (assoc model :mat* mat*)))
-  
+
 
   (def o-model (build-model "tmp/templates/word021.png"))
-  
 
-  
-  
+
+
+
 
   ;;
   )
@@ -2422,12 +2422,12 @@ joc-numseq*
 
   (add-tap (bound-fn* utl/print4tap))
 
-  
+
 
   (defn neighbors?
     [[x1 y1 _] [x2 y2 _]]
     (<= (+ (abs (- x1 x2))  (abs (- y1 y2))) 2))
-  
+
 
   (neighbors? [41 23 84] [42 22 17])
   ;; => true
@@ -2440,7 +2440,7 @@ joc-numseq*
   (defn continuation?
     [lseq1 lseq2]
     (neighbors? (last lseq1) (first lseq2)))
-  
+
   (defn loop?
     [lseq1 lseq2]
     (and (neighbors? (first lseq1) (first lseq2))
@@ -2465,14 +2465,14 @@ joc-numseq*
   ;; => 2
 
   (parallel-lineseq? [[6 16 144]])
-  
+
   (get-ltype [[6 16 144]])
   ;; => 1
 
   (count [[6 16 144]])
   ;; => 1
-  
-  
+
+
   (defn parallel-lineseq?
     [lseq]
     (= (nested-levels lseq) 3))
@@ -2483,12 +2483,12 @@ joc-numseq*
     (if (and (parallel-lineseq? lseq) (= (count lseq) 1))
       (first lseq)
       lseq))
-  
 
 
 
 
-  
+
+
   (defn process-lineseq
     [{:keys [prev res modifs-count] :as state} line-seq]
     (tap> (-> state
@@ -2556,7 +2556,7 @@ joc-numseq*
         :mat* mat*
         :lineseq* lineseq*)))
 
-  
+
 
   (def a-model (build-model "tmp/templates/word015.png"))
   (def ale-model (build-model "tmp/templates/word000.png"))
@@ -2605,7 +2605,7 @@ joc-numseq*
       (neighbors? (last lseq1) (first lseq2))))
 
 
-  
+
   (defn process-lineseq
     [{:keys [prev res modifs-count]} line-seq]
     (tap> {:lseq line-seq})
@@ -2664,7 +2664,7 @@ joc-numseq*
         (mapv (fn [ls] {:ltype (get-ltype ls) :line (mapv #(subvec % 0 2) ls) :numseq (mapv last ls)}) new-lineseq)
         (format-lineseq new-lineseq))))
 
-  
+
   (defn build-model
     [fileimage]
     (let [mat* (image2matrix (cv2/imread fileimage))
@@ -2681,7 +2681,7 @@ joc-numseq*
 
   (small-lineseq? [])
   (small-lineseq? nil)
-  
+
 
   (def a-model (build-model "tmp/templates/word015.png"))
   (def ale-model (build-model "tmp/templates/word000.png"))
@@ -2699,7 +2699,7 @@ joc-numseq*
   (def n-model (build-model "tmp/templates/word018.png"))
   (def o-model (build-model "tmp/templates/word021.png"))
   (def om-model (build-model "tmp/templates/word006.png"))
-  
+
   (def p-model (build-model "tmp/templates/word023.png"))
   (def pat-model (build-model "tmp/templates/word007.png"))
   (def pi-model (build-model "tmp/templates/word001.png"))
@@ -2718,10 +2718,10 @@ joc-numseq*
      []]
 
     )
-  
+
   (filterv seq [[1 2 3] []])
   ;; => [[1 2 3]]
-  
+
 
   ;;
   )
@@ -3250,7 +3250,7 @@ joc-numseq*
     :freq-tolerance 6}])
 
 
-;; a 
+;; a
 {:freq {34 1 66 1 36 1 68 1 136 4 144 1 17 2 18 1} :len 12}
 {:freq {34 1 66 1 36 1 68 1 72 1 136 2 17 3} :len 10}
 {:freq {66 1 36 2 68 1 132 1 136 4 17 2 18 1} :len 12}
@@ -3330,22 +3330,22 @@ joc-numseq*
     :freq-tolerance 2}
    {:letter "e"
     :len 6
-    :len-tolerance 2 
+    :len-tolerance 2
     :freq {33 1, 66 1, 36 1, 136 2, 18 1}
     :freq-tolerance 2}
    {:letter "f"
     :len 7
-    :len-tolerance 2 
+    :len-tolerance 2
     :freq {66 3, 36 1, 68 3}
     :freq-tolerance 2}
    {:letter "i"
     :len 7
-    :len-tolerance 2 
+    :len-tolerance 2
     :freq {34 3, 68 1, 132 1, 136 1, 17 1}
     :freq-tolerance 2}
    {:letter "j"
     :len 15
-    :len-tolerance 2 
+    :len-tolerance 2
     :freq {33 1, 34 1, 66 3, 36 1, 68 1, 132 1, 136 3, 144 1, 17 2, 18 1}
     :freq-tolerance 10}
    {:letter "l"
@@ -3420,7 +3420,7 @@ joc-numseq*
 ;; => 3
 (get-freq-diff {33 1, 34 4, 132 1, 136 5, 17 3} {33 1 34 4 36 1 68 1 132 1 136 2 17 1 145 1})
 ;; => 5
-  #+end_src 
+  #+end_src
 
 * 2025-03-10
 
@@ -3944,7 +3944,7 @@ joc-numseq*
     :freq-tolerance 6}])
 
 
-;; a 
+;; a
 {:freq {34 1 66 1 36 1 68 1 136 4 144 1 17 2 18 1} :len 12}
 {:freq {34 1 66 1 36 1 68 1 72 1 136 2 17 3} :len 10}
 {:freq {66 1 36 2 68 1 132 1 136 4 17 2 18 1} :len 12}
@@ -4024,22 +4024,22 @@ joc-numseq*
     :freq-tolerance 2}
    {:letter "e"
     :len 6
-    :len-tolerance 2 
+    :len-tolerance 2
     :freq {33 1, 66 1, 36 1, 136 2, 18 1}
     :freq-tolerance 2}
    {:letter "f"
     :len 7
-    :len-tolerance 2 
+    :len-tolerance 2
     :freq {66 3, 36 1, 68 3}
     :freq-tolerance 2}
    {:letter "i"
     :len 7
-    :len-tolerance 2 
+    :len-tolerance 2
     :freq {34 3, 68 1, 132 1, 136 1, 17 1}
     :freq-tolerance 2}
    {:letter "j"
     :len 15
-    :len-tolerance 2 
+    :len-tolerance 2
     :freq {33 1, 34 1, 66 3, 36 1, 68 1, 132 1, 136 3, 144 1, 17 2, 18 1}
     :freq-tolerance 10}
    {:letter "l"
@@ -4054,7 +4054,7 @@ joc-numseq*
     :freq-tolerance 5}
    {:letter "n"
     :len 17
-    :len-tolerance 2 
+    :len-tolerance 2
     :freq {33 1, 34 3, 36 1, 132 1, 72 1, 136 8, 17 2}
     :freq-tolerance 5}
    ])
@@ -4165,17 +4165,17 @@ joc-numseq*
     :freq-tolerance 2}
    {:letter "g"
     :len 12
-    :len-tolerance 4 
+    :len-tolerance 4
     :freq {33 2, 17 2, 18 8}
     :freq-tolerance 4}
    {:letter "e"
     :len 6
-    :len-tolerance 2 
+    :len-tolerance 2
     :freq {33 1, 66 1, 36 1, 136 2, 18 1}
     :freq-tolerance 2}
    {:letter "f"
     :len 7
-    :len-tolerance 2 
+    :len-tolerance 2
     :freq {66 3, 36 1, 68 3}
     :freq-tolerance 2}
    {:letter "v"
@@ -4185,12 +4185,12 @@ joc-numseq*
     :freq-tolerance 4}
    {:letter "i"
     :len 7
-    :len-tolerance 2 
+    :len-tolerance 2
     :freq {34 3, 68 1, 132 1, 136 1, 17 1}
     :freq-tolerance 2}
    {:letter "j"
     :len 15
-    :len-tolerance 2 
+    :len-tolerance 2
     :freq {33 1, 34 1, 66 3, 36 1, 68 1, 132 1, 136 3, 144 1, 17 2, 18 1}
     :freq-tolerance 10}
    {:letter "l"
@@ -4205,27 +4205,27 @@ joc-numseq*
     :freq-tolerance 5}
    {:letter "n"
     :len 17
-    :len-tolerance 2 
+    :len-tolerance 2
     :freq {33 1, 34 3, 36 1, 132 1, 72 1, 136 8, 17 2}
     :freq-tolerance 5}
    {:letter "p"
     :len 6
-    :len-tolerance 2 
+    :len-tolerance 2
     :freq {34 6}
     :freq-tolerance 2}
    {:letter "b"
     :len 12
-    :len-tolerance 4 
+    :len-tolerance 4
     :freq {34 12}
     :freq-tolerance 4}
    {:letter "r"
     :len 14
-    :len-tolerance 2 
+    :len-tolerance 2
     :freq {136 7 73 1 17 6}
     :freq-tolerance 2}
    {:letter "s"
     :len 14
-    :len-tolerance 2 
+    :len-tolerance 2
     :freq {33 1, 34 2, 66 1, 68 1, 136 3, 17 1, 18 2}
     :freq-tolerance 6}
    {:letter "t"
@@ -4743,7 +4743,7 @@ min-refseq
           y-min (apply min (map second lineseq))
           new-lineseq (mapv (fn [[x y n]] [(- x x-min) (- y y-min) n]) lineseq)]
       (assoc lsign :lineseq new-lineseq)))
-  
+
 
   (defn image-to-wsign
     [image]
@@ -4757,14 +4757,14 @@ min-refseq
          (mapv normalize2-lsign)))
 
   (def wsign2 (image-to-wsign  (cv2/imread imagefile)))
-  
+
   (utl/start-proc utl/show-matrix matrix)
 
   (def mat2 (utl/lineseq-to-matrix (:lineseq (first wsign2))))
-  
+
   (utl/start-proc utl/show-lsign (nth wsign2 2))
 
-  
+
   ;;
   )
   #+end_src
@@ -4857,8 +4857,8 @@ min-refseq
        (map :text)
        (apply str))
   ;; => "pat"
-  
-  
+
+
 
   ;;
   )
@@ -4895,11 +4895,11 @@ min-refseq
             (assoc acc k v))
           {}
           test-dict)
-  
+
   ;; (require '[basilisp.pprint :as pprint])
 
   ;; (pprint/pprint (range 30))
-  
+
   (reduce (fn [acc k]
             (if-let [v (get test-dict k)]
               (assoc acc k v)
@@ -4907,14 +4907,14 @@ min-refseq
           {}
           test-dict)
   ;; => {"b" 2}
-  
+
   (def translators (python/list ["freq"]))
 
   (mapv #(get translators-functions %) translators)
   ;; => [freq/translate]
 
   (methods tra/translate )
-  
+
 
 
 
@@ -5100,7 +5100,7 @@ min-refseq
 ;;
   )
   #+end_src
- 
+
 * 2025-07-03
 
 ** #23 Improve freq translator
@@ -5294,7 +5294,7 @@ min-refseq
   ;; => {:letter "o" :freq-tolerance 14 :freq {33 2 34 5 36 2 68 2 132 2 72 2 136 7 9 1 144 1 17 4} :len 28 :len-tolerance 4}
 
 ;;
-  ) 
+  )
   #+end_src
 
 * 2025-07-05
@@ -5323,7 +5323,7 @@ min-refseq
   (count corp)
 
   (compute-reference corp)
-  ;; => 
+  ;; =>
 
   ;;
   (def ref)
@@ -5332,4 +5332,250 @@ min-refseq
 
   ;;
   )
+  #+end_src
+
+* 2026-04-01
+
+- rescriu =extractor= cu ajutorul AI:
+  #+begin_src clojure
+(import
+  [cv2 :as cv2]
+  [numpy :as np]
+  [matplotlib.pyplot :as plt])
+
+(def img (cv2/imread "test/resources/orig.png"))
+
+(def gray (cv2/cvtColor img cv2/COLOR_BGR2GRAY))
+
+  (require
+    '[steno.utils :as utl]
+    '[steno.show :as show]
+    '[steno.imageprocessor :as img])
+
+(def proc1 (utl/start-proc show/show-image img))
+
+;; În loc de start-proc, încearcă apelul direct pentru testare:
+(show/show-image img)
+
+(defmacro mget [m r1 r2 c1 c2]
+                  `(aget ~m (python/tuple [(python/slice ~r1 ~r2) (python/slice ~c1 ~c2)])))
+
+(def matrix (np/array [[1, 2, 3],
+                       [4, 5, 6],
+                       [7, 8, 9]]))
+
+(mget matrix 1 3 1 3)
+;; => array([[5, 6],
+;;           [8, 9]])
+
+(defn extract-gliphs [image-path]
+  (let [img (cv2/imread image-path)
+        gray (cv2/cvtColor img cv2/COLOR_BGR2GRAY)
+        ;; Binarizarea (Inversă)
+        [_ thresh] (cv2/threshold gray 150 255 cv2/THRESH_BINARY_INV)
+        ;; Dilatare pentru a uni fragmentele mici
+        kernel (np/ones [2 2] np/uint8)
+        dilated (cv2/dilate thresh kernel ** :iterations 1)
+        ;; Detectarea contururilor
+        [contours _] (cv2/findContours dilated cv2/RETR_EXTERNAL cv2/CHAIN_APPROX_SIMPLE)
+        ;; Extragerea datelor despre glife (X, Y, W, H, ROI)
+        glyphs (->> contours
+                    (map (fn [cnt]
+                           (let [[x y w h] (cv2/boundingRect cnt)]
+                             {:x x :y y :w w :h h :roi (mget img y (+ y h) x (+ x w))})))
+                    (filter (fn [g] (and (> (:w g) 5) (> (:h g) 5))))
+                    (sort-by :y))
+        row-threshold 30
+        ;; Gruparea în rânduri și coloane
+        grouped-rows (reduce
+                         (fn [rows g]
+                           (let [last-row (last rows)]
+                             (if (and (not-empty last-row)
+                                      (< (:y g) (+ (:y (last last-row)) row-threshold)))
+                               (conj (vec (butlast rows)) (conj last-row g))
+                               (conj rows [g]))))
+                         []
+                         glyphs)
+        ;; Sortăm fiecare rând după axa X
+        final-matrix (map (fn [row] (sort-by :x row)) grouped-rows)]
+          (println (str "Detectate " (count final-matrix) " rânduri."))
+          final-matrix))
+
+(def imagefile "test/resources/template.png")
+;; => #'user/imagefile
+
+(def mtx1 (extract-gliphs imagefile))
+;; => #'user/mtx1
+
+(defn show-glyph-matrix
+  "Afișează toate glifele extrase într-o grilă Matplotlib."
+  [matrix]
+  (let [num-rows (count matrix)
+        num-cols (apply max (map count matrix))
+        ;; Creăm figura și axele
+        [fig axs] (plt/subplots num-rows num-cols ** :figsize [15 10])]
+    (doseq [i (range num-rows)]
+      (let [row (nth matrix i)]
+        (doseq [j (range num-cols)]
+          (let [ax (if (= num-rows 1)
+                     (nth axs j)
+                     (get (nth axs i) j))]
+            (.axis ax "off")
+            (when (< j (count row))
+              (let [glyph (nth row j)]
+                (.imshow ax (:roi glyph) ** :cmap "gray")))))))
+
+    (plt/tight_layout)
+    (plt/show)))
+
+(def mtx (extract-gliphs "test/resources/template.png"))
+
+(defn show-glyph-matrix
+  "Afișează toate glifele extrase într-o grilă Matplotlib."
+  [matrix]
+  (let [num-rows (count matrix)
+        num-cols (apply max (map count matrix))
+        ;; Creăm figura și axele
+        [fig axs] (plt/subplots num-rows num-cols ** :figsize [15 10])]
+
+    (doseq [i (range num-rows)]
+      (let [row (nth matrix i)]
+        (doseq [j (range num-cols)]
+          ;; Folosim get pentru indexare Python pe array-ul NumPy
+          ;; axs[i, j] în Python devine (get (get axs i) j) în Basilisp
+          (let [ax (cond
+                     (= 1 num-rows num-cols) axs
+                     (= 1 num-rows) (get axs j)
+                     (= 1 num-cols) (get axs i)
+                     :else (get (get axs i) j))]
+            (.axis ax "off")
+            (when (< j (count row))
+              (let [glyph (nth row j)]
+                (.imshow ax (:roi glyph) ** :cmap "gray")))))))
+
+    (plt/tight_layout)
+    (plt/show)))
+
+
+(defn show-glyph-matrix
+  "Afișează toate glifele extrase într-o grilă Matplotlib, gestionând rânduri inegale."
+  [matrix]
+  (let [num-rows (count matrix)
+        num-cols (apply max (map count matrix))
+        ;; Creăm figura și axele
+        [fig axs] (plt/subplots num-rows num-cols ** :figsize [15 10])
+        ;; Convertim axele într-o listă plată pentru a le accesa ușor
+        ;; Indiferent dacă axs e 1D sau 2D, .flatten îl face 1D
+        flat-axs (if (instance? np/ndarray axs)
+                   (.flatten axs)
+                   [axs])]
+
+    (doseq [i (range num-rows)]
+      (let [row (nth matrix i)]
+        (doseq [j (range num-cols)]
+          (let [idx (+ (* i num-cols) j)
+                ax (get flat-axs idx)]
+            ;; Verificăm dacă axa există (nu este None)
+            (when ax
+              (.axis ax "off")
+              ;; Verificăm dacă avem o pictogramă pentru această poziție
+              (if (< j (count row))
+                (let [glyph (nth row j)]
+                  (.imshow ax (:roi glyph) ** :cmap "gray"))))))))
+
+    (plt/tight_layout)
+    (plt/show)))
+
+
+;; Afișare directă (va deschide o fereastră nouă)
+(show-glyph-matrix mtx)
+
+
+(defn show-glyph-matrix
+  "Afișează toate pictogramele extrase într-o singură grilă Matplotlib."
+  [matrix]
+  (let [num-rows (count matrix)
+        num-cols (apply max (map count matrix))
+        ;; Inițializăm figura și grila de axe
+        [fig axs] (plt/subplots num-rows num-cols ** :figsize [20 20])
+        ;; Convertim axele într-o listă plată pentru parcurgere liniară
+        flat-axs (if (instance? np/ndarray axs) (.flatten axs) [axs])]
+
+    ;; Ascundem toate axele inițial pentru a evita afișarea celulelor goale
+    (doseq [ax flat-axs]
+      (.axis ax "off"))
+
+    ;; Populăm celulele corespunzătoare pictogramelor
+    (doseq [i (range num-rows)]
+      (let [row (nth matrix i)]
+        (doseq [j (range (count row))]
+          (let [idx (+ (* i num-cols) j)
+                ax (get flat-axs idx)
+                glyph (nth row j)]
+            ;; Randăm regiunea de interes (ROI) a pictogramei
+            (.imshow ax (:roi glyph) ** :cmap "gray")))))
+
+    (plt/tight_layout)
+    (plt/show))
+
+
+
+
+
+;; Dacă vrei să rulezi într-un proces separat să nu blochezi REPL-ul:
+  (steno.utils/start-proc show-glyph-matrix mtx) [cite: 3])
+
+  (defn show-glyph-matrix
+  "Afișează pictogramele extrase într-o grilă, evitând erorile de scop (scope) ale variabilelor."
+  [matrix]
+  (let [num-rows (count matrix)
+        num-cols (if (pos? num-rows) (apply max (map count matrix)) 0)
+        ;; Creăm figura
+        [fig axs] (plt/subplots num-rows num-cols ** :figsize [20 20])
+        ;; Convertim axele într-o listă plată (Python list) pentru a evita problemele NumPy cu 'nth'
+        flat-axs (cond
+                   (not (instance? np/ndarray axs)) [axs]
+                   :else (vec (.flatten axs)))]
+
+    ;; Dezactivăm axele vizibile (grila goală)
+    (doseq [ax flat-axs]
+      (.axis ax "off"))
+
+    ;; Folosim i și j pentru a parcurge matricea
+    (doseq [i (range num-rows)]
+      (let [row (nth matrix i)
+            ;; Forțăm num-cols în acest context local pentru a evita eroarea de macroexpansiune
+            cols-count num-cols]
+        (doseq [j (range (count row))]
+          (let [idx (+ (* i cols-count) j)
+                ax (get flat-axs idx)
+                glyph (nth row j)]
+            (when (and ax (:roi glyph))
+              (.imshow ax (:roi glyph) ** :cmap "gray"))))))
+
+    (plt/tight_layout)
+    (plt/show)))
+
+(show-glyph-matrix mtx1)
+  #+end_src
+
+* 2026-04-03
+
+- testez noile functii
+  #+begin_src clojure
+(require
+    '[steno.utils :as utl]
+    '[steno.show :as show]
+    '[steno.extractor :as ext])
+
+(def imagefile "test/resources/template.png")
+
+(def mtx (ext/extract-glyphs imagefile))
+
+(ext/save-glyphs! mtx "test" "tmp/test-save")
+
+(show/show-glyph-matrix mtx)
+
+(utl/start-proc show/show-glyph-matrix mtx)
+;; => <Process name='Process-1' pid=3627512 parent=2867400 started>
   #+end_src

@@ -1,61 +1,72 @@
 (ns steno.extractor
   "Functions to extract word images from a page image"
-  (:import cv2))
+  (:require
+   [steno.utils :as utl])
+  (:import
+   cv2
+   [numpy :as np]))
 
-(defn compare-img-position
-  "Compare the position of 2 images in page."
-  [h-max img1 img2]
-  (let [ydif (- (:y img1) (:y img2))]
-    (cond
-      (and (pos? ydif) (> ydif h-max)) 1
-      (and (neg? ydif) (> (abs ydif) h-max)) -1
-      :else (compare (:x img1) (:x img2)))))
+(defn extract-glyphs
+  "Extract glyphs (word images) from an image stored in IMAGE-PATH,
+   put them in a matrix and return the matrix."
+  [image-path]
+  (let [img (cv2/imread image-path)
+        gray (cv2/cvtColor img cv2/COLOR_BGR2GRAY)
+        ;; Binarizarea (Inversă)
+        [_ thresh] (cv2/threshold gray 150 255 cv2/THRESH_BINARY_INV)
+        ;; Dilatare pentru a uni fragmentele mici
+        kernel (np/ones [2 2] np/uint8)
+        dilated (cv2/dilate thresh kernel ** :iterations 1)
+        ;; Detectarea contururilor
+        [contours _] (cv2/findContours dilated cv2/RETR_EXTERNAL cv2/CHAIN_APPROX_SIMPLE)
+        ;; Extragerea datelor despre glife (X, Y, W, H, ROI)
+        glyphs (->> contours
+                    (map (fn [cnt]
+                           (let [[x y w h] (cv2/boundingRect cnt)]
+                             {:x x :y y :w w :h h :roi (utl/mget img y (+ y h) x (+ x w))})))
+                    (filter (fn [g] (and (> (:w g) 5) (> (:h g) 5))))
+                    (sort-by :y))
+        row-threshold 30
+        ;; Gruparea în rânduri și coloane
+        grouped-rows (reduce
+                      (fn [rows g]
+                        (let [last-row (last rows)]
+                          (if (and (not-empty last-row)
+                                   (< (:y g) (+ (:y (last last-row)) row-threshold)))
+                            (conj (vec (butlast rows)) (conj last-row g))
+                            (conj rows [g]))))
+                      []
+                      glyphs)
+        ;; Sortăm fiecare rând după axa X
+        final-matrix (map (fn [row] (sort-by :x row)) grouped-rows)]
+    final-matrix))
 
-(defn extract-word-images
-  "Extract word images from the page image stored in PAGE-FILENAME file. Returns the word images vector."
-  [page-filename]
-  (let [image (cv2/imread page-filename)
-        gray (cv2/cvtColor image cv2/COLOR_BGR2GRAY)
-        blur (cv2/GaussianBlur gray [5 5] 0)
-        thresh (second (cv2/threshold blur 0 255 (+ cv2/THRESH_BINARY_INV
-                                                    cv2/THRESH_OTSU)))
-        kernel (cv2/getStructuringElement cv2/MORPH_RECT [7 7])
-        dilate (cv2/dilate thresh kernel ** :iterations 1)
-        cnts* (cv2/findContours dilate cv2/RETR_EXTERNAL cv2/CHAIN_APPROX_SIMPLE)
-        cnts (if (= (count cnts*) 2) (first cnts*) (second cnts*))
-        words (map (fn [contour]
-                     (let [[x y w h] (cv2/boundingRect contour)]
-                       {:x x :y y :h h
-                        :image (aget image #py ((slice y (+ y h)) (slice x (+ x w))))}))
-                   cnts)
-        h-max (apply max (map :h words))
-        cip (partial compare-img-position h-max)]
-    (->> words
-         (sort cip)
-         (mapv :image))))
-
-(defn save-word-images!
-  "Save the WORDS images vector in files in OUTDIR folder. The filename format is NAME-XXX.png where XXX is the index of the word in the vector."
-  [words name outdir]
-  (doseq [[idx image] (map-indexed (fn [idx image] [idx image]) words)]
-    (cv2/imwrite (format "%s/%s-%03d.png" outdir name idx) image)))
+(defn save-glyphs!
+  "Save the GLYPHS list of lists in files in OUTDIR folder. The filename format is NAME-YY-XX.png where YY is the line index and XX is column index of the glyphs in the matrix."
+  [glyphs name outdir]
+  (let [num-rows (count glyphs)]
+    (doseq [y (range num-rows)]
+      (let [row (nth glyphs y)          ; Extragem rândul curent (o listă)
+            num-cols (count row)]       ; Aflăm câte pictograme sunt pe acest rând
+        (doseq [x (range num-cols)]
+          (let [glyph (nth row x)]      ; Extragem pictograma (un dicționar)
+            (when (:roi glyph)
+              (cv2/imwrite
+               (format "%s/%s-%02d-%02d.png" outdir name y x)
+               (:roi glyph)))))))))
 
 (comment
 
   (require
-    '[steno.utils :as utl]
-    '[steno.show :as show]
-    '[steno.imageprocessor :as img])
+   '[steno.utils :as utl]
+   '[steno.show :as show])
 
   (def imagefile "test/resources/template.png")
 
-  (def word-images (->> imagefile
-                        extract-word-images
-                        (map img/process-image)))
+  (def mtx (ext/extract-glyphs imagefile))
 
-  (utl/start-proc show/show-image (nth word-images 17))
+  (ext/save-glyphs! mtx "test" "tmp/test-save")
 
-  (save-word-images! word-images (utl/get-filename imagefile) "test/resources/templates")
-
-  ;;
+  (utl/start-proc show/show-glyph-matrix mtx)
+;;
   )

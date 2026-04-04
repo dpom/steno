@@ -3,6 +3,7 @@
   (:require
    [steno.utils :as utl])
   (:import
+   [numpy :as np]
    [matplotlib :as matp]
    [matplotlib.pyplot :as plt]))
 
@@ -41,3 +42,30 @@
   [{:keys [lineseq]}]
   (show-matrix (utl/lineseq-to-matrix lineseq)))
 
+(defn show-glyph-matrix
+  "Afișează GLYPHS din lista de liste într-o grilă."
+  [glyphs]
+  (let [num-rows (count glyphs)
+        num-cols (if (pos? num-rows) (apply max (map count glyphs)) 0)
+        ;; Creăm figura
+        [fig axs] (plt/subplots num-rows num-cols ** :figsize [20 20])
+        ;; Convertim axele într-o listă plată (Python list) pentru a evita problemele NumPy cu 'nth'
+        flat-axs (cond
+                   (not (instance? np/ndarray axs)) [axs]
+                   :else (vec (.flatten axs)))]
+    ;; Dezactivăm axele vizibile (grila goală)
+    (doseq [ax flat-axs]
+      (.axis ax "off"))
+    ;; Folosim i și j pentru a parcurge matricea
+    (doseq [i (range num-rows)]
+      (let [row (nth glyphs i)
+            ;; Forțăm num-cols în acest context local pentru a evita eroarea de macroexpansiune
+            cols-count num-cols]
+        (doseq [j (range (count row))]
+          (let [idx (+ (* i cols-count) j)
+                ax (get flat-axs idx)
+                glyph (nth row j)]
+            (when (and ax (:roi glyph))
+              (.imshow ax (:roi glyph) ** :cmap "gray"))))))
+    (plt/tight_layout)
+    (plt/show)))
