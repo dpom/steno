@@ -5579,3 +5579,55 @@ min-refseq
 (utl/start-proc show/show-glyph-matrix mtx)
 ;; => <Process name='Process-1' pid=3627512 parent=2867400 started>
   #+end_src
+
+* 2026-04-09
+
+- incerc sa pun la punct o metoda de a crea un corpus cu lsign
+  #+begin_src clojure
+(require
+  '[steno.extractor :as extr]
+  '[steno.imageprocessor :as img]
+  '[steno.converter :as conv]
+  '[steno.utils :as utl]
+  '[steno.show :as show])
+
+(defn map-glyph-matrix
+  "Generic function that iterates through the MATRIX of glyphs
+  and returns a new matrix applying function F to each glyph.
+  F must be side-effect free and has 3 arguments: row index,
+  column index and glyph"
+  [matrix f]
+  (map-indexed (fn [idx-row row]
+         (map-indexed (fn [idx-col glyph]
+                (f idx-row idx-col glyph))
+              row))
+               matrix))
+
+(def imagefile "test/resources/template.png")
+
+(def mtx (extr/extract-glyphs imagefile))
+
+(defn pimage
+  [row col glyph]
+  {:row row
+   :col col
+   :roi (img/process-image (:roi glyph))})
+
+(def mtx2 (map-glyph-matrix mtx pimage))
+
+(utl/start-proc show/show-glyph-matrix mtx2)
+
+(defn convert-image
+  [row col glyph]
+  {:row row
+   :col col
+   :wsign (-> (:roi glyph)
+              img/process-image
+              conv/image-to-wsign)})
+
+(def mtx3 (utl/map-glyph-matrix mtx convert-image))
+
+(def wsign (nth (nth mtx3 3) 2))
+
+  (show/show-lsign (nth (:wsign wsign) 1))
+  #+end_src

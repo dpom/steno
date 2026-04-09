@@ -42,6 +42,18 @@
       (aset mat x y 1))
     mat))
 
+(defn map-glyph-matrix
+  "Generic function that iterates through the MATRIX of glyphs
+  and returns a new matrix applying function F to each glyph.
+  F must be side-effect free and has 3 arguments: row index,
+  column index and glyph"
+  [matrix f]
+  (map-indexed (fn [idx-row row]
+                 (map-indexed (fn [idx-col glyph]
+                                (f idx-row idx-col glyph))
+                              row))
+               matrix))
+
 (defn save-edn
   [filename entity]
   (with-open [w (bio/writer filename)]

@@ -12,14 +12,14 @@
   [image-path]
   (let [img (cv2/imread image-path)
         gray (cv2/cvtColor img cv2/COLOR_BGR2GRAY)
-        ;; Binarizarea (Inversă)
+        ;; Inversion (Negative)
         [_ thresh] (cv2/threshold gray 150 255 cv2/THRESH_BINARY_INV)
-        ;; Dilatare pentru a uni fragmentele mici
+        ;; Expansion to join small fragments
         kernel (np/ones [2 2] np/uint8)
         dilated (cv2/dilate thresh kernel ** :iterations 1)
-        ;; Detectarea contururilor
+        ;; Edge detection
         [contours _] (cv2/findContours dilated cv2/RETR_EXTERNAL cv2/CHAIN_APPROX_SIMPLE)
-        ;; Extragerea datelor despre glife (X, Y, W, H, ROI)
+        ;; Extracting glyph data (X, Y, W, H, ROI)
         glyphs (->> contours
                     (map (fn [cnt]
                            (let [[x y w h] (cv2/boundingRect cnt)]
@@ -27,7 +27,7 @@
                     (filter (fn [g] (and (> (:w g) 5) (> (:h g) 5))))
                     (sort-by :y))
         row-threshold 30
-        ;; Gruparea în rânduri și coloane
+        ;; Grouping by rows and columns
         grouped-rows (reduce
                       (fn [rows g]
                         (let [last-row (last rows)]
@@ -37,7 +37,7 @@
                             (conj rows [g]))))
                       []
                       glyphs)
-        ;; Sortăm fiecare rând după axa X
+        ;; Sort each row by the X-axis
         final-matrix (map (fn [row] (sort-by :x row)) grouped-rows)]
     final-matrix))
 
@@ -46,10 +46,10 @@
   [glyphs name outdir]
   (let [num-rows (count glyphs)]
     (doseq [y (range num-rows)]
-      (let [row (nth glyphs y)          ; Extragem rândul curent (o listă)
-            num-cols (count row)]       ; Aflăm câte pictograme sunt pe acest rând
+      (let [row (nth glyphs y)          ; Extract the current row (a list)
+            num-cols (count row)]       ; We are finding out how many glyphs are on this row
         (doseq [x (range num-cols)]
-          (let [glyph (nth row x)]      ; Extragem pictograma (un dicționar)
+          (let [glyph (nth row x)]      ; Extract the glyph (a map)
             (when (:roi glyph)
               (cv2/imwrite
                (format "%s/%s-%02d-%02d.png" outdir name y x)
@@ -63,9 +63,9 @@
 
   (def imagefile "test/resources/template.png")
 
-  (def mtx (ext/extract-glyphs imagefile))
+  (def mtx (extract-glyphs imagefile))
 
-  (ext/save-glyphs! mtx "test" "tmp/test-save")
+  (save-glyphs! mtx "test" "tmp/test-save")
 
   (utl/start-proc show/show-glyph-matrix mtx)
 ;;
