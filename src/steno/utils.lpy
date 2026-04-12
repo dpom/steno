@@ -6,7 +6,11 @@
    [basilisp.core :as core])
   (:import
    [multiprocessing :refer [Process]]
-   [numpy :as np]))
+   [numpy :as np]
+   os
+   [os.path :as path]
+   [pyaml_env :as yml]
+   uuid))
 
 (defn start-proc
   "Start FUNC with ARG in a thread process and return its id."
@@ -63,6 +67,14 @@
   [filename]
   (with-open [r (bio/reader filename)]
     (edn/read r)))
+
+(defn get-filename
+  "Extract the name of a file without extension from a full PATH."
+  [path]
+  (-> path
+      (path/basename)
+      (path/splitext)
+      (first)))
 
 (comment
 

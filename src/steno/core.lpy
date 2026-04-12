@@ -44,14 +44,6 @@
   [config]
   (println "Application config: " config))
 
-(defn get-filename
-  "Extract the name of a file without extension from a full PATH."
-  [path]
-  (-> path
-      (path/basename)
-      (path/splitext)
-      (first)))
-
 (defn get-word-images
   [infile]
   (println "- extract word images")
@@ -65,7 +57,7 @@
         outdir (get config "output")]
     (println "Extract and process word images from " infile)
     (let [word-images (get-word-images infile)
-          outname (get-filename infile)]
+          outname (utl/get-filename infile)]
       (ext/save-word-images! word-images outname outdir)
       (println "Saved words in " outdir))))
 
@@ -143,4 +135,3 @@
           config (assoc (get-config args) "parser" parser)
           action (get actions (get config "action"))]
       (action config))))
-

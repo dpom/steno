@@ -383,8 +383,6 @@
 
   (require '[steno.utils :as utl])
 
-  (add-tap tap-topic (bound-fn* utl/print4tap))
-
   (require
    '[steno.extractor :as extr]
    '[steno.imageprocessor :as img]
