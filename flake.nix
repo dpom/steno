@@ -31,6 +31,7 @@
               pkgs.babashka
               pkgs.clj-kondo
               pkgs.cljfmt
+              pkgs.cq
               pkgs.uv
               python
               tkinter

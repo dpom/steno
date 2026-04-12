@@ -3,12 +3,11 @@
   :CATEGORY: steno
   :END:
 
-steno is a personal project to digitize my stenographic writings.
-
+steno is a personal project to digitalize my stenographic writings.
 
 ** Description
 
-In my youth most of my notes were written in shorthand (Duployer system). This project aims to digitize old notes and integrate them into the current note system (org-roam).
+In my youth most of my notes were written in shorthand (Duployer system). This project aims to digitalize old notes and integrate them into the current note system (org-roam).
 
 The method would contain 2 steps:
 1. scan the notes page by page
@@ -113,6 +112,12 @@ SCHEDULED: <2025-06-30 Lu>
 CLOCK: [2025-07-04 Vi 06:33]
 CLOCK: [2025-07-01 Ma 07:03]--[2025-07-01 Ma 17:41] => 10:38
 :END:
+*** DONE #25 Build a diff translator
+SCHEDULED: <2025-07-09 Mi>
+*** DONE #26 Add a build-references action in cli
+*** DONE #28 Add logging enhancement
+*** #31 Improve references for freq and diff translators enhancement
+
 
 ** References
 
@@ -123,6 +128,5 @@ CLOCK: [2025-07-01 Ma 07:03]--[2025-07-01 Ma 17:41] => 10:38
 5. https://docs.opencv.org/4.x/d9/d61/tutorial_py_morphological_ops.html
 
 ** License
-
 
 This project is released under the GNU General Public License. See the [[file:LICENSE][file]] for details.

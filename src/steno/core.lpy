@@ -2,15 +2,19 @@
   (:require
    [basilisp.edn :as edn]
    [basilisp.io :as bio]
+   [basilisp.pprint :as pprint]
    [clojure.string :as str]
    [steno.converter :as cnv]
    [steno.extractor :as ext]
    [steno.imageprocessor :as img]
    [steno.translator :as tra]
-   [steno.translators.freq])
+   [steno.translators.diff]
+   [steno.translators.freq]
+   [steno.utils :as utl])
   (:import
    [argparse :as arg]
    cv2
+   [logging :as log]
    os
    [os.path :as path]
    [pyaml_env :as yml]
@@ -29,24 +33,21 @@
   [args]
   (let [config-file (.- args config)
         config (yml/parse_config config-file)
-        dict-args (remove-nil-values (.- args __dict__))
-        ;; map-args (zipmap (.keys dict-args) (.values dict-args))
-        ]
-    ;; (println (format "args: %s" map-args))
-    ;; (merge-with (fn [a b] (if (nil? b) a b)) config dict-args)
+        dict-args (remove-nil-values (.- args __dict__))]
     (merge config dict-args)))
 
 (defn action-help
   [config]
-  (.print_help (get config "parser")))
+  (.print_help (:parser config)))
 
 (defn action-list-config
   [config]
-  (println "Application config: " config))
+  (.info (:logger config) "application config:")
+  (pprint/pprint config))
 
 (defn get-word-images
-  [infile]
-  (println "- extract word images")
+  [logger infile]
+  (.info logger "  extract word images")
   (->> infile
        ext/extract-word-images
        (map img/process-image)))
@@ -54,35 +55,37 @@
 (defn action-extract-words
   [config]
   (let [infile (get config "input")
-        outdir (get config "output")]
-    (println "Extract and process word images from " infile)
-    (let [word-images (get-word-images infile)
+        outdir (get config "output")
+        logger (:logger config)]
+    (.info logger "Extract and process word images from %s" infile)
+    (let [word-images (get-word-images logger infile)
           outname (utl/get-filename infile)]
       (ext/save-word-images! word-images outname outdir)
-      (println "Saved words in " outdir))))
+      (.info logger "Saved words in %s" outdir))))
 
 (defn display-message
-  [msg obj]
-  (println msg)
+  [logger msg obj]
+  (.info logger msg)
   obj)
 
 (defn action-translate
   [config]
   (let [infile (get config "input")
         outfile (get config "output")
-        translators (get config "translators")]
-    (println (format "Translate %s using %s" infile translators))
+        translators (get config "translators")
+        logger (:logger config)]
+    (.info logger "Translate %s using %s" infile translators)
     (let [ctx (tra/prepare-translations config translators)
           traw (partial tra/translate-wsign ctx translators)]
       (->> infile
-           (get-word-images)
-           (display-message "- convert to wsign")
+           (get-word-images logger)
+           (display-message logger "  convert to wsign")
            (map cnv/image-to-wsign)
-           (display-message "- translate wsigns")
+           (display-message logger "  translate wsigns")
            (map traw)
            (str/join " ")
            (spit outfile)))
-    (println "Saved in " outfile)))
+    (.info logger "Saved in %s" outfile)))
 
 (defn save-corpus
   [filename corpus]
@@ -93,29 +96,46 @@
   [config]
   (let [infile (get config "input")
         outfile (get config "output")
-        translators (get config "translators")]
-    (printf "Make corpus %s using %s\n" infile translators)
+        translators (get config "translators")
+        logger (:logger config)]
+    (.info logger "Make corpus %s using %s" infile translators)
     (let [ctx (tra/prepare-translations config translators)
           tral (partial tra/translate-lsign ctx translators)]
       (->> infile
-           (get-word-images)
-           (display-message "- convert to wsign")
+           (get-word-images logger)
+           (display-message logger "  convert to wsign")
            (map cnv/image-to-wsign)
-           (display-message "- create corpus")
+           (display-message logger "  create corpus")
            (mapcat identity)
-           (display-message "- translate lsigns")
+           (display-message logger "  translate lsigns")
            (map tral)
-           (display-message "- add uuid")
+           (display-message logger "  remove letters")
+           (map #(dissoc % :letters))
+           (display-message logger "  add uuid")
            (mapv #(assoc % :id (uuid/uuid4)))
            (save-corpus outfile)))
-    (println "Saved in " outfile)))
+    (.info logger "Saved in %s" outfile)))
+
+(defn action-make-references
+  [config]
+  (let [corpus (tra/load-edn (get config "input"))
+        outdir (get config "output")
+        translators (get config "translators")
+        logger (:logger config)]
+    (doseq [tr translators]
+      (.info logger "Make references for %s" tr)
+      (let [references (tra/build-references tr config corpus)
+            outfile (bio/path outdir (str tr "-references.edn"))]
+        (tra/save-edn outfile references)
+        (.info logger "saved in %s" outfile)))))
 
 (def actions
-  {"extract-words" action-extract-words
-   "help"          action-help
-   "list-config"   action-list-config
-   "make-corpus"   action-make-corpus
-   "translate"     action-translate})
+  {"extract-words"   action-extract-words
+   "help"            action-help
+   "list-config"     action-list-config
+   "make-corpus"     action-make-corpus
+   "make-references" action-make-references
+   "translate"       action-translate})
 
 (defn cli
   []
@@ -127,11 +147,52 @@
     (.add_argument parser "-o" "--output" ** :help "the output of the action")
     (.add_argument parser "-c" "--config" ** :help "the config file"
                    :default "resources/config.yml")
-    (.add_argument parser "-f" "--freq_refseqs" ** :help "the reference sequences file for freq translators")
-    (.add_argument parser "-t" "--translators" ** :help "the translators used"
+    (.add_argument parser "--freq_references" ** :help "the reference sequences file for the freq translator")
+    (.add_argument parser "--diff_references" ** :help "the reference sequences file for the diff translator")
+    (.add_argument parser "-t" "--translators" ** :help "the translators to use"
                    :choices (keys (methods tra/translate))
                    :action "append")
+    (.add_argument parser  "-d" "--debug" ** :help "debug mode"
+                   :action "store_true")
     (let [args   (.parse_args parser)
-          config (assoc (get-config args) "parser" parser)
+          logger (log/getLogger "steno")
+          config (assoc (get-config args)
+                        :logger logger
+                        :parser parser)
+          ch (log/StreamHandler)
+          log-formatter (log/Formatter "%(asctime)s - %(levelname)s - %(message)s")
           action (get actions (get config "action"))]
+      (.setLevel logger log/DEBUG)
+      (.setLevel ch (if (.- args debug) log/DEBUG log/INFO))
+      (.setFormatter ch log-formatter)
+      (.addHandler logger ch)
       (action config))))
+
+(comment
+
+  (def config (-> "resources/config.yml"
+                  (yml/parse_config)
+                  (remove-nil-values)))
+  config
+  ;; => {"diff_references" "resources/diff-references.edn" "freq_references" "resources/freq-references.edn" "translators" #py ["freq" "diff"]}
+
+  (def translators (get config "translators"))
+
+  (def ctx (tra/prepare-translations config translators))
+
+  (def corpus (tra/load-edn "tmp/orig-corpus.edn"))
+
+  (count corpus)
+
+  (require
+   '[steno.utils :as utl]
+   '[steno.show :as show])
+
+  (utl/start-proc  show/show-lsign (nth corpus 13))
+
+  (require '[steno.translators.diff :as diff])
+
+  (def lsign (diff/add-numseq (nth corpus 9)))
+
+;;
+  )

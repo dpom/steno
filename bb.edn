@@ -1,28 +1,34 @@
 {:paths ["src"]
  :tasks
- {nrepl  {:doc  "Starts the REPL"
+ {:requires ([babashka.process :refer [shell process check]]
+             [clojure.java.io :as io])
+  nrepl  {:doc  "Start the REPL"
           :task (shell "basilisp nrepl-server")}
-  kondo  {:doc  "Runs kondo linter on default or specific file"
+  kondo  {:doc  "Run kondo linter on default or specific file"
           :task (let [[src-file] *command-line-args*]
                   (shell (str "clj-kondo --lint "
                               (if (empty? src-file)
                                 "src"
                                 src-file))))}
-  style  {:doc  "Checks code style on default or specific file"
+  style  {:doc  "Check code style on default or specific file"
           :task (let [[src-file] *command-line-args*]
                   (shell (str "cljfmt check "
                               (if (empty? src-file)
                                 "src test resources"
                                 src-file))))}
-  format {:doc  "Formats codebase on default or specific file"
+  format {:doc  "Format codebase on default or specific file"
           :task (let [[src-file] *command-line-args*]
                   (shell  (str "cljfmt fix "
                                (if (empty? src-file)
                                  "src test resources"
                                  src-file))))}
+  edn    {:doc "Format an edn file"
+          :task (let [[edn-file] *command-line-args*
+                      edn (slurp edn-file)]
+                  (-> (process {:in edn :out :write :out-file (io/file edn-file)} "cq -i edn -o edn")
+                      check))}
   test   {:doc  "Run tests"
           :task (shell "basilisp test --include-path test")}
   app    {:doc      "Run the application"
           :requires ([clojure.string :as str])
-          :task     (shell (str "uv run steno "
-                                (str/join " " *command-line-args*)))}}}
+          :task     (apply shell "uv run steno" *command-line-args*)}}}

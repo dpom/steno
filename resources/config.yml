@@ -1,2 +1,3 @@
-translators: ["freq"]
-freq_refseqs: "resources/freq-refsequences.edn"
+translators: ["freq", "diff"]
+freq_references: "resources/freq-references.edn"
+diff_references: "resources/diff-references.edn"

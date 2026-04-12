@@ -388,6 +388,8 @@
    '[steno.imageprocessor :as img]
    '[steno.show :as show])
 
+  (add-tap tap-topic (bound-fn* utl/print4tap))
+
   (def imagefile "test/resources/template.png")
 
   (def mtx (extr/extract-glyphs imagefile))

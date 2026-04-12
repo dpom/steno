@@ -7,7 +7,7 @@
 ;; project settings
 (setq ent-project-home (file-name-directory (if load-file-name load-file-name buffer-file-name)))
 (setq ent-project-name "steno")
-(setq ent-clean-regexp "~$")
+(setq ent-clean-regexp ".*~$\\|.*sync-conflict.*$")
 (setq ent-dirclean-regexp "__pycache__" )
 
 (ent-load-default-tasks)

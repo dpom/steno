@@ -58,7 +58,6 @@
 (comment
 
   (require
-   '[steno.utils :as utl]
    '[steno.show :as show])
 
   (def imagefile "test/resources/template.png")
