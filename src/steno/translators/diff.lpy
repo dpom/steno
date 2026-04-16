@@ -1,7 +1,9 @@
 (ns steno.translators.diff
   "Implement a translator based on cnum difference"
   (:require
-   [steno.translator :as tra])
+   [steno.corpus :as corpus]
+   [steno.translator :as tra]
+   [steno.utils :as utl])
   (:import
    [statistics :as st]))
 
@@ -122,8 +124,7 @@
                         (map #(get-best-match ref-numseq* %))
                         (map :best)
                         (make-median-numseq))
-        letter-reference {:letter (:text (first corpus))
-                          :min-len min-len
+        letter-reference {:min-len min-len
                           :max-len max-len
                           :reference ref-numseq
                           :max-bits (* 8 min-len)}]
@@ -133,6 +134,13 @@
                        (map :numseq)
                        (map #(check-letter letter-reference %))
                        (mapv second))))))
+
+(defn- build-diff-ref
+  [letter-path]
+  (-> letter-path
+      corpus/read-corpus
+      build-reference
+      (assoc :letter (utl/get-filename letter-path))))
 
 ;; entry points
 
@@ -149,13 +157,14 @@
     (assoc lsign :letters (conj letters (translate-numseq references cnumseq ltype)))))
 
 (defmethod tra/build-references "diff"
-  [_ _ctx corpus]
-  (let [brf (fn [c] (build-reference (filter #(= (:text %) c) corpus)))
-        type-1 (->> tra/type-1-letters
-                    (map brf)
+  [_ _ctx corpus-dir]
+  (let [type-1 (->> (corpus/walk-corpus corpus-dir tra/type-1? build-diff-ref)
+                    (sort-by :min-len >)
+                    vec)
+        type-0 (->> (corpus/walk-corpus corpus-dir tra/type-0? build-diff-ref)
                     (sort-by :min-len >)
                     vec)]
-    {:type-0 (mapv brf tra/type-0-letters)
+    {:type-0 type-0
      :type-1 type-1
      :min-refseq (:min-len (last type-1))}))
 

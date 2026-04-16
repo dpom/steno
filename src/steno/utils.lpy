@@ -58,15 +58,17 @@
                               row))
                matrix))
 
-(defn save-edn
-  [filename entity]
-  (with-open [w (bio/writer filename)]
-    (edn/write entity w)))
-
 (defn load-edn
+  "Load an entity from an edn file with FILENAME."
   [filename]
   (with-open [r (bio/reader filename)]
     (edn/read r)))
+
+(defn save-edn
+  "Save an ENTITY in an edn file with FILENAME."
+  [filename entity]
+  (with-open [w (bio/writer filename)]
+    (edn/write entity w)))
 
 (defn get-filename
   "Extract the name of a file without extension from a full PATH."

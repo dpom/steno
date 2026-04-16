@@ -1,11 +1,14 @@
 (ns steno.corpus
   (:require
+   [basilisp.core :refer [format]]
+   [basilisp.edn :as edn]
+   [basilisp.io :as bio]
+   [basilisp.string :as str]
+   [steno.converter :as conv]
    [steno.extractor :as extr]
    [steno.imageprocessor :as img]
-   [steno.converter :as conv]
-   [steno.utils :as utl]
-   [basilisp.io :as bio]
-   [basilisp.core :refer [format]]))
+   [steno.utils :as utl])
+  (:import [pathlib :refer [Path]]))
 
 (defn extract-lsign-from-wsing!
   [imagefile outdir row column wsign]
@@ -45,11 +48,43 @@
              (extract-lsign-from-wsing! fileimage outdir row column cell))]
     (walk-matrix! wsigns f!)))
 
+(defn edn-file?
+  "Check if the object is a file and has the .edn extension"
+  [fisier]
+  (and (.is_file fisier)
+       (str/ends-with? (.-name fisier) ".edn")))
+
+(defn read-corpus [corpus-dir]
+  (let [root (Path. corpus-dir)]
+    (->> (iterator-seq (.rglob root "*")) ; rglob returns the generator that iterator-seq consumes correctly
+         (filter edn-file?)
+         (mapv (fn [f]
+                 (edn/read-string (slurp (str f))))))))
+
+(defn dir?
+  [path]
+  (.is_dir path))
+
+(defn walk-corpus
+  "Traverse the directories in CORPUS-DIR and apply the PROCESS-FN function to FILTERed ones.
+  The function is side-efect free and accepts the director as an argument.
+  Returns a lazy collection."
+  [corpus-dir filter-fn process-fn]
+  (let [root (Path. corpus-dir)]
+    (->> (iterator-seq (.rglob root "*")) ; rglob returnează un generator pe care iterator-seq îl consumă corect
+         (filter dir?)
+         (filter filter-fn)
+         (map process-fn))))
+
 (comment
 
   (def imagefile "test/resources/template.png")
 
-  (extract-lsign-from-image! imagefile "tmp/corpus")
+  (def corpus-dir "tmp/corpus")
+
+  (extract-lsign-from-image! imagefile corpus-dir)
+
+  (def corpus (read-corpus corpus-dir))
 
   ;;
   )

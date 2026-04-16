@@ -6488,3 +6488,206 @@ min-refseq
 
 (extract-lsign-from-image imagefile "tmp/corpus")
   #+end_src
+
+* 2026-04-12
+
+- folosesc modulul corpus pentru generare referinte translators:
+  #+begin_src clojure
+(require
+  '[steno.corpus :as corpus]
+  '[steno.utils :as utl]
+  '[steno.show :as show]
+  '[basilisp.io :as bio]
+  '[basilisp.edn :as edn]
+  '[basilisp.string :as str]
+  )
+
+(import [pathlib :refer [Path]])
+
+(def dir-path "tmp/corpus")
+
+(def director (Path. dir-path))
+
+(.glob director "*.edn")
+
+(file-seq (bio/path dir-path))
+
+(defn read-corpus [dir-path]
+  (let [director (Path. dir-path)]
+    (if (.is_dir director)
+      (->> (.glob director "*.edn")
+           (mapv (fn [filepath]
+                   (-> filepath
+                       slurp
+                       edn/read-string))))
+      (println "Error: The specified path is not a directory."))))
+
+(def corpus (read-corpus "tmp/corpus"))
+
+(defn e-fisier-edn? [fisier]
+  ;; Verificăm dacă obiectul este un fișier și are extensia .edn
+  (and (.is_file fisier)
+       (str/ends-with? (.name fisier) ".edn")))
+
+(defn citeste-toate-edn [cale-director]
+  (->> (bio/file cale-director)
+       file-seq
+       (filter e-fisier-edn?)
+       (map (fn [f]
+              {:nume (.name f)
+               :date (edn/read-string (slurp f))}))
+       doall))
+
+;; Utilizare
+(println (citeste-toate-edn "./datele-mele"))
+
+(defn read-corpus [cale-string]
+  (let [root (Path. cale-string)]
+    (->> (file-seq root)
+         (filter e-fisier-edn?)
+         (mapv (fn [f]
+                 (edn/read-string (slurp (str f))))))))
+
+(def corpus (read-corpus "tmp/corpus"))
+  #+end_src
+
+* 2026-04-13
+
+- construiesc corpus:
+  #+begin_src clojure
+(require
+  '[steno.corpus :as corp]
+  '[steno.utils :as utl]
+  '[steno.translator :as tra]
+  '[steno.translators.diff :as dif]
+  '[steno.translators.freq :as fre]
+  '[steno.show :as show])
+
+
+(def corpus-file "tmp/corpus/template-00-00-0.edn")
+
+(def lsign (utl/load-edn corpus-file))
+
+(def dif-ref (utl/load-edn "resources/diff-references.edn"))
+
+(def fre-ref (utl/load-edn "resources/freq-references.edn"))
+
+(def ctx {dif/ctx-key dif-ref
+          fre/ctx-key fre-ref})
+
+(tra/translate "diff" ctx lsign)
+;; => {:fileimage "test/resources/template.png", :column 0, :pos 0, :row 0, :letters [[["c" 0.71875]]], :ltype 1, :lineseq [[0 0 32] [1 0 34] [2 0 34] [3 0 34] [4 0 66] [5 1 36] [6 1 34] [7 1 34] [8 1 34] [9 1 34] [10 1 34] [11 1 34] [12 1 34] [13 1 34] [14 1 34] [15 1 34] [16 1 34] [17 1 34] [18 1 34] [19 1 34] [20 1 34] [21 1 34] [22 1 34] [23 1 2]]}
+
+(tra/translate "freq" ctx lsign)
+;; => {:fileimage "test/resources/template.png", :column 0, :pos 0, :row 0, :letters [[["*" 0]]], :ltype 1, :lineseq [[0 0 32] [1 0 34] [2 0 34] [3 0 34] [4 0 66] [5 1 36] [6 1 34] [7 1 34] [8 1 34] [9 1 34] [10 1 34] [11 1 34] [12 1 34] [13 1 34] [14 1 34] [15 1 34] [16 1 34] [17 1 34] [18 1 34] [19 1 34] [20 1 34] [21 1 34] [22 1 34] [23 1 2]]}
+
+(show/show-lsign lsign)
+
+  #+end_src
+
+* 2026-04-14
+
+- continui constructia corpus:
+  #+begin_src clojure
+(require
+  '[steno.corpus :as corp]
+  '[steno.utils :as utl]
+  '[steno.translator :as tra]
+  '[steno.translators.diff :as dif]
+  '[steno.translators.freq :as fre]
+  '[steno.show :as show])
+
+(def dif-ref (utl/load-edn "resources/diff-references.edn"))
+(def fre-ref (utl/load-edn "resources/freq-references.edn"))
+(def ctx {dif/ctx-key dif-ref
+          fre/ctx-key fre-ref})
+
+(defn translate-lsign [lsign]
+    {:diff (:letters (tra/translate "diff" ctx lsign))
+     :freq (:letters (tra/translate "freq" ctx lsign))})
+
+(def lsign (utl/load-edn "tmp/corpus/template-05-01-1.edn"))
+
+(translate-lsign lsign)
+(show/show-lsign lsign)
+  #+end_src
+
+* 2026-04-16
+
+- refactorizare constructie referinte translatori:
+  #+begin_src clojure
+
+(import [pathlib :refer [Path]])
+
+(def corpus-dir "./resources/corpus")
+
+(defn dir?
+  [path]
+  (.is_dir path))
+
+(defn walk-corpus
+  "Traverse the directories in CORPUS-DIR and apply the PROCESS-FN function to FILTERed ones.
+  The function is side-efect free and accepts the director as an argument.
+  Returns a lazy collection."
+  [corpus-dir filter-fn process-fn]
+  (let [root (Path. corpus-dir)]
+    (->> (iterator-seq (.rglob root "*")) ; rglob returnează un generator pe care iterator-seq îl consumă corect
+         (filter dir?)
+         (filter filter-fn)
+         (map process-fn))))
+
+(require
+  '[steno.corpus :as corpus]
+  '[steno.translator :as tra]
+  '[steno.translators.diff :as diff]
+  '[steno.translators.freq :as freq]
+  '[steno.utils :as utl])
+
+(defn type-0?
+  [path]
+  (tra/type-0-letters (utl/get-filename path)))
+
+(tra/type-0-letters "a")
+;; => "a"
+
+(tra/type-0-letters "p")
+;; => nil
+
+(defn type-1?
+  [path]
+  (tra/type-1-letters (utl/get-filename path)))
+
+(walk-corpus corpus-dir type-0? corpus/read-corpus)
+;; => [[{:fileimage "test/resources/template.png", :column 1, :pos 0, :row 4, :ltype 0, :lineseq [[0 10 136] [0 9 144] [1 8 9] [1 7 144] [2 6 17] [3 5 9] [3 4 144] [4 3 17] [5 2 17] [6 1 33] [7 1 18] [8 0 33] [9 0 34] [10 0 34] [11 0 34] [12 0 50] [13 0 74] [14 1 132] [14 2 72] [15 3 68] [16 4 68] [17 5 36] [18 5 66] [19 6 36] [20 6 34] [21 6 66] [22 7 68] [23 8 68] [24 9 132] [24 10 136] [24 11 72] [25 12 132] [25 13 136] [25 14 136] [25 15 136] [25 16 136] [25 17 9] [24 18 144] [24 19 136] [24 20 9] [23 21 144] [23 22 9] [22 23 144] [22 24 9] [21 25 17] [20 26 144] [20 27 9] [19 28 18] [18 28 33] [17 29 17] [16 30 18] [15 30 34] [14 30 34] [13 30 34] [12 30 34] [11 30 34] [10 30 34] [9 30 34] [8 30 36] [7 29 68] [6 28 68] [5 27 68] [4 26 68] [3 25 68] [2 24 68] [1 23 72] [1 22 136] [1 21 136] [1 20 136] [1 19 132] [0 18 72] [0 17 136] [0 16 136] [0 15 136] [0 14 136] [0 13 136] [0 12 136] [0 11 136]]} {:fileimage "test/resources/template.png", :column 2, :pos 1, :row 4, :ltype 0, :lineseq [[0 9 136] [0 8 144] [1 7 9] [1 6 136] [1 5 144] [2 4 17] [3 3 17] [4 2 33] [5 2 18] [6 1 33] [7 1 34] [8 1 18] [9 0 33] [10 0 34] [11 0 34] [12 0 34] [13 0 34] [14 0 34] [15 0 34] [16 0 34] [17 0 34] [18 0 34] [19 0 34] [20 0 34] [22 1 68] [23 2 132] [23 3 72] [24 4 132] [24 5 72] [25 6 69] [24 7 144] [24 8 9] [23 9 144] [23 10 9] [22 11 144] [22 12 9] [21 13 144] [21 14 136] [21 15 136] [21 16 9] [20 17 144] [20 18 136] [20 19 136] [20 20 9] [19 21 144] [19 22 9] [18 23 17] [17 24 17] [16 25 17] [15 26 18] [14 26 34] [13 26 34] [12 26 34] [11 26 34] [10 26 36] [9 25 66] [8 25 34] [7 25 36] [6 24 68] [5 23 68] [4 22 68] [3 21 72] [3 20 132] [2 19 68] [1 18 72] [1 17 132] [0 16 72] [0 15 136] [0 14 136] [0 13 136] [0 12 136] [0 11 136] [0 10 136]]} {:fileimage "test/resources/template.png", :column 4, :pos 2, :row 4, :ltype 0, :lineseq [[0 13 136] [0 12 144] [1 11 17] [2 10 9] [2 9 144] [3 8 17] [4 7 17] [5 6 17] [6 5 9] [6 4 144] [7 3 17] [8 2 17] [9 1 9] [9 0 144] [17 1 132] [17 2 72] [18 3 68] [19 4 132] [19 5 72] [20 6 132] [20 7 136] [20 8 72] [21 9 68] [22 10 132] [22 11 72] [23 12 132] [23 13 136] [23 14 136] [23 15 136] [23 16 72] [24 17 132] [24 18 9] [23 19 144] [23 20 136] [23 21 9] [22 22 144] [22 23 136] [22 24 9] [21 25 144] [21 26 9] [20 27 17] [19 28 17] [18 29 17] [17 30 17] [16 31 18] [15 31 34] [14 31 34] [13 31 34] [12 31 34] [11 31 34] [10 31 34] [9 31 34] [8 31 34] [7 31 34] [6 31 34] [5 31 34] [4 31 36] [3 30 68] [2 29 68] [1 28 72] [1 27 136] [1 26 132] [0 25 72] [0 24 136] [0 23 136] [0 22 136] [0 21 136] [0 20 136] [0 19 136] [0 18 136] [0 17 136] [0 16 136] [0 15 136] [0 14 136]]} {:fileimage "test/resources/template.png", :column 5, :pos 1, :row 1, :ltype 0, :lineseq [[1 22 9] [1 21 136] [1 20 136] [1 19 136] [1 18 136] [1 17 136] [1 16 136] [1 15 136] [1 14 144] [2 13 9] [2 12 144] [3 11 9] [3 10 144] [4 9 9] [4 8 144] [5 7 9] [5 6 144] [6 5 17] [7 4 17] [8 3 17] [9 2 33] [10 2 18] [11 1 33] [12 1 34] [13 1 18] [14 0 33] [15 0 34] [16 0 34] [17 0 34] [18 0 66] [19 1 36] [20 1 34] [21 1 34] [22 1 34] [23 1 34] [24 1 34] [25 1 66] [26 2 68] [27 3 68] [28 4 68] [29 5 68] [30 6 132] [30 7 72] [31 8 132] [31 9 136] [31 10 136] [31 11 136] [31 12 136] [31 13 136] [31 14 9] [30 15 144] [30 16 136] [30 17 136] [30 18 9] [29 19 144] [29 20 136] [29 21 9] [28 22 144] [28 23 9] [27 24 17] [26 25 144] [26 26 9] [25 27 17] [24 28 17] [23 29 17] [22 30 17] [21 31 18] [20 31 33] [19 32 18] [18 32 34] [17 32 33] [16 33 18] [15 33 34] [14 33 34] [13 33 34] [12 33 34] [11 33 34] [10 33 34] [9 33 33] [8 34 18] [7 34 34] [6 34 36] [5 33 66] [4 33 34] [3 33 34] [2 33 36] [1 32 72] [1 31 132] [0 30 72] [0 29 136] [0 28 136] [0 27 136] [0 26 136] [0 25 136] [0 24 136]]} {:fileimage "test/resources/template.png", :column 2, :pos 1, :row 3, :ltype 0, :lineseq [[0 17 144] [1 16 9] [1 15 136] [1 14 136] [1 13 136] [1 12 136] [1 11 144] [2 10 9] [2 9 144] [3 8 9] [3 7 144] [4 6 9] [4 5 144] [5 4 17] [6 3 17] [7 2 33] [8 2 18] [9 1 33] [10 1 34] [11 1 34] [12 1 18] [13 0 33] [14 0 34] [15 0 34] [16 0 34] [17 0 34] [18 0 34] [19 0 34] [20 0 66] [21 1 36] [22 1 34] [23 1 34] [24 1 34] [25 1 66] [26 2 36] [27 2 66] [28 3 132] [28 4 72] [29 5 132] [29 6 136] [29 7 136] [29 8 136] [29 9 136] [29 10 136] [29 11 136] [29 12 136] [29 13 136] [29 14 9] [28 15 144] [28 16 9] [27 17 17] [26 18 17] [25 19 17] [24 20 18] [23 20 33] [22 21 18] [21 21 34] [20 21 34] [19 21 34] [18 21 34] [17 21 34] [16 21 34] [15 21 34] [14 21 34] [13 21 34] [12 21 34] [11 21 34] [10 21 36] [9 20 66] [8 20 34] [7 20 34] [6 20 34] [5 20 34] [4 20 34] [3 20 36] [2 19 66] [1 19 36]]}] [{:fileimage "test/resources/template.png", :column 4, :pos 1, :row 1, :ltype 0, :lineseq [[1 10 9] [1 9 136] [1 8 136] [1 7 136] [1 6 144] [2 5 9] [2 4 144] [3 3 17] [4 2 17] [5 1 33] [6 1 34] [7 1 18] [8 0 33] [9 0 34] [10 0 66] [11 1 36] [12 1 34] [13 1 34] [14 1 66] [15 2 68] [16 3 68] [17 4 132] [17 5 136] [17 6 136] [17 7 136] [17 8 136] [17 9 136] [17 10 136] [17 11 136] [17 12 9] [16 13 144] [16 14 9] [15 15 17] [14 16 17] [13 17 18] [12 17 34] [11 17 34] [10 17 34] [9 17 33] [8 18 18] [7 18 34] [6 18 34] [5 18 34] [4 18 36] [3 17 66] [2 17 36] [1 16 68] [0 15 72] [0 14 136] [0 13 136] [0 12 136]]} {:fileimage "test/resources/template.png", :column 1, :pos 1, :row 2, :ltype 0, :lineseq [[1 1 144] [2 0 33] [3 0 34] [4 0 34] [5 0 34] [6 0 34] [7 0 34] [8 0 66] [9 1 36] [10 1 34] [11 1 34] [12 1 66] [13 2 36] [14 2 34] [15 2 50] [16 2 74] [17 3 132] [17 4 72] [18 5 132] [18 6 136] [18 7 136] [18 8 72] [19 9 132] [19 10 136] [19 11 136] [19 12 9] [18 13 17] [17 14 17] [16 15 17] [15 16 18] [14 16 34] [13 16 34] [12 16 33] [11 17 18] [10 17 34] [9 17 36] [8 16 66] [7 16 34] [6 16 34] [5 16 36] [4 15 68] [3 14 68] [2 13 68] [1 12 72] [1 11 132] [0 10 72] [0 9 136] [0 8 136] [0 7 136] [0 6 136] [0 5 136] [0 4 136] [0 3 144] [1 2 9]]} {:fileimage "test/resources/template.png", :column 0, :pos 0, :row 2, :ltype 0, :lineseq [[0 5 136] [0 4 144] [1 3 9] [1 2 144] [2 1 33] [3 1 18] [4 0 33] [5 0 34] [6 0 34] [7 0 34] [8 0 34] [9 0 34] [10 0 34] [11 0 34] [12 0 66] [13 1 36] [14 1 66] [15 2 36] [16 2 98] [17 3 140] [17 4 136] [17 5 136] [17 6 136] [17 7 9] [16 8 144] [16 9 136] [16 10 136] [16 11 9] [15 12 17] [14 13 17] [13 14 17] [12 15 17] [11 16 18] [10 16 34] [9 16 34] [8 16 34] [7 16 36] [6 15 66] [5 15 36] [4 14 68] [3 13 68] [2 12 68] [1 11 72] [1 10 132] [0 9 72] [0 8 136] [0 7 136] [0 6 136]]} {:fileimage "test/resources/template.png", :column 0, :pos 1, :row 3, :ltype 0, :lineseq [[0 4 136] [0 3 144] [1 2 33] [2 2 18] [3 1 33] [4 1 34] [5 1 34] [6 1 18] [7 0 33] [8 0 34] [9 0 66] [10 1 36] [11 1 34] [12 1 34] [13 1 34] [14 1 66] [15 2 68] [16 3 68] [17 4 132] [17 5 136] [17 6 136] [17 7 136] [17 8 9] [16 9 18] [15 9 33] [14 10 17] [13 11 18] [12 11 34] [11 11 34] [10 11 34] [9 11 34] [8 11 34] [7 11 34] [6 11 34] [5 11 34] [4 11 33] [3 12 18] [2 12 35] [0 9 9] [0 8 136] [0 7 136] [0 6 136] [0 5 136]]} {:fileimage "test/resources/template.png", :column 1, :pos 0, :row 5, :ltype 0, :lineseq [[1 4 136] [1 3 144] [2 2 17] [3 1 33] [4 1 18] [5 0 33] [6 0 34] [7 0 34] [8 0 34] [9 0 34] [10 0 34] [11 0 66] [12 1 36] [13 1 66] [14 2 132] [14 3 136] [14 4 136] [14 5 136] [14 6 136] [14 7 136] [14 8 9] [13 9 144] [13 10 136] [13 11 9] [12 12 17] [11 13 144] [11 14 9] [10 15 17] [8 15 66] [7 15 36] [6 14 66] [5 14 34] [4 14 36] [3 13 68] [2 12 68] [1 11 72] [1 10 132] [0 9 72] [0 8 136] [0 7 136] [0 6 144] [1 5 9]]} {:fileimage "test/resources/template.png", :column 3, :pos 1, :row 4, :ltype 0, :lineseq [[0 3 136] [0 2 144] [1 1 33] [2 1 18] [3 0 33] [4 0 34] [5 0 34] [6 0 34] [7 0 66] [8 1 36] [9 1 66] [10 2 68] [11 3 132] [11 4 136] [11 5 72] [12 6 132] [12 7 136] [12 8 136] [12 9 136] [9 13 34] [8 13 36] [7 12 66] [6 12 34] [5 12 36] [4 11 66] [3 11 34] [2 11 36] [1 10 68] [0 9 72] [0 8 136] [0 7 136] [0 6 136] [0 5 136] [0 4 136]]}]]
+
+
+(defn build-freq-ref
+  [letter-path]
+  (-> letter-path
+      corpus/read-corpus
+      freq/build-reference
+      (assoc :letter (utl/get-filename letter-path))))
+
+(walk-corpus corpus-dir type-0? build-freq-ref)
+;; => [{:letter "o", :min-match 0.75, :min-len 25, :max-len 32, :reference {33 1, 34 5, 36 2, 68 1, 132 2, 136 8, 9 1, 144 1, 17 3, 18 1}} {:letter "a", :min-match 0.6666666666666667, :min-len 12, :max-len 18, :reference {33 1, 34 4, 36 2, 68 1, 136 5, 17 2}}]
+
+(walk-corpus corpus-dir type-1? build-freq-ref)
+;; => [{:letter "f", :min-match 1.0, :min-len 9, :max-len 9, :reference {66 5, 36 1, 68 3}} {:letter "c", :min-match 0.9230769230769231, :min-len 10, :max-len 10, :reference {18 7}} {:letter "n", :min-match 1.0, :min-len 28, :max-len 28, :reference {128 1, 33 2, 34 3, 36 2, 68 1, 132 1, 72 2, 136 11, 9 1, 17 3, 18 1}} {:letter "j", :min-match 0.7391304347826086, :min-len 24, :max-len 26, :reference {33 2, 34 4, 66 1, 68 1, 132 2, 72 1, 136 6, 144 1, 17 2, 18 2}} {:letter "p", :min-match 0.7142857142857143, :min-len 8, :max-len 12, :reference {34 7, 36 1}} {:letter "s", :min-match 0.8, :min-len 22, :max-len 25, :reference {33 1, 34 3, 66 2, 36 2, 68 1, 132 2, 72 1, 136 5, 144 1, 17 2, 18 3}} {:letter "m", :min-match 0.7843137254901961, :min-len 20, :max-len 27, :reference {33 2, 34 6, 66 1, 36 1, 68 1, 132 1, 72 1, 136 6, 144 1, 17 4}} {:letter "t", :min-match 0.8571428571428572, :min-len 10, :max-len 12, :reference {136 9}} {:letter "l", :min-match 1.0, :min-len 15, :max-len 15, :reference {128 1, 136 7, 9 3, 144 3, 17 1}} {:letter "e", :min-match 1.0, :min-len 10, :max-len 10, :reference {33 3, 34 2, 36 2, 72 1, 136 2}} {:letter "i", :min-match 1.0, :min-len 12, :max-len 12, :reference {34 4, 36 2, 68 1, 136 3, 144 1, 17 1}}]
+
+(defmethod tra/build-references "freq"
+  [_ _ctx corpus-dir]
+  (let [type-1 (->> (walk-corpus corpus-dir type-1? build-freq-ref)
+                    (sort-by :min-len >)
+                    vec)
+         type-0 (->> (walk-corpus corpus-dir type-0? build-freq-ref)
+                    (sort-by :min-len >)
+                    vec)]
+    {:type-0 type-0
+     :type-1 type-1
+     :min-refseq (:min-len (last type-1))}))
+
+(def freq-ref (tra/build-references "freq" nil corpus-dir))
+freq-ref
+;; => {:type-0 [{:letter "o", :min-match 0.75, :min-len 25, :max-len 32, :reference {33 1, 34 5, 36 2, 68 1, 132 2, 136 8, 9 1, 144 1, 17 3, 18 1}} {:letter "a", :min-match 0.6666666666666667, :min-len 12, :max-len 18, :reference {33 1, 34 4, 36 2, 68 1, 136 5, 17 2}}], :type-1 [{:letter "n", :min-match 1.0, :min-len 28, :max-len 28, :reference {128 1, 33 2, 34 3, 36 2, 68 1, 132 1, 72 2, 136 11, 9 1, 17 3, 18 1}} {:letter "j", :min-match 0.7391304347826086, :min-len 24, :max-len 26, :reference {33 2, 34 4, 66 1, 68 1, 132 2, 72 1, 136 6, 144 1, 17 2, 18 2}} {:letter "s", :min-match 0.8, :min-len 22, :max-len 25, :reference {33 1, 34 3, 66 2, 36 2, 68 1, 132 2, 72 1, 136 5, 144 1, 17 2, 18 3}} {:letter "m", :min-match 0.7843137254901961, :min-len 20, :max-len 27, :reference {33 2, 34 6, 66 1, 36 1, 68 1, 132 1, 72 1, 136 6, 144 1, 17 4}} {:letter "l", :min-match 1.0, :min-len 15, :max-len 15, :reference {128 1, 136 7, 9 3, 144 3, 17 1}} {:letter "i", :min-match 1.0, :min-len 12, :max-len 12, :reference {34 4, 36 2, 68 1, 136 3, 144 1, 17 1}} {:letter "c", :min-match 0.9230769230769231, :min-len 10, :max-len 10, :reference {18 7}} {:letter "t", :min-match 0.8571428571428572, :min-len 10, :max-len 12, :reference {136 9}} {:letter "e", :min-match 1.0, :min-len 10, :max-len 10, :reference {33 3, 34 2, 36 2, 72 1, 136 2}} {:letter "f", :min-match 1.0, :min-len 9, :max-len 9, :reference {66 5, 36 1, 68 3}} {:letter "p", :min-match 0.7142857142857143, :min-len 8, :max-len 12, :reference {34 7, 36 1}}], :min-refseq 8}
+
+  #+end_src
