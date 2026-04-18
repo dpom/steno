@@ -110,7 +110,7 @@
 (defmethod tra/prepare-translation "freq"
   [_ config]
   (let [filename (get config "freq_references")
-        references (tra/load-edn filename)]
+        references (utl/load-edn filename)]
     (assoc config ctx-key references)))
 
 (defmethod tra/translate "freq"

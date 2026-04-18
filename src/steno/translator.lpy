@@ -8,7 +8,23 @@
 
 (def type-0-letters #{"o" "a"})
 
-(def type-1-letters #{"p" "t" "c" "f" "l" "m" "n" "j" "s" "e" "i"})
+(def type-1-letters #{"b"
+                      "c"
+                      "d"
+                      "e"
+                      "f"
+                      "g"
+                      "i"
+                      "j"
+                      "l"
+                      "m"
+                      "n"
+                      "p"
+                      "r"
+                      "s"
+                      "t"
+                      "ţ"
+                      "v"})
 
 (defn type-0?
   [path]

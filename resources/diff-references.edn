@@ -1,14 +1,16 @@
-{:type-0 [{:letter "o" :min-match 0.64 :min-len 25 :max-len 32 :max-bits 200 :reference [136 36 18 33 66 72 132 72 132 132 136 132 136 136 34 33 33 34 34 68 132 136 136 136 136]}
-          {:letter "a" :min-match 0.7019230769230769 :min-len 13 :max-len 19 :max-bits 104 :reference [68 34 34 66 68 132 136 41 36 34 36 36 36]}]
- :type-1 [{:letter "j" :min-match 0.7916666666666666 :min-len 24 :max-len 26 :max-bits 192 :reference [34 34 18 33 33 18 144 136 17 144 136 136 136 136 136 136 72 136 72 72 68 68 66 68]}
-          {:letter "s" :min-match 0.8369565217391305 :min-len 23 :max-len 25 :max-bits 184 :reference [34 68 66 36 66 66 68 132 72 132 136 136 136 136 17 136 18 17 18 33 33 33 34]}
-          {:letter "m" :min-match 0.8421052631578947 :min-len 19 :max-len 33 :max-bits 152 :reference [33 17 18 33 33 34 34 34 34 34 36 66 66 68 72 132 136 136 136]}
-          {:letter "n" :min-match 0.8235294117647058 :min-len 17 :max-len 28 :max-bits 136 :reference [132 68 68 36 36 34 34 34 34 33 18 17 17 136 136 136 136]}
-          {:letter "l" :min-match 0.8333333333333334 :min-len 12 :max-len 18 :max-bits 96 :reference [136 136 136 136 136 136 136 136 17 136 17 136]}
-          {:letter "f" :min-match 0.7386363636363636 :min-len 11 :max-len 11 :max-bits 88 :reference [66 68 68 68 66 66 66 66 66 66 66]}
-          {:letter "t" :min-match 0.95 :min-len 10 :max-len 15 :max-bits 80 :reference [136 136 136 136 136 136 136 136 136 136]}
-          {:letter "p" :min-match 0.9166666666666666 :min-len 9 :max-len 12 :max-bits 72 :reference [34 34 34 34 34 34 34 34 34]}
-          {:letter "e" :min-match 0.8055555555555556 :min-len 9 :max-len 12 :max-bits 72 :reference [33 18 136 136 136 72 66 36 36]}
-          {:letter "i" :min-match 0.8333333333333334 :min-len 9 :max-len 12 :max-bits 72 :reference [34 68 72 136 136 136 17 18 33]}
-          {:letter "c" :min-match 0.765625 :min-len 8 :max-len 11 :max-bits 64 :reference [33 18 18 18 33 18 18 18]}]
+{:type-0 [{:letter "o" :min-match 0.65 :min-len 25 :max-len 32 :max-bits 200 :reference [136 33 18 33 34 68 36 66 132 132 136 136 136 17 18 18 33 34 34 68 68 72 132 136 136]}
+          {:letter "a" :min-match 0.71875 :min-len 12 :max-len 18 :max-bits 96 :reference [34 36 66 68 136 136 34 36 36 68 132 136]}]
+ :type-1 [{:letter "n" :min-match 1.0 :min-len 28 :max-len 28 :max-bits 224 :reference [136 136 136 136 136 136 132 72 72 68 36 34 36 33 34 34 33 18 17 17 17 9 136 136 136 136 136 128]}
+          {:letter "j" :min-match 0.71875 :min-len 24 :max-len 26 :max-bits 192 :reference [34 34 33 34 18 18 33 34 34 17 34 136 136 132 132 72 132 132 132 136 72 68 68 68]}
+          {:letter "ţ" :min-match 1.0 :min-len 24 :max-len 24 :max-bits 192 :reference [128 132 136 132 72 132 132 136 132 136 136 136 136 136 136 136 136 17 18 17 144 17 17 33]}
+          {:letter "s" :min-match 0.8863636363636364 :min-len 22 :max-len 25 :max-bits 176 :reference [36 66 36 68 66 68 132 132 136 136 136 136 136 136 18 18 17 18 18 33 33 34]}
+          {:letter "r" :min-match 1.0 :min-len 21 :max-len 21 :max-bits 168 :reference [136 136 17 136 17 136 136 17 144 17 136 17 144 136 9 17 9 136 9 144 9]}
+          {:letter "m" :min-match 0.85 :min-len 20 :max-len 27 :max-bits 160 :reference [144 17 17 17 33 33 34 34 34 34 36 34 66 68 132 136 136 136 136 136]}
+          {:letter "l" :min-match 1.0 :min-len 15 :max-len 15 :max-bits 120 :reference [128 136 17 136 136 144 9 144 136 136 9 144 136 136 9]}
+          {:letter "i" :min-match 1.0 :min-len 12 :max-len 12 :max-bits 96 :reference [34 36 36 68 136 136 136 144 17 34 34 34]}
+          {:letter "c" :min-match 0.75 :min-len 10 :max-len 10 :max-bits 80 :reference [18 18 33 18 18 33 18 18 33 34]}
+          {:letter "t" :min-match 0.925 :min-len 10 :max-len 12 :max-bits 80 :reference [136 136 136 136 136 136 136 136 136 136]}
+          {:letter "e" :min-match 1.0 :min-len 10 :max-len 10 :max-bits 80 :reference [33 34 33 33 136 136 72 36 36 34]}
+          {:letter "f" :min-match 1.0 :min-len 9 :max-len 9 :max-bits 72 :reference [68 68 68 66 66 66 66 66 36]}
+          {:letter "p" :min-match 0.90625 :min-len 8 :max-len 12 :max-bits 64 :reference [34 34 36 34 34 34 34 34]}]
  :min-refseq 8}

@@ -33,17 +33,20 @@
         (let [cell (nth row x)]
           (function! y x cell))))))
 
+(defn convert-glyph
+  "Convert the GLYPH located in the ROW, COLUMN cell of a matrix into a wsign."
+  [row col glyph]
+  {:row row
+   :col col
+   :wsign (-> (:roi glyph)
+              img/process-image
+              conv/image-to-wsign)})
+
 (defn extract-lsign-from-image!
   "Extract all lsigns from a FILEIMAGE and save them as edn files in OUTPUTDIR."
   [fileimage outdir]
   (let [mtx (extr/extract-glyphs fileimage)
-        convert-image (fn [row col glyph]
-                        {:row row
-                         :col col
-                         :wsign (-> (:roi glyph)
-                                    img/process-image
-                                    conv/image-to-wsign)})
-        wsigns (utl/map-glyph-matrix mtx convert-image)
+        wsigns (utl/map-glyph-matrix mtx convert-glyph)
         f! (fn [row column cell]
              (extract-lsign-from-wsing! fileimage outdir row column cell))]
     (walk-matrix! wsigns f!)))

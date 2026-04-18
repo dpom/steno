@@ -147,7 +147,7 @@
 (defmethod tra/prepare-translation "diff"
   [_ config]
   (let [filename (get config "diff_references")
-        references (tra/load-edn filename)]
+        references (utl/load-edn filename)]
     (assoc config ctx-key references)))
 
 (defmethod tra/translate "diff"

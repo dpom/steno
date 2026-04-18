@@ -83,42 +83,6 @@ git config --local  core.hooksPath ./githooks
 #+end_src
 The ~pre-push~ script will block the push if there are style or lint errors in code.
 
-** Tasks
-*** DONE #1 Refactor project layout to use basilisp
-*** DONE #3 Split the page image in word images
-*** DONE #4 Reduce lines to 1 pixel
-*** DONE #5 Convert a word image in a number sequence
-*** DONE #8  Order of word images bug
-SCHEDULED: <2025-06-20 Vi>
-:LOGBOOK:
-CLOCK: [2025-06-20 Vi 12:21]--[2025-06-20 Vi 12:25] =>  0:04
-CLOCK: [2025-06-20 Vi 08:36]--[2025-06-20 Vi 11:22] =>  2:46
-:END:
-*** DONE #9 Build the "standard" sequences
-*** TODO #16 Build an AI translator enhancement
-*** DONE #17 Order of letter in word sequence bug
-SCHEDULED: <2025-06-19 Jo>
-:LOGBOOK:
-CLOCK: [2025-06-19 Jo 09:48]--[2025-06-19 Jo 11:32] =>  1:44
-:END:
-*** DONE #21 Make translator system modular
-SCHEDULED: <2025-06-25 Mi>
-:LOGBOOK:
-CLOCK: [2025-06-25 Mi 14:21]--[2025-06-26 Jo 13:30] => 23:09
-:END:
-*** DONE #23 Improve freq translator
-SCHEDULED: <2025-06-30 Lu>
-:LOGBOOK:
-CLOCK: [2025-07-04 Vi 06:33]
-CLOCK: [2025-07-01 Ma 07:03]--[2025-07-01 Ma 17:41] => 10:38
-:END:
-*** DONE #25 Build a diff translator
-SCHEDULED: <2025-07-09 Mi>
-*** DONE #26 Add a build-references action in cli
-*** DONE #28 Add logging enhancement
-*** #31 Improve references for freq and diff translators enhancement
-
-
 ** References
 
 1. https://en.wikipedia.org/wiki/Duployan_shorthand

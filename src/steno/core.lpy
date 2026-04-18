@@ -1,10 +1,11 @@
 (ns steno.core
   (:require
-   [basilisp.edn :as edn]
+   ;; [basilisp.edn :as edn]
    [basilisp.io :as bio]
    [basilisp.pprint :as pprint]
    [clojure.string :as str]
    [steno.converter :as cnv]
+   [steno.corpus :as corpus]
    [steno.extractor :as ext]
    [steno.imageprocessor :as img]
    [steno.translator :as tra]
@@ -19,6 +20,9 @@
    [os.path :as path]
    [pyaml_env :as yml]
    uuid))
+
+(def default-corpus-dir "resources/corpus")
+(def default-references-dir "resources")
 
 (defn remove-nil-values
   [dict]
@@ -45,24 +49,6 @@
   (.info (:logger config) "application config:")
   (pprint/pprint config))
 
-(defn get-word-images
-  [logger infile]
-  (.info logger "  extract word images")
-  (->> infile
-       ext/extract-word-images
-       (map img/process-image)))
-
-(defn action-extract-words
-  [config]
-  (let [infile (get config "input")
-        outdir (get config "output")
-        logger (:logger config)]
-    (.info logger "Extract and process word images from %s" infile)
-    (let [word-images (get-word-images logger infile)
-          outname (utl/get-filename infile)]
-      (ext/save-word-images! word-images outname outdir)
-      (.info logger "Saved words in %s" outdir))))
-
 (defn display-message
   [logger msg obj]
   (.info logger msg)
@@ -75,63 +61,67 @@
         translators (get config "translators")
         logger (:logger config)]
     (.info logger "Translate %s using %s" infile translators)
-    (let [ctx (tra/prepare-translations config translators)
-          traw (partial tra/translate-wsign ctx translators)]
-      (->> infile
-           (get-word-images logger)
-           (display-message logger "  convert to wsign")
-           (map cnv/image-to-wsign)
-           (display-message logger "  translate wsigns")
-           (map traw)
-           (str/join " ")
-           (spit outfile)))
+    (with-open [of (bio/writer outfile)]
+      (let [ctx (tra/prepare-translations config translators)
+            mtx (ext/extract-glyphs infile)
+            wsigns (utl/map-glyph-matrix mtx corpus/convert-glyph)
+            current-row (atom 0)
+            f! (fn [row _column {:keys [wsign]}]
+                 (let [text (tra/translate-wsign ctx translators wsign)]
+                   (.info logger "text: %s" text)
+                   (when text
+                     (when (> row @current-row)
+                       (.write of "\n")
+                       (reset! current-row row))
+                     (.write of text)
+                     (.write of " "))))]
+        (corpus/walk-matrix! wsigns f!)))
     (.info logger "Saved in %s" outfile)))
-
-(defn save-corpus
-  [filename corpus]
-  (with-open [w (bio/writer filename)]
-    (edn/write corpus w)))
 
 (defn action-make-corpus
   [config]
   (let [infile (get config "input")
-        outfile (get config "output")
+        outdir (get config "output" default-corpus-dir)
         translators (get config "translators")
         logger (:logger config)]
     (.info logger "Make corpus %s using %s" infile translators)
     (let [ctx (tra/prepare-translations config translators)
-          tral (partial tra/translate-lsign ctx translators)]
-      (->> infile
-           (get-word-images logger)
-           (display-message logger "  convert to wsign")
-           (map cnv/image-to-wsign)
-           (display-message logger "  create corpus")
-           (mapcat identity)
-           (display-message logger "  translate lsigns")
-           (map tral)
-           (display-message logger "  remove letters")
-           (map #(dissoc % :letters))
-           (display-message logger "  add uuid")
-           (mapv #(assoc % :id (uuid/uuid4)))
-           (save-corpus outfile)))
-    (.info logger "Saved in %s" outfile)))
+          mtx (ext/extract-glyphs infile)
+          wsigns (utl/map-glyph-matrix mtx corpus/convert-glyph)
+          f! (fn [row column cell]
+               (let [fname (utl/get-filename infile)
+                     ws (:wsign cell)]
+                 (doseq [i (range (count ws))]
+                   (let [lsign (merge (nth ws i)
+                                      {:fileimage infile
+                                       :row row
+                                       :column column
+                                       :pos i})
+                         text (get (tra/translate-lsign ctx translators lsign) :text "@")
+                         lsign-dir (bio/path outdir text)
+
+                         outname (format "%s-%02d-%02d-%01d.edn" fname row column i)
+                         outfile (bio/path lsign-dir outname)]
+                     (.mkdir lsign-dir ** :parents true :exist_ok true)
+                     (utl/save-edn outfile lsign)
+                     (.debug logger "Saved in %s" outfile)))))]
+      (corpus/walk-matrix! wsigns f!))))
 
 (defn action-make-references
   [config]
-  (let [corpus (tra/load-edn (get config "input"))
-        outdir (get config "output")
+  (let [corpus-dir (get config "input" default-corpus-dir)
+        outdir (get config "output" default-references-dir)
         translators (get config "translators")
         logger (:logger config)]
     (doseq [tr translators]
       (.info logger "Make references for %s" tr)
-      (let [references (tra/build-references tr config corpus)
+      (let [references (tra/build-references tr config corpus-dir)
             outfile (bio/path outdir (str tr "-references.edn"))]
-        (tra/save-edn outfile references)
+        (utl/save-edn outfile references)
         (.info logger "saved in %s" outfile)))))
 
 (def actions
-  {"extract-words"   action-extract-words
-   "help"            action-help
+  {"help"            action-help
    "list-config"     action-list-config
    "make-corpus"     action-make-corpus
    "make-references" action-make-references
@@ -179,20 +169,6 @@
   (def translators (get config "translators"))
 
   (def ctx (tra/prepare-translations config translators))
-
-  (def corpus (tra/load-edn "tmp/orig-corpus.edn"))
-
-  (count corpus)
-
-  (require
-   '[steno.utils :as utl]
-   '[steno.show :as show])
-
-  (utl/start-proc  show/show-lsign (nth corpus 13))
-
-  (require '[steno.translators.diff :as diff])
-
-  (def lsign (diff/add-numseq (nth corpus 9)))
 
 ;;
   )
