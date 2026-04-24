@@ -3,63 +3,83 @@
   (:require
    [steno.utils :as utl])
   (:import
+   [io :as io]
    [numpy :as np]
    [matplotlib :as matp]
-   [matplotlib.pyplot :as plt]))
+   [matplotlib.pyplot :as plt]
+   [os :as os]
+   [subprocess :as sp]
+   [tempfile :as tf]))
 
-(matp/use "tkagg")
+(defn display-image-stream
+  "Save bytes to a temporary file and instruct Emacs to read it."
+  [img-bytes]
+  (let [tmp (tf/NamedTemporaryFile ** :suffix ".png" :mode "wb" :delete false)
+        tmp-path (.- tmp name)]
+    (try
+      (.write tmp img-bytes)
+      (.flush tmp)
+      (.close tmp)
+
+      (let [lisp-cmd (str "(local/display-image-from-file \"" tmp-path "\")")]
+        (sp/run ["emacsclient" "-n" "-e" lisp-cmd]))
+
+      (catch Exception e
+        (println "Error sending to Emacs:" (str e))))))
+
+(defn- figure-to-bytes
+  "Convert the current figure into a tight PNG byte format, preserving the axes."
+  []
+  (let [buf (io/BytesIO)]
+    ;; bbox_inches "tight" asigură că axele nu sunt tăiate la salvare
+    (plt/savefig buf ** :format "png" :bbox_inches "tight")
+    (plt/close)
+    (.getvalue buf)))
 
 (defn show-image
-  "Display an image using pyplot."
+  "Display an image using pyplot cu axe vizibile."
   [img]
   (plt/imshow img ** :cmap "gray")
-  (plt/show))
+  (display-image-stream (figure-to-bytes)))
 
 (defn show-two-images
   "Display two images side by side."
   [[img1 img2]]
-  (let [[_ axs] (plt/subplots 1 2 ** :figsize [200 200])]
+  (let [[_ axs] (plt/subplots 1 2 ** :figsize [10 5])]
     (.imshow (first axs) img1 ** :cmap "gray")
     (.imshow (second axs) img2 ** :cmap "gray")
-    (plt/show)))
+    (display-image-stream (figure-to-bytes))))
 
 (defn show-matrix
   "Display a binary matrix."
   [mat]
   (plt/imshow mat ** :cmap "gray" :interpolation "nearest")
-  (plt/show))
+  (display-image-stream (figure-to-bytes)))
 
 (defn show-two-matrices
   "Display two matrices side by side."
   [[img1 img2]]
-  (let [[_ axs] (plt/subplots 1 2 ** :figsize [100 100])]
+  (let [[_ axs] (plt/subplots 1 2 ** :figsize [10 5])]
     (.imshow (first axs) img1 ** :cmap "gray" :vmin 0 :vmax 1)
     (.imshow (second axs) img2 ** :cmap "gray" :vmin 0 :vmax 1)
-    ;; (plt/tight_layout)
-    (plt/show)))
+    (plt/tight_layout)
+    (display-image-stream (figure-to-bytes))))
 
 (defn show-lsign
   [{:keys [lineseq]}]
   (show-matrix (utl/lineseq-to-matrix lineseq)))
 
 (defn show-glyph-matrix
-  "Afișează GLYPHS din lista de liste într-o grilă."
+  "Afișează GLYPHS într-o grilă, păstrând axele vizibile."
   [glyphs]
   (let [num-rows (count glyphs)
         num-cols (if (pos? num-rows) (apply max (map count glyphs)) 0)
-        ;; Creăm figura
         [fig axs] (plt/subplots num-rows num-cols ** :figsize [20 20])
-        ;; Convertim axele într-o listă plată (Python list) pentru a evita problemele NumPy cu 'nth'
         flat-axs (cond
                    (not (instance? np/ndarray axs)) [axs]
                    :else (vec (.flatten axs)))]
-    ;; Dezactivăm axele vizibile (grila goală)
-    (doseq [ax flat-axs]
-      (.axis ax "off"))
-    ;; Folosim i și j pentru a parcurge matricea
     (doseq [i (range num-rows)]
       (let [row (nth glyphs i)
-            ;; Forțăm num-cols în acest context local pentru a evita eroarea de macroexpansiune
             cols-count num-cols]
         (doseq [j (range (count row))]
           (let [idx (+ (* i cols-count) j)
@@ -68,4 +88,4 @@
             (when (and ax (:roi glyph))
               (.imshow ax (:roi glyph) ** :cmap "gray"))))))
     (plt/tight_layout)
-    (plt/show)))
+    (display-image-stream (figure-to-bytes))))

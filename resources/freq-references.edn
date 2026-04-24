@@ -1,16 +1,1 @@
-{:type-0 [{:letter "o" :min-match 0.75 :min-len 25 :max-len 32 :reference {33 1 34 5 36 2 68 1 132 2 136 8 9 1 144 1 17 3 18 1}}
-          {:letter "a" :min-match 0.6666666666666667 :min-len 12 :max-len 18 :reference {33 1 34 4 36 2 68 1 136 5 17 2}}]
- :type-1 [{:letter "n" :min-match 1.0 :min-len 28 :max-len 28 :reference {128 1 33 2 34 3 36 2 68 1 132 1 72 2 136 11 9 1 17 3 18 1}}
-          {:letter "j" :min-match 0.7391304347826086 :min-len 24 :max-len 26 :reference {33 2 34 4 66 1 68 1 132 2 72 1 136 6 144 1 17 2 18 2}}
-          {:letter "ţ" :min-match 1.0 :min-len 24 :max-len 24 :reference {128 1 33 1 132 5 72 1 136 10 144 1 17 4 18 1}}
-          {:letter "s" :min-match 0.8 :min-len 22 :max-len 25 :reference {33 1 34 3 66 2 36 2 68 1 132 2 72 1 136 5 144 1 17 2 18 3}}
-          {:letter "r" :min-match 1.0 :min-len 21 :max-len 21 :reference {136 8 9 4 144 3 17 6}}
-          {:letter "m" :min-match 0.7843137254901961 :min-len 20 :max-len 27 :reference {33 2 34 6 66 1 36 1 68 1 132 1 72 1 136 6 144 1 17 4}}
-          {:letter "l" :min-match 1.0 :min-len 15 :max-len 15 :reference {128 1 136 7 9 3 144 3 17 1}}
-          {:letter "i" :min-match 1.0 :min-len 12 :max-len 12 :reference {34 4 36 2 68 1 136 3 144 1 17 1}}
-          {:letter "c" :min-match 0.9230769230769231 :min-len 10 :max-len 10 :reference {18 7}}
-          {:letter "t" :min-match 0.8571428571428572 :min-len 10 :max-len 12 :reference {136 9}}
-          {:letter "e" :min-match 1.0 :min-len 10 :max-len 10 :reference {33 3 34 2 36 2 72 1 136 2}}
-          {:letter "f" :min-match 1.0 :min-len 9 :max-len 9 :reference {66 5 36 1 68 3}}
-          {:letter "p" :min-match 0.7142857142857143 :min-len 8 :max-len 12 :reference {34 7 36 1}}]
- :min-refseq 8}
+{:type-0 [{:letter "o" :min-match 0.679245283018868 :min-len 25 :max-len 35 :reference {33 2 34 4 66 1 36 1 68 1 132 2 72 2 136 8 9 1 17 3 18 1}} {:letter "a" :min-match 0.5333333333333333 :min-len 12 :max-len 38 :reference {33 1 34 3 66 1 36 2 68 1 132 1 72 1 136 6 17 1 18 1}}] :type-1 [{:letter "n" :min-match 0.8518518518518519 :min-len 28 :max-len 29 :reference {33 4 34 4 36 2 68 2 132 3 72 2 136 11 18 3}} {:letter "j" :min-match 0.7391304347826086 :min-len 24 :max-len 26 :reference {33 2 34 4 66 1 68 1 132 2 72 1 136 6 144 1 17 2 18 2}} {:letter "ţ" :min-match 0.8372093023255813 :min-len 22 :max-len 25 :reference {33 1 132 3 72 1 136 13 17 2 18 1}} {:letter "s" :min-match 0.5957446808510638 :min-len 22 :max-len 27 :reference {33 1 34 3 66 2 36 2 68 2 132 2 72 1 136 5 17 2 18 2}} {:letter "m" :min-match 0.625 :min-len 20 :max-len 32 :reference {33 2 34 5 66 1 36 1 132 1 72 1 136 7 17 3 18 1}} {:letter "l" :min-match 0.72 :min-len 15 :max-len 18 :reference {136 7 9 3 144 2 17 4}} {:letter "r" :min-match 0.5769230769230769 :min-len 14 :max-len 34 :reference {136 12 9 2 144 1 17 3}} {:letter "i" :min-match 0.8888888888888888 :min-len 12 :max-len 13 :reference {34 4 136 3 17 3}} {:letter "c" :min-match 0.2666666666666667 :min-len 10 :max-len 16 :reference {33 1 17 4 18 1}} {:letter "d" :min-match 0.5161290322580645 :min-len 10 :max-len 33 :reference {132 2 136 21}} {:letter "t" :min-match 0.5454545454545454 :min-len 10 :max-len 19 :reference {132 1 136 7}} {:letter "e" :min-match 0.7058823529411764 :min-len 10 :max-len 14 :reference {33 1 34 2 36 1 68 1 136 2 18 1}} {:letter "f" :min-match 0.4444444444444444 :min-len 9 :max-len 14 :reference {68 2 72 1 136 3}} {:letter "p" :min-match 0.16666666666666663 :min-len 8 :max-len 19 :reference {34 2 36 1 136 1}}] :min-refseq 8}

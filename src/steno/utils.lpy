@@ -68,7 +68,8 @@
   "Save an ENTITY in an edn file with FILENAME."
   [filename entity]
   (with-open [w (bio/writer filename)]
-    (edn/write entity w)))
+    (edn/write entity w)
+    (.write w "\n")))
 
 (defn get-filename
   "Extract the name of a file without extension from a full PATH."
