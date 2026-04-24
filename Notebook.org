@@ -6692,3 +6692,169 @@ freq-ref
 
   #+end_src
 - refactorizare cli
+
+* 2026-04-18
+
+- completez corpus:
+  #+begin_src clojure
+ (require
+  '[steno.utils :as utl]
+  '[steno.show :as show])
+
+(def lsign (utl/load-edn "tmp/yoga1/d/yoga1-04-01-1.edn"))
+
+(show/show-lsign lsign)
+  #+end_src
+
+* 2026-04-20
+
+- noi fisiere:
+  #+begin_src clojure
+  (def imagefile "tmp/yoga1_12.png")
+
+  (def mtx (extract-glyphs imagefile))
+
+  (save-glyphs! mtx "yoga1_12" "tmp/yoga1_12")
+
+  (utl/start-proc show/show-glyph-matrix mtx)
+
+
+  #+end_src
+
+* 2026-04-21
+
+- extrag noi elemente pt corpus:
+  #+begin_src clojure
+ (require
+  '[steno.utils :as utl]
+  '[steno.show :as show])
+
+(def lsign (utl/load-edn "tmp/corpus/d/yoga1-21-24-1.edn"))
+
+(def lsign (utl/load-edn "tmp/corpus/d/yoga1_12-08-04-3.edn"))
+
+(def lsign (utl/load-edn "resources/corpus/b/yoga1-17-08-1.edn"))
+
+(show/show-lsign lsign)
+
+(require
+  '[basilisp.shell :refer [sh]]
+  '[basilisp.string :as str])
+
+(import [base64 :as b64])
+
+(defn display-image-stream [img-bytes]
+  "Trimite un byte-array către Emacs via emacsclient."
+  (let [;; Convertim bytes în string Base64 (Python interop)
+        b64-str (.decode (b64/b64encode b64 img-bytes) "utf-8")
+        ;; Construim apelul Lisp
+        lisp-cmd (str "(local/display-image-stream \"" b64-str "\")")]
+
+    ;; Apelăm emacsclient
+    (try
+      (sh "emacsclient" "--eval" lisp-cmd)
+      (catch Exception e
+        (println "Eroare: Asigură-te că (server-start) este rulat în Emacs!" (.getMessage e))))))
+  #+end_src
+
+* 2026-04-24
+
+- o noua metoda de afisare:
+  #+begin_src clojure
+  (import [base64 :as b64]
+           [subprocess :as sp])
+
+(defn display-image-stream
+  "Trimite un byte-array (imagine raw) către Emacs."
+  [img-bytes]
+  (let [;; Codificăm bytes în base64 (Python returnează bytes)
+        b64-bytes (b64/b64encode img-bytes)
+        ;; Convertim bytes în string UTF-8 pentru a-l trimite prin emacsclient
+        b64-str (.decode b64-bytes "utf-8")
+        ;; Construim apelul Lisp
+        lisp-cmd (str "(local/display-image-stream \"" b64-str "\")")]
+
+    ;; Folosim subprocess din Python pentru a rula emacsclient
+    (try
+      (sp/run ["emacsclient" "-n" "--eval" lisp-cmd] :check true)
+      (catch Exception e
+        (println "Eroare la trimiterea către Emacs:" (str e))))))
+
+(require
+  '[basilisp.io :as bio])
+
+
+(defn display-image-stream [img-bytes]
+  (let [b64-bytes (b64/b64encode img-bytes)
+        b64-str (.decode b64-bytes "utf-8")
+        ;; Escapăm string-ul pentru a evita problemele cu ghilimelele în Lisp
+        lisp-cmd (str "(steno-display-image-stream \"" b64-str "\")")]
+    (try
+      ;; Folosim explicit vectorul de argumente.
+      ;; Am scos :check true pentru a evita ambiguitatea pozițională,
+      ;; subprocess.run va arunca oricum excepție dacă binarul nu există.
+      (sp/run ["emacsclient" "-n" "-e" lisp-cmd])
+      (catch Exception e
+        (println "Eroare la trimiterea către Emacs:" (str e))))))
+
+
+(let [img-path "tmp/yoga1.png"]
+  (with-open [f (python/open img-path ** :mode "rb")]
+    (let [img-bytes (.read f)]
+      (display-image-stream img-bytes))))
+
+  (import [subprocess :as sp]
+           [tempfile :as tf]
+           [os :as os])
+
+(defn display-image-stream
+  "Salvează bytes într-un fișier temporar și anunță Emacs să îl citească."
+  [img-bytes]
+  (let [;; Cream un fișier temporar care se șterge automat (sau manual)
+        tmp (tf/NamedTemporaryFile :suffix ".png" :delete false)
+        tmp-path (.name tmp)]
+    (try
+      ;; 1. Scriem bytes în fișier
+      (.write tmp img-bytes)
+      (.close tmp)
+
+      ;; 2. Trimitem DOAR calea către Emacs (string scurt, nu crapă)
+      (let [lisp-cmd (str "(local/display-image-from-file \"" tmp-path "\")")]
+        (sp/run ["emacsclient" "-n" "-e" lisp-cmd]))
+
+      ;; Opțional: Putem adăuga un mecanism de curățare, dar Emacs are nevoie
+      ;; de fișier pentru a randa. Fișierele din /tmp se curăță la restart.
+
+      (catch Exception e
+        (println "Eroare:" (str e))))))
+
+(ns steno.display
+  (:import [subprocess :as sp]
+           [tempfile :as tf]
+           [os :as os]))
+
+
+(defn display-image-stream
+  "Salvează bytes într-un fișier temporar și anunță Emacs să îl citească."
+  [img-bytes]
+  (let [;; Folosim mapa cu # pentru kwargs
+        tmp (tf/NamedTemporaryFile ** :suffix ".png" :mode "wb" :delete false)
+        tmp-path (.- tmp name)]
+    (try
+      (.write tmp img-bytes)
+      (.flush tmp)
+      (.close tmp)
+
+      (let [lisp-cmd (str "(local/display-image-from-file \"" tmp-path "\")")]
+        (sp/run ["emacsclient" "-n" "-e" lisp-cmd]))
+
+      (catch Exception e
+        (println "Eroare la trimiterea către Emacs:" (str e))))))
+
+
+(let [img-path "tmp/yoga1.png"]
+  (with-open [f (python/open img-path ** :mode "rb")]
+    (let [img-bytes (.read f)]
+      (display-image-stream img-bytes))))
+
+  #+end_src

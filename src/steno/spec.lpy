@@ -9,7 +9,7 @@
 (def X nat-int?)
 (def Y nat-int?)
 
-(def CNUM [:and int? #(< % 127)  #(> % -128)])
+(def CNUM [:and nat-int? #(< % 256)])
 
 (def CNUMSEQ [:sequential CNUM])
 

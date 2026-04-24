@@ -66,6 +66,7 @@
 
   (save-glyphs! mtx "test" "tmp/test-save")
 
-  (utl/start-proc show/show-glyph-matrix mtx)
-;;
+  (show/show-glyph-matrix mtx)
+
+  ;;
   )

@@ -381,14 +381,13 @@
   (compare-cell [46 8] [22 9])
   ;; => 1
 
-  (require '[steno.utils :as utl])
-
   (require
    '[steno.extractor :as extr]
    '[steno.imageprocessor :as img]
-   '[steno.show :as show])
+   '[steno.show :as show]
+   '[steno.utils :as utl])
 
-  (add-tap tap-topic (bound-fn* utl/print4tap))
+  (add-tap (bound-fn* utl/print4tap))
 
   (def imagefile "test/resources/template.png")
 

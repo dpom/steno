@@ -34,7 +34,7 @@
 
   (def mtx2 (utl/map-glyph-matrix mtx pimage))
 
-  (utl/start-proc show/show-glyph-matrix mtx2)
+  (show/show-glyph-matrix mtx2)
 
 ;;
   )
