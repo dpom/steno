@@ -18,6 +18,7 @@
    [logging :as log]
    os
    [os.path :as path]
+   [pathlib :refer [Path]]
    [pyaml_env :as yml]
    uuid))
 
@@ -97,7 +98,8 @@
                                        :row row
                                        :column column
                                        :pos i})
-                         text (get (tra/translate-lsign ctx translators lsign) :text "@")
+                         text* (get (tra/translate-lsign ctx translators lsign) :text)
+                         text (or text* "@")
                          lsign-dir (bio/path outdir text)
 
                          outname (format "%s-%02d-%02d-%01d.edn" fname row column i)
@@ -108,6 +110,7 @@
       (corpus/walk-matrix! wsigns f!))))
 
 (defn action-make-references
+  "Build translators references using a corpus."
   [config]
   (let [corpus-dir (get config "input" default-corpus-dir)
         outdir (get config "output" default-references-dir)
@@ -120,12 +123,40 @@
         (utl/save-edn outfile references)
         (.info logger "saved in %s" outfile)))))
 
+(defn action-save-glyphs
+  "Save each glyphs of an image as a png file in the output directory."
+  [config]
+  (let [infile (get config "input")
+        outdir (get config "output")
+        mtx (ext/extract-glyphs infile)
+        name (utl/get-filename infile)]
+    (ext/save-glyphs! mtx name outdir)))
+
+(defn renormalize-lsigns!
+  [dir]
+  (let [lsign-files (->> (iterator-seq (.rglob (Path. dir) "*.edn")))]
+    (doseq [lf lsign-files]
+      (->> lf
+           utl/load-edn
+           cnv/normalize2-lsign
+           (utl/save-edn lf)))))
+
+(defn action-renormalize-corpus
+  "Renormalize the corpus lsigns."
+  [config]
+  (let [corpus-dir (get config "input" default-corpus-dir)
+        logger (:logger config)]
+    (.info logger "Renormalize %s corpus" corpus-dir)
+    (corpus/walk-corpus! corpus-dir identity renormalize-lsigns!)))
+
 (def actions
-  {"help"            action-help
-   "list-config"     action-list-config
-   "make-corpus"     action-make-corpus
-   "make-references" action-make-references
-   "translate"       action-translate})
+  {"help"               action-help
+   "list-config"        action-list-config
+   "make-corpus"        action-make-corpus
+   "make-references"    action-make-references
+   "renormalize-corpus" action-renormalize-corpus
+   "save-glyphs"        action-save-glyphs
+   "translate"          action-translate})
 
 (defn cli
   []

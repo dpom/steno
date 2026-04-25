@@ -10,7 +10,7 @@
    [steno.utils :as utl])
   (:import [pathlib :refer [Path]]))
 
-(defn extract-lsign-from-wsing!
+(defn extract-lsign-from-wsign!
   [imagefile outdir row column wsign]
   (let [fname (utl/get-filename imagefile)
         ws (:wsign wsign)]
@@ -48,7 +48,7 @@
   (let [mtx (extr/extract-glyphs fileimage)
         wsigns (utl/map-glyph-matrix mtx convert-glyph)
         f! (fn [row column cell]
-             (extract-lsign-from-wsing! fileimage outdir row column cell))]
+             (extract-lsign-from-wsign! fileimage outdir row column cell))]
     (walk-matrix! wsigns f!)))
 
 (defn edn-file?
@@ -79,6 +79,17 @@
          (filter filter-fn)
          (map process-fn))))
 
+(defn walk-corpus!
+  "Traverse the directories in CORPUS-DIR and apply the PROCESS-FN function to FILTERed ones.
+  The function has side-efect and accepts the director as an argument."
+  [corpus-dir filter-fn process-fn!]
+  (let [root (Path. corpus-dir)
+        dirs (->> (iterator-seq (.rglob root "*")) ; rglob returnează un generator pe care iterator-seq îl consumă corect
+                  (filter dir?)
+                  (filter filter-fn))]
+    (doseq [d dirs]
+      (process-fn! d))))
+
 (comment
 
   (def imagefile "test/resources/template.png")
@@ -88,6 +99,11 @@
   (extract-lsign-from-image! imagefile corpus-dir)
 
   (def corpus (read-corpus corpus-dir))
+
+  (defn p! [dir]
+    (println dir))
+
+  (walk-corpus! corpus-dir identity p!)
 
   ;;
   )

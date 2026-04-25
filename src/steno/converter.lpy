@@ -349,7 +349,7 @@
     (assoc lsign :lineseq (reverse lineseq))
     lsign))
 
-(defn- normalize2-lsign
+(defn normalize2-lsign
   "Shift LSIGN lineseq to axe origin."
   [{:keys [lineseq] :as lsign}]
   (let [x-min (apply min (map first lineseq))

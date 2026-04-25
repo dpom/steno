@@ -74,7 +74,7 @@
   [glyphs]
   (let [num-rows (count glyphs)
         num-cols (if (pos? num-rows) (apply max (map count glyphs)) 0)
-        [fig axs] (plt/subplots num-rows num-cols ** :figsize [20 20])
+        [_fig axs] (plt/subplots num-rows num-cols ** :figsize [20 20])
         flat-axs (cond
                    (not (instance? np/ndarray axs)) [axs]
                    :else (vec (.flatten axs)))]

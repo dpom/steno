@@ -6858,3 +6858,62 @@ freq-ref
       (display-image-stream img-bytes))))
 
   #+end_src
+
+* 2026-04-25
+
+- ma intorc la completarea corpus:
+  #+begin_src clojure
+ (require
+  '[steno.utils :as utl]
+  '[steno.show :as show])
+
+;; (def lsign (utl/load-edn "resources/corpus/b/yoga1-17-08-1.edn"))
+
+(def lsign (utl/load-edn "tmp/corpus/ct/yoga1-17-09-5.edn"))
+
+(show/show-lsign lsign)
+
+  #+end_src
+- implementez o functie de renormalizare a elementelor corpus:
+  #+begin_src clojure
+(require
+  '[steno.corpus :as corpus]
+  '[basilisp.edn :as edn]
+  '[steno.utils :as utl]
+  '[steno.converter :as conv])
+
+(import [pathlib :refer [Path]])
+
+(defn walk-corpus!
+  "Traverse the directories in CORPUS-DIR and apply the PROCESS-FN function to FILTERed ones.
+  The function has side-efect and accepts the director as an argument."
+  [corpus-dir filter-fn process-fn!]
+  (let [root (Path. corpus-dir)
+        dirs (->> (iterator-seq (.rglob root "*")) ; rglob returnează un generator pe care iterator-seq îl consumă corect
+         (filter corpus/dir?)
+         (filter filter-fn))]
+         (doseq [d dirs]
+           (process-fn! d))))
+
+(def corpus-dir "resources/corpus")
+
+(defn p! [dir]
+  (println dir))
+
+(walk-corpus! corpus-dir identity p!)
+
+(iterator-seq (.rglob (Path. "resources/corpus/d" ) "*.edn"))
+;; => (resources/corpus/d/yoga1-16-01-1.edn resources/corpus/d/yoga1-04-01-2.edn resources/corpus/d/yoga1_12-16-06-1.edn resources/corpus/d/yoga1-17-05-4.edn resources/corpus/d/yoga1_12-01-03-1.edn resources/corpus/d/yoga1_12-19-00-2.edn resources/corpus/d/yoga1-05-02-7.edn resources/corpus/d/yoga1-03-01-8.edn resources/corpus/d/yoga1-16-08-2.edn resources/corpus/d/yoga1_12-10-04-0.edn resources/corpus/d/yoga1-17-09-6.edn resources/corpus/d/yoga1-09-27-0.edn resources/corpus/d/yoga1-17-10-0.edn resources/corpus/d/yoga1_12-09-11-4.edn resources/corpus/d/yoga1-03-01-5.edn)
+
+
+(defn renormalize-lsigns!
+  [dir]
+  (let [lsign-files (->> (iterator-seq (.rglob (Path. dir) "*.edn")))]
+    (doseq [lf lsign-files]
+      (->> lf
+          utl/load-edn
+          conv/normalize2-lsign
+          (utl/save-edn lf)))))
+
+(walk-corpus! corpus-dir identity renormalize-lsigns!)
+  #+end_src
