@@ -23,3 +23,5 @@ wheels/
 /tmp/
 #*
 /Steno.org
+/.clj-kondo/
+/.lsp/

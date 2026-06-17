@@ -85,6 +85,7 @@
         outdir (get config "output" default-corpus-dir)
         translators (get config "translators")
         logger (:logger config)]
+    (.mkdir (Path. outdir) ** :parents true :exist_ok true)
     (.info logger "Make corpus %s using %s" infile translators)
     (let [ctx (tra/prepare-translations config translators)
           mtx (ext/extract-glyphs infile)
@@ -116,6 +117,7 @@
         outdir (get config "output" default-references-dir)
         translators (get config "translators")
         logger (:logger config)]
+    (.mkdir (Path. outdir) ** :parents true :exist_ok true)
     (doseq [tr translators]
       (.info logger "Make references for %s" tr)
       (let [references (tra/build-references tr config corpus-dir)
@@ -130,6 +132,7 @@
         outdir (get config "output")
         mtx (ext/extract-glyphs infile)
         name (utl/get-filename infile)]
+    (.mkdir (Path. outdir) ** :parents true :exist_ok true)
     (ext/save-glyphs! mtx name outdir)))
 
 (defn renormalize-lsigns!

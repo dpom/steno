@@ -6917,3 +6917,18 @@ freq-ref
 
 (walk-corpus! corpus-dir identity renormalize-lsigns!)
   #+end_src
+
+* 2026-04-28
+
+- ma intorc la completarea corpus:
+  #+begin_src clojure
+ (require
+  '[steno.utils :as utl]
+  '[steno.show :as show])
+
+;; (def lsign (utl/load-edn "resources/corpus/b/yoga1-17-08-1.edn"))
+
+(def lsign (utl/load-edn "tmp/corpus/ft/yoga1-16-03-3.edn"))
+
+(show/show-lsign lsign)
+  #+end_src

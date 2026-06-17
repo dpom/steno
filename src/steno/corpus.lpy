@@ -70,7 +70,7 @@
 
 (defn walk-corpus
   "Traverse the directories in CORPUS-DIR and apply the PROCESS-FN function to FILTERed ones.
-  The function is side-efect free and accepts the director as an argument.
+   The function is side-effect free and accepts the directory as an argument.
   Returns a lazy collection."
   [corpus-dir filter-fn process-fn]
   (let [root (Path. corpus-dir)]
@@ -81,7 +81,7 @@
 
 (defn walk-corpus!
   "Traverse the directories in CORPUS-DIR and apply the PROCESS-FN function to FILTERed ones.
-  The function has side-efect and accepts the director as an argument."
+   The function has side-effect and accepts the directory as an argument."
   [corpus-dir filter-fn process-fn!]
   (let [root (Path. corpus-dir)
         dirs (->> (iterator-seq (.rglob root "*")) ; rglob returnează un generator pe care iterator-seq îl consumă corect
