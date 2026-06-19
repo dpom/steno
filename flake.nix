@@ -3,7 +3,7 @@
 
   inputs = {
     flake-parts.url = "github:hercules-ci/flake-parts";
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
     mynixpkgs.url = "git+https://github.com/dpom/mynixpkgs";
   };
 
@@ -22,7 +22,7 @@
         }:
         let
           mypkgs = mynixpkgs.packages.${system};
-          python = pkgs.python312Full;
+          python = pkgs.python312;
           tkinter = pkgs.python312Packages.tkinter;
         in
         {
@@ -32,6 +32,7 @@
               pkgs.clj-kondo
               pkgs.cljfmt
               pkgs.cq
+              pkgs.openspec
               pkgs.uv
               python
               tkinter
