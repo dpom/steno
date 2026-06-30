@@ -1,5 +1,7 @@
 # steno — Agentic Coding Guide
 
+- For OpenSpec propose/apply/verify/archive workflows, use the local `openspec-git-discipline` agent skill to enforce proposal commits before apply and merge-before-archive discipline.
+
 ## Project Overview
 
 Purpose: steno is a personal project to digitalize stenographic (shorthand) writings in the Duployer system. It converts scanned page images of handwritten shorthand into plain text. The pipeline is:
