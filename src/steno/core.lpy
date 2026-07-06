@@ -11,6 +11,7 @@
    [steno.translator :as tra]
    [steno.translators.diff]
    [steno.translators.freq]
+   [steno.translators.knn]
    [steno.utils :as utl])
   (:import
    [argparse :as arg]

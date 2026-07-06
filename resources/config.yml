@@ -1,3 +1,5 @@
 translators: ["freq", "diff"]
 freq_references: "resources/freq-references.edn"
 diff_references: "resources/diff-references.edn"
+knn_references: "resources/knn-references.edn"
+knn_k: 3

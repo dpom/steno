@@ -2,7 +2,8 @@
   (:require
    [basilisp.io :as io]
    [basilisp.test :refer [deftest is are testing]]
-   [steno.translator :as sut]))
+   [steno.translator :as sut]
+   [steno.translators.knn :as knn]))
 
 (deftest my-test
   (is true))
@@ -15,3 +16,53 @@
       "word015.png" "a"
       "word022.png" "t"
       "word023.png" "p")))
+
+(deftest knn-get-diff-test
+  (testing "identical sequences return max same-bit count"
+    (is (= 28 (knn/get-diff [136 136 136 8] [136 136 136 8]))))
+  (testing "completely different sequences return 0"
+    (is (= 0 (knn/get-diff [0 0 0 0] [255 255 255 255])))))
+
+(deftest knn-get-best-match-test
+  (testing "equal length match"
+    (let [result (knn/get-best-match [136 136 136 8] [136 136 136 8])]
+      (is (= 28 (:diff result)))
+      (is (= 4 (:len result)))))
+  (testing "sliding window finds best position"
+    (let [result (knn/get-best-match [136 136 8] [0 0 136 136 8 0])]
+      (is (= 21 (:diff result)))
+      (is (= 5 (:len result))))))
+
+(deftest knn-build-references-test
+  (let [references (sut/build-references "knn" {} "resources/corpus")]
+    (is (some? (:type-0 references)))
+    (is (some? (:type-1 references)))
+    (testing "type-1 has entries"
+      (is (pos? (count (:type-1 references)))))
+    (testing "each type-1 entry has letter, samples, min-len, max-len"
+      (doseq [entry (:type-1 references)]
+        (is (string? (:letter entry)))
+        (is (vector? (:samples entry)))
+        (is (pos? (:min-len entry)))
+        (is (pos? (:max-len entry)))))
+    (testing "letter 't' exists in type-1"
+      (let [t-ref (first (filter #(= "t" (:letter %)) (:type-1 references)))]
+        (is (some? t-ref))
+        (is (pos? (count (:samples t-ref))))))))
+
+(deftest knn-prepare-translation-test
+  (let [config {"knn_references" "resources/knn-references.edn"}]
+    (testing "throws when references file missing"
+      (is (thrown? Exception (sut/prepare-translation "knn" config))))))
+
+(deftest knn-translate-test
+  (let [corpus-dir "resources/corpus"
+        references (sut/build-references "knn" {} corpus-dir)
+        ctx {knn/ctx-key references}
+        lsign {:ltype 1
+               :lineseq [[0 0 128] [0 1 136] [0 2 136] [0 3 136] [0 4 136] [0 5 136] [0 6 136] [0 7 136] [0 8 136] [0 9 136] [0 10 136] [0 11 136] [0 12 136] [0 13 136] [0 14 136] [0 15 136] [0 16 136] [0 17 136] [0 18 136] [0 19 136] [0 20 136] [0 21 136] [0 22 136] [0 23 136] [0 24 136] [0 25 136] [0 26 136] [0 27 136] [0 28 136] [0 29 136] [0 30 136] [0 31 136] [0 32 136] [0 33 136] [0 34 8]]
+               :letters []}]
+    (testing "translates a lsign producing letter matches"
+      (let [result (sut/translate "knn" ctx lsign)]
+        (is (some? (:letters result)))
+        (is (pos? (count (:letters result))))))))

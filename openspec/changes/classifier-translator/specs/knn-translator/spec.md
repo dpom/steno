@@ -2,7 +2,7 @@
 
 ### Requirement: Build reference data from corpus samples
 
-Feature: knn-translator
+Feature: knn-translator SHALL build reference data from corpus samples
 Rule: The knn translator stores individual sample sequences per letter, preserving multi-modal writing style variation.
 
 #### Scenario: Build references collects one sample per corpus entry
@@ -29,7 +29,7 @@ Rule: The knn translator stores individual sample sequences per letter, preservi
 
 ### Requirement: Translate cnum sequences using k-NN classification
 
-Feature: knn-translator
+Feature: knn-translator SHALL translate cnum sequences using k-NN classification
 Rule: The translator classifies a glyph's cnum sequence by finding the k nearest neighbors from reference samples using Hamming distance with sliding window, then applies distance-weighted voting.
 
 #### Scenario: Translation with exact match returns the correct letter
@@ -57,8 +57,8 @@ Rule: The translator classifies a glyph's cnum sequence by finding the k nearest
 
 ### Requirement: Support configurable k value
 
-Feature: knn-translator
-Rule: The k parameter controls how many nearest neighbors are considered during voting.
+Feature: knn-translator SHALL support configurable k value
+Rule: The translator supports a configurable k parameter that controls how many nearest neighbors are considered during voting.
 
 #### Scenario: Default k value is 3
 - **GIVEN** no knn_k is specified in the configuration

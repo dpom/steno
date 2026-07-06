@@ -1,0 +1,154 @@
+(ns steno.translators.knn
+  "Implement a translator based on k-NN classification"
+  (:require
+   [steno.corpus :as corpus]
+   [steno.translator :as tra]
+   [steno.utils :as utl])
+  (:import
+   [statistics :as st]))
+
+(def ctx-key :knn-references)
+
+(def knn-default-k 3)
+
+(def one-bit-num
+  [0 1 1 2 1 2 2 3 1 2 2 3 2 3 3 4
+   1 2 2 3 2 3 3 4 2 3 3 4 3 4 4 5
+   1 2 2 3 2 3 3 4 2 3 3 4 3 4 4 5
+   2 3 3 4 3 4 4 5 3 4 4 5 4 5 5 6
+   1 2 2 3 2 3 3 4 2 3 3 4 3 4 4 5
+   2 3 3 4 3 4 4 5 3 4 4 5 4 5 5 6
+   2 3 3 4 3 4 4 5 3 4 4 5 4 5 5 6
+   3 4 4 5 4 5 5 6 4 5 5 6 5 6 6 7
+   1 2 2 3 2 3 3 4 2 3 3 4 3 4 4 5
+   2 3 3 4 3 4 4 5 3 4 4 5 4 5 5 6
+   2 3 3 4 3 4 4 5 3 4 4 5 4 5 5 6
+   3 4 4 5 4 5 5 6 4 5 5 6 5 6 6 7
+   2 3 3 4 3 4 4 5 3 4 4 5 4 5 5 6
+   3 4 4 5 4 5 5 6 4 5 5 6 5 6 6 7
+   3 4 4 5 4 5 5 6 4 5 5 6 5 6 6 7
+   4 5 5 6 5 6 6 7 5 6 6 7 6 7 7 8])
+
+(defn get-diff
+  "Get the number of same bits between NUMSEQ1 and NUMSEQ2."
+  [numseq1 numseq2]
+  (apply + (mapv #(nth one-bit-num (bit-not (bit-xor %1 %2))) numseq1 numseq2)))
+
+(defn get-best-match
+  "Slide REFERENCE across NUMSEQ to find the best matching position.
+   Returns {:diff <same-bit-count> :len <end-position>}."
+  [reference numseq]
+  (let [ref-len (count reference)
+        numseq-len (count numseq)]
+    (if (= ref-len numseq-len)
+      {:diff (get-diff reference numseq)
+       :len numseq-len}
+      (reduce (fn [{:keys [diff] :as acc} pos]
+                (let [new-diff (get-diff reference (aslice numseq pos (+ pos ref-len)))]
+                  (if (> new-diff diff)
+                    {:diff new-diff
+                     :len (+ pos ref-len)}
+                    acc)))
+              {:diff 0
+               :len 0}
+              (range (inc (- numseq-len ref-len)))))))
+
+(defn- add-numseq
+  [{:keys [lineseq] :as lsign}]
+  (let [numseq (tra/normalize-numseq (mapv last lineseq))]
+    (assoc lsign :numseq numseq :len (count numseq))))
+
+(defn- build-letter-reference
+  [letter-path]
+  (let [corpus (corpus/read-corpus letter-path)
+        corpus* (map add-numseq corpus)
+        samples (mapv :numseq corpus*)
+        lens (map :len corpus*)]
+    (when (seq samples)
+      {:letter (utl/get-filename letter-path)
+       :samples samples
+       :min-len (apply min lens)
+       :max-len (apply max lens)})))
+
+(defn- score-sample
+  "Score a single SAMPLE against a NUMSEQ slice. Returns {:score <0-1> :len <advance>} or nil."
+  [sample slice]
+  (let [sample-len (count sample)
+        slice-len (count slice)]
+    (when (>= slice-len sample-len)
+      (let [{:keys [diff len]} (get-best-match sample slice)
+            max-bits (* 8 sample-len)]
+        {:score (tra/compute-match max-bits diff)
+         :len len}))))
+
+(defn- classify-numseq
+  "Classify NUMSEQ using k-NN with distance-weighted voting.
+   Returns [[letter score] remaining-seq]."
+  [references numseq k]
+  (let [candidates (mapcat (fn [{:keys [letter samples min-len max-len]}]
+                             (if (< (count numseq) min-len)
+                               []
+                               (let [slice (aslice numseq (min (count numseq) max-len))]
+                                 (keep (fn [sample]
+                                         (when-let [result (score-sample sample slice)]
+                                           (assoc result :letter letter)))
+                                       samples))))
+                           references)
+        top-k (->> candidates
+                   (sort-by :score >)
+                   (take k))
+        votes (reduce (fn [acc {:keys [letter score]}]
+                        (update acc letter (fnil + 0) score))
+                      {}
+                      top-k)
+        best-letter (->> votes (sort-by second >) (first) (first))]
+    (if (nil? best-letter)
+      [[tra/unknown-letter 0] numseq]
+      (let [best-match (->> top-k
+                            (filter #(= (:letter %) best-letter))
+                            (sort-by :score >)
+                            (first))
+            advance-len (:len best-match (count numseq))]
+        [[best-letter (:score best-match)] (aslice numseq advance-len (count numseq))]))))
+
+(defn- translate-numseq
+  "Translate a normalized CNUMSEQ of LTYPE using k-NN with K neighbors."
+  [references cnumseq ltype k]
+  (if (zero? ltype)
+    [(first (classify-numseq (:type-0 references) cnumseq k))]
+    (loop [s cnumseq
+           acc []]
+      (let [l (count s)]
+        (if (< l (:min-refseq references))
+          acc
+          (let [[letter-match new-s] (classify-numseq (:type-1 references) s k)]
+            (recur new-s (conj acc letter-match))))))))
+
+;; entry points
+
+(defmethod tra/prepare-translation "knn"
+  [_ config]
+  (let [filename (get config "knn_references")
+        references (utl/load-edn filename)]
+    (assoc config ctx-key references)))
+
+(defmethod tra/translate "knn"
+  [_ ctx {:keys [ltype lineseq letters] :or {letters []} :as lsign}]
+  (let [references (ctx-key ctx)
+        k (get ctx "knn_k" knn-default-k)
+        cnumseq (tra/get-numseq lineseq)]
+    (assoc lsign :letters (conj letters (translate-numseq references cnumseq ltype k)))))
+
+(defmethod tra/build-references "knn"
+  [_ _ctx corpus-dir]
+  (let [type-1 (->> (corpus/walk-corpus corpus-dir tra/type-1? build-letter-reference)
+                    (remove nil?)
+                    (sort-by :min-len >)
+                    vec)
+        type-0 (->> (corpus/walk-corpus corpus-dir tra/type-0? build-letter-reference)
+                    (remove nil?)
+                    (sort-by :min-len >)
+                    vec)]
+    {:type-0 type-0
+     :type-1 type-1
+     :min-refseq (if (seq type-1) (:min-len (last type-1)) 0)}))
