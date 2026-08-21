@@ -12,6 +12,7 @@ Purpose: steno is a personal project to digitalize stenographic (shorthand) writ
 
 Language: The project is written in Basilisp (.lpy files), which is a Clojure dialect that runs on top of the Python VM. It uses Python libraries (OpenCV, numpy, scikit-image, matplotlib) via interop. The entry point is a thin Python shim (src/steno/__init__.py) that bootstraps into Basilisp.
 
+- Dictionary of project concepts: doc/Dictionary.org
 - Source files: src/steno/*.lpy (8 source files + 1 __init__.py)
 - Test files: test/steno/*.lpy (1 test file)
 - Config: pyproject.toml declares basilisp>=0.5.0 as a dependency
