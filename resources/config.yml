@@ -1,4 +1,4 @@
-translators: ["freq", "diff"]
+translators: ["freq", "diff", "knn"]
 freq_references: "resources/freq-references.edn"
 diff_references: "resources/diff-references.edn"
 knn_references: "resources/knn-references.edn"
