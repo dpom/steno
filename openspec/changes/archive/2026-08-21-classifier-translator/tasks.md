@@ -1,3 +1,17 @@
+## Verification Notes (2026-08-21)
+
+Archived with known test gaps (user accepted). Implementation verified functionally
+correct against all spec scenarios via runtime checks; the gaps are test-only:
+
+- 4.2/4.3: promised tests missing — no exact-match letter assertion, no
+  distance-weighted voting test, no fewer-samples-than-k test, no configurable-k test.
+- Existing `knn-get-best-match-test` asserts diff 21 for `[136 136 8]` vs
+  `[0 0 136 136 8 0]`; actual best-match diff is 24 (len 5 is correct).
+- Existing `knn-prepare-translation-test` asserts a throw but points at the existing
+  `resources/knn-references.edn`, which loads fine.
+- Pre-existing, environmental: `bb test` fails at collection ("steno.translator not
+  found"), reproduced at pre-change commit b4ed09c; masks the above until fixed.
+
 ## 1. Reference Data Format
 
 - [x] 1.1 Create `src/steno/translators/knn.lpy` with `build-references` multimethod that collects individual sample sequences per letter from corpus entries
