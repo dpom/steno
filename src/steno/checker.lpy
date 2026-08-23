@@ -10,7 +10,7 @@
     GUI-screen.png): top panel with the large 'gliph image' display frame,
     middle 'lsigns' table with 6 columns (Lsign image, freq, diff, knn,
     select, save) and a menu bar with a File menu (open image / open
-    directory / quit) plus direct Save, Previous and Next buttons."
+    directory / quit) plus direct Save, Previous, Next and Delete buttons."
   (:require
    [basilisp.core :refer [format]]
    [basilisp.io :as bio]
@@ -316,6 +316,22 @@
       (swap! (:state* ui) update :idx inc)
       (load-position! ui))))
 
+(defn- delete-glyph!
+  "Delete the glyph image file at the current queue position, remove it
+   from the review queue and reload the screen (confirmation first)."
+  [ui]
+  (let [{:keys [files idx]} @(:state* ui)
+        file (nth files idx nil)]
+    (when (and file (.exists (Path. file)))
+      (when (mb/askyesno ** :parent (:root ui)
+                          :title "Delete glyph"
+                          :message (str "Delete " file "?"))
+        (.unlink (Path. file))
+        (let [new-files (vec (keep-indexed (fn [i f] (when (not= i idx) f)) files))
+              new-idx (if (empty? new-files) 0 (min idx (dec (count new-files))))]
+          (swap! (:state* ui) assoc :files new-files :idx new-idx :rows [])
+          (load-position! ui))))))
+
 (defn- collect-row!
   "Merge the live widget values into ROW."
   [{:keys [sel-var save-var row]}]
@@ -366,6 +382,9 @@
     (.add_command menubar ** :label "Next"
                   :accelerator "Ctrl-Right"
                   :command (fn [] (next-glyph! ui)))
+    (.add_command menubar ** :label "Delete"
+                  :accelerator "Ctrl-D"
+                  :command (fn [] (delete-glyph! ui)))
     (.config root ** :menu menubar)))
 
 (defn- build-top-panel!
@@ -423,6 +442,7 @@
     (.bind root "<Control-s>" (fn [_] (save-checked! ui)))
     (.bind root "<Control-Left>" (fn [_] (prev-glyph! ui)))
     (.bind root "<Control-Right>" (fn [_] (next-glyph! ui)))
+    (.bind root "<Control-d>" (fn [_] (delete-glyph! ui)))
     (.bind root "<Control-q>" (fn [_] (quit-app! ui)))
     (when (seq inputs)
       (load-position! ui))
