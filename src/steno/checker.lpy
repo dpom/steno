@@ -25,12 +25,13 @@
     [pathlib :refer [Path]]
     [tempfile :as tf]
     [tkinter :as tk]
-   [tkinter.filedialog :as fd]
+    [matplotlib.figure :as mfig]
+    [matplotlib.backends.backend_tkagg :as tkagg]
+    [tkinter.filedialog :as fd]
    [tkinter.messagebox :as mb]
    [tkinter.ttk :as ttk]))
 
 (def thumbnail-height 40)
-(def glyph-height 400)
 (def image-suffixes #{"png" "jpg" "jpeg" "tif" "tiff"})
 (def table-headers ["Lsign" "freq" "diff" "knn" "select" "save"])
 
@@ -239,12 +240,17 @@
     (reset! widgets* @widgets)))
 
 (defn- refresh-glyph!
-  "Show the current glyph in the top 'gliph image' frame."
+  "Show the current glyph in the top 'gliph image' frame with x/y axes."
   [ui imagefile]
   (let [image (cv2/imread imagefile cv2/IMREAD_GRAYSCALE)]
     (when-not (nil? image)
-      (.configure (:glyph-label ui)
-                  ** :image (matrix-photo (:photos* ui) :glyph image glyph-height)))))
+      (let [ax (:glyph-ax ui)]
+        (.clear ax)
+        (.imshow ax image ** :cmap "gray")
+        (.set_xlabel ax "x")
+        (.set_ylabel ax "y")
+        (.axis ax "on")
+        (.draw (:glyph-canvas ui))))))
 
 (defn- clear-screen!
   "Empty the screen when no glyph is available."
@@ -252,7 +258,10 @@
   (clear-frame! (:table ui))
   (reset! (:widgets* ui) [])
   (reset! (:photos* ui) {})
-  (.configure (:glyph-label ui) ** :image ""))
+  (let [ax (:glyph-ax ui)]
+    (.clear ax)
+    (.axis ax "off")
+    (.draw (:glyph-canvas ui))))
 
 (defn- load-position!
   "(Re)load the glyph at the current queue index: convert, translate and
@@ -360,12 +369,18 @@
     (.config root ** :menu menubar)))
 
 (defn- build-top-panel!
-  "Top panel: the large central image display frame labelled 'gliph image'."
+  "Top panel: the large central image display frame labelled 'gliph image',
+   rendered through a matplotlib canvas showing x/y axes."
   [root photos*]
-  (let [panel (tk/LabelFrame root ** :text "gliph image"  :padx 10  :pady 10)]
+  (let [panel (tk/LabelFrame root ** :text "gliph image"  :padx 10  :pady 10)
+        fig (mfig/Figure ** :figsize (python/tuple [5 5]))
+        canvas (tkagg/FigureCanvasTkAgg fig panel)
+        ax (.add_subplot fig 1 1 1)]
+    (.pack (.get_tk_widget canvas) ** :padx 10  :pady 10)
     {:panel panel
-     :glyph-label (doto (tk/Label panel)
-                    (.pack ** :padx 10  :pady 10))
+     :glyph-fig fig
+     :glyph-ax ax
+     :glyph-canvas canvas
      :photos* photos*}))
 
 (defn- build-table-panel!
