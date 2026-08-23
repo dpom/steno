@@ -365,12 +365,12 @@
     (doto file-menu
       (.add_command ** :label "Open image..."
                     :accelerator "Ctrl-O"
-                    :command (fn [_] (open-image! ui)))
+                    :command (fn [] (open-image! ui)))
       (.add_command ** :label "Open directory..."
-                    :command (fn [_] (open-dir! ui)))
+                    :command (fn [] (open-dir! ui)))
       (.add_separator)
       (.add_command ** :label "Quit"
-                    :command (fn [_] (quit-app! ui))))
+                    :command (fn [] (quit-app! ui))))
     (.add_cascade menubar ** :label "File"  :menu file-menu)
     (.config root ** :menu menubar)))
 
@@ -394,16 +394,16 @@
   [root ui]
   (let [frame (tk/Frame root ** :pady 10)]
     (doto (tk/Button frame ** :text "SAVE"  :width 12
-                     :command (fn [_] (save-checked! ui)))
+                     :command (fn [] (save-checked! ui)))
       (.grid ** :row 0  :column 1  :pady 4))
     (doto (tk/Button frame ** :text "PREV"  :width 12
-                     :command (fn [_] (prev-glyph! ui)))
+                     :command (fn [] (prev-glyph! ui)))
       (.grid ** :row 1  :column 0  :padx 20  :pady 4))
     (doto (tk/Button frame ** :text "NEXT"  :width 12
-                     :command (fn [_] (next-glyph! ui)))
+                     :command (fn [] (next-glyph! ui)))
       (.grid ** :row 1  :column 2  :padx 20  :pady 4))
     (doto (tk/Button frame ** :text "QUIT"  :width 12
-                     :command (fn [_] (quit-app! ui)))
+                     :command (fn [] (quit-app! ui)))
       (.grid ** :row 2  :column 1  :pady 4))
     frame))
 
