@@ -55,8 +55,10 @@ Bullets:
 ```mermaid
 flowchart TB
     subgraph app["steno.checker namespace"]
-        toolbar["Toolbar<br/>Open / Prev / Next / Save / Save&Next"]
-        rows["Rows panel<br/>thumbnail + results + combobox"]
+        glyphframe["Top panel<br/>'gliph image' display frame"]
+        table["lsigns table (middle panel)<br/>thumbnail, freq/diff/knn chains,<br/>select input, save checkbox"]
+        cluster["Bottom control cluster (diamond)<br/>SAVE / PREV / NEXT / QUIT"]
+        menu["File→Open menu"]
         state["UI state atom<br/>files queue, index, current glyph rows"]
         pure["Pure core functions<br/>build-glyph-data, format-results,<br/>lsign-path!, letters-list"]
     end
@@ -65,17 +67,19 @@ flowchart TB
     showb["show/display-image-stream bridge"]
     tk["tkinter widgets<br/>(PhotoImage from PNG bytes)"]
 
-    toolbar --> state
+    glyphframe --> tk
+    table --> tk
+    cluster --> state
+    menu --> state
     state -->|"load glyph"| pure --> pipeline2
-    pure -->|"rows data"| rows
-    rows --> tk
-    rows -- "send lsign" --> showb --> emacs
-    toolbar -- "save non-empty rows" --> pure --> corpus
+    pure -->|"rows data"| table
+    table -- "send lsign" --> showb --> emacs
+    cluster -- "save checked rows" --> pure --> corpus
 ```
 
 Bullets:
 
-- The tkinter layer stays thin: it maps the pure row model to widgets and delegates every decision to the pure core functions.
+- The tkinter layer stays thin: it maps the pure row model to the fixed three-panel screen (top "gliph image" frame, middle "lsigns" table, bottom diamond SAVE/PREV/NEXT/QUIT cluster) and delegates every decision to the pure core functions.
 - All headless logic (glyph loading, result formatting, path/naming computation, letter listing) sits in testable functions with no Tk types in their signatures.
 - UI state is a single atom (file queue + index + current rows) so navigation is trivially serial and synchronous.
 
@@ -85,7 +89,8 @@ Bullets:
 
 - Validate/correct translator proposals per lsign before anything enters the corpus (human-in-the-loop).
 - Display glyph image, each lsign thumbnail, and every configured translator's letters with probabilities; combobox pre-filled with best match.
-- Accept `-i <glyph.png>` or `-i <dir>` (sorted iteration with Prev/Next, Save & Next).
+- Accept `-i <glyph.png>` or `-i <dir>` (sorted iteration with Prev/Next).
+- Single-window Tkinter screen with the fixed three-panel layout agreed in the mockup (`specs/translator-checker/GUI-screen.png`): top "gliph image" display frame, middle "lsigns" table (6 columns: Lsign image, freq, diff, knn, select, save), bottom diamond cluster SAVE / PREV / NEXT / QUIT.
 - Save corrected lsigns in the exact `make-corpus` format and naming under `<corpus-dir>/<letter>/`, creating new letter folders on demand.
 - Best-effort Emacs display of glyph/lsign images that degrades silently when Emacs is absent.
 - Headless-testable core; zero new pip dependencies.
@@ -115,7 +120,7 @@ Bullets:
    `-i` accepts a file or a directory; directories expand to a sorted list of image files (`png jpg jpeg tif tiff`). A single atom holds `{files idx rows}`; Prev/Next move the index and lazily process one glyph at a time; File→Open replaces the queue. Processing is synchronous — translation of one word takes milliseconds.
 
 5. **Row model and result presentation.**
-   Each lsign becomes a row map `{:pos :matrix :results {"freq" [["t" 0.91] ...] ...} :best "t"}`. Per-translator results render as probability chains, e.g. `t(0.91) l(0.75)`; the combined best match (`:text`) labels the row and pre-fills its combobox. Combobox values come from existing corpus subfolders; free text creates a folder on save; empty means skip.
+   Each lsign becomes a row map `{:pos :matrix :results {"freq" [["t" 0.91] ...] ...} :best "t" :save? true}`. The rows render as the "lsigns" table: thumbnail column, one probability-chain column per configured translator (`freq`/`diff`/`knn`, e.g. `t(0.91) l(0.75)`), a select combobox pre-filled with the best match (`:text`), and a save checkbox bound to `:save?` (checked by default). Combobox values come from existing corpus subfolders; free text creates a folder on save; SAVE persists only checked rows with a non-empty letter.
 
 6. **Corpus save semantics identical to `make-corpus`.**
    Saved keys exactly `{:ltype :lineseq :fileimage :row :column :pos}` (translator annotations stripped); since there is no page matrix, `row`/`column` pin to 0 and `pos` is the wsign index; filename `<image>-00-00-<pos>.edn` via the same `format` convention; written with `utl/save-edn` into `<corpus-dir>/<letter>/`, parents created as needed. Overwriting an existing file for the same source position is intended replacement (idempotent curation).
