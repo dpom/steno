@@ -26,10 +26,6 @@
       :doc "lint with kondo"
       :action "bb kondo")
 
-(task "tests"
-      :doc "run tests"
-      :action "bb test")
-
 (provide '.ent)
 ;;; .ent.el ends here
 

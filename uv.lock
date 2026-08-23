@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.12"
 resolution-markers = [
     "sys_platform == 'darwin'",
@@ -18,7 +18,7 @@ wheels = [
 
 [[package]]
 name = "basilisp"
-version = "0.5.0"
+version = "0.5.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "attrs" },
@@ -27,9 +27,14 @@ dependencies = [
     { name = "pyrsistent" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/15/52/b0ad0d8c16d962337b9da5d1e5f2161edd7e4d27dd03ed41135b5e19b686/basilisp-0.5.0.tar.gz", hash = "sha256:c6b491d4dbf3dc88808bab3ed0ca7db7c1587b30b8259abd3cb8ad87562e4b12", size = 286154, upload-time = "2026-01-24T18:27:30.021Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e9/7b/dd9183cdacf72302d0079ca8e11e2fcdf4f20c03410f67c9e8ca851e1b98/basilisp-0.5.1.tar.gz", hash = "sha256:bcf7dde97ca4a42b4e287e73bc330908a61b61bf90b2e7c061d9524adaa603d7", size = 289806, upload-time = "2026-04-09T23:11:39.549Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/52/7f/8d6cde2296d25c7de9a93ea3080ef494070cb46d71e3a0c274a14a9eab86/basilisp-0.5.0-py3-none-any.whl", hash = "sha256:6c58e4e7d921448353f5fd62a5e530c7b9311fcdf01bc153b0acfc29843e8038", size = 313940, upload-time = "2026-01-24T18:27:28.758Z" },
+    { url = "https://files.pythonhosted.org/packages/b0/23/74c350bed33b7e47657177fd4f4cec560d9b6e272cedb66dc749e3ad6289/basilisp-0.5.1-py3-none-any.whl", hash = "sha256:beaed768776c45b9b63042bcb5f5632db13746d7c5df1ae72d600d0095ed334d", size = 318241, upload-time = "2026-04-09T23:11:37.484Z" },
+]
+
+[package.optional-dependencies]
+pytest = [
+    { name = "pytest" },
 ]
 
 [[package]]
@@ -569,7 +574,7 @@ name = "steno"
 version = "1.1"
 source = { editable = "." }
 dependencies = [
-    { name = "basilisp" },
+    { name = "basilisp", extra = ["pytest"] },
     { name = "matplotlib" },
     { name = "opencv-python" },
     { name = "pyaml-env" },
@@ -579,7 +584,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "basilisp", specifier = ">=0.5.0" },
+    { name = "basilisp", extras = ["pytest"], specifier = ">=0.5.1" },
     { name = "matplotlib", specifier = ">=3.10.0" },
     { name = "opencv-python", specifier = ">=4.10.0.84" },
     { name = "pyaml-env", specifier = ">=1.2.2" },

@@ -32,7 +32,6 @@ src/steno/              # Source code (.lpy + one __init__.py)
   utils.lpy             # Shared utilities (edn, matrix, files)
   spec.lpy              # Entity type spec documentation
   show.lpy              # Emacs-based visual display functions
-test/steno/             # Tests
 resources/              # Config, corpus data, references
 ```
 
@@ -52,24 +51,11 @@ source .venv/bin/activate
 ### Task runner (babashka — `bb`)
 ```sh
 bb app <action>          # Run the steno CLI (e.g. `bb app translate`)
-bb test                  # Run all basilisp tests
 bb kondo [file]          # Lint with clj-kondo (src by default)
 bb format [path]         # Format code with cljfmt (src test resources by default)
 bb style [path]          # Check formatting without fixing
 bb nrepl                 # Start basilisp nREPL server
 bb edn <file>            # Format an .edn file
-```
-
-### Running a single test
-```sh
-# Run a specific test namespace
-basilisp test --include-path test -n steno.translator-test
-
-# Run a specific test var
-basilisp test --include-path test -v steno.translator-test/my-test
-
-# Using bb (all tests only — no single-test filter via bb)
-bb test
 ```
 
 ### Repl-driven development
@@ -166,14 +152,8 @@ bb test
 - Use `python/float`, `python/slice`, `python/tuple` for Python type coercion
 
 ### Test Style
-```clojure
-(ns steno.translator-test
-  (:require
-   [basilisp.test :refer [deftest is are testing]]))
-```
-- Use `deftest`, `is`, `are`, `testing` from `basilisp.test`
-- Name tests with kebab-case ending in `-test`
-- Use `are` for data-driven table tests
+
+Tests are embeded in the end of code files in a comment section (see existing code files for examples).
 
 ### REPL / Dev Conventions
 - Each source file ends with a `(comment ...)` block for interactive dev

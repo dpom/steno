@@ -6932,3 +6932,10 @@ freq-ref
 
 (show/show-lsign lsign)
   #+end_src
+
+* 2026-08-22
+
+- incerc sa inteleg codul din translatorul knn:
+  #+begin_src clojure
+  
+  #+end_src

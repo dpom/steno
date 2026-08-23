@@ -5,7 +5,7 @@ description = "steno is a project to digitize stenographic writings"
 authors = [{ name = "Dan Pomohaci", email = "dan.pomohaci@gmail.com" }]
 requires-python = ">=3.12"
 dependencies = [
-    "basilisp>=0.5.0",
+    "basilisp[pytest]>=0.5.1",
     "matplotlib>=3.10.0",
     "opencv-python>=4.10.0.84",
     "pyaml-env>=1.2.2",
@@ -28,3 +28,4 @@ packages = ["src/steno"]
 testpaths = [ # what directories contain tests
     "test",
 ]
+addopts = "--cache-clear"
