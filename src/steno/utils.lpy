@@ -41,9 +41,9 @@
   [lineseq]
   (let [x-max (inc (apply max (map first lineseq)))
         y-max (inc (apply max (map second lineseq)))
-        mat (np/zeros [x-max y-max] ** :dtype "int")]
-    (doseq [[x y _] lineseq]
-      (aset mat x y 1))
+        mat (np/zeros [x-max y-max] ** :dtype "uint8")]
+    (doseq [[x y] lineseq]
+      (aset mat x y 255))
     mat))
 
 (defn map-glyph-matrix
