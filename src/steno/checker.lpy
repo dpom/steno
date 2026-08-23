@@ -6,11 +6,11 @@
    translators and lets the reviewer correct the proposals before saving
    curated corpus entries identical to the automatic ones (ADR-0002).
 
-   Screen layout follows the mockup (specs/translator-checker/
-   GUI-screen.png): top panel with the large 'gliph image' display frame,
-   middle 'lsigns' table with 6 columns (Lsign image, freq, diff, knn,
-   select, save) and a bottom diamond control cluster with SAVE on top,
-   PREV/NEXT on the left/right and QUIT at the bottom."
+    Screen layout follows the mockup (specs/translator-checker/
+    GUI-screen.png): top panel with the large 'gliph image' display frame,
+    middle 'lsigns' table with 6 columns (Lsign image, freq, diff, knn,
+    select, save) and a menu bar with a File menu (open image / open
+    directory / quit) plus direct Save, Previous and Next buttons."
   (:require
    [basilisp.core :refer [format]]
    [basilisp.io :as bio]
@@ -22,17 +22,15 @@
   (:import
    base64
    cv2
-   [pathlib :refer [Path]]
-   [subprocess :as sp]
-   [tempfile :as tf]
-   [tkinter :as tk]
+    [pathlib :refer [Path]]
+    [tempfile :as tf]
+    [tkinter :as tk]
    [tkinter.filedialog :as fd]
    [tkinter.messagebox :as mb]
    [tkinter.ttk :as ttk]))
 
 (def thumbnail-height 40)
 (def glyph-height 400)
-(def emacs-timeout-secs 3)
 (def image-suffixes #{"png" "jpg" "jpeg" "tif" "tiff"})
 (def table-headers ["Lsign" "freq" "diff" "knn" "select" "save"])
 
@@ -151,29 +149,13 @@
       :else [])))
 
 ;; ---------------------------------------------------------------------------
-;; Best-effort Emacs bridge
+;; Image helpers
 ;; ---------------------------------------------------------------------------
 
 (defn- matrix-to-png-bytes
-  "Encode a matrix as PNG bytes."
+  "Encode a matrix as PNG bytes (used by the thumbnail / glyph rendering)."
   [mat]
   (.tobytes (second (cv2/imencode ".png" mat))))
-
-(defn- send-to-emacs!
-  "Send PNG BYTES to Emacs through a temporary file. Best-effort: any
-   failure (missing server, timeout) is swallowed so the GUI keeps working."
-  [png-bytes]
-  (try
-    (let [tmp (tf/NamedTemporaryFile ** :suffix ".png" :mode "wb" :delete false)
-          tmp-path (.-name tmp)]
-      (.write tmp png-bytes)
-      (.flush tmp)
-      (.close tmp)
-      (sp/run ["emacsclient" "-n" "-e"
-               (str "(local/display-image-from-file \"" tmp-path "\")")]
-              ** :timeout emacs-timeout-secs))
-    (catch Exception _
-      nil)))
 
 ;; ---------------------------------------------------------------------------
 ;; tkinter UI layer (thin, private defs)
@@ -221,15 +203,9 @@
   (let [{:keys [files idx]} @(:state* ui)]
     (nth files idx nil)))
 
-(defn- send-lsign!
-  "Send the lsign matrix of ROW to Emacs for closer inspection."
-  [row]
-  (send-to-emacs! (matrix-to-png-bytes (:matrix row))))
-
 (defn- refresh-table!
   "Rebuild the 'lsigns' table for the current ROWS: one 6-column row per
-   lsign (thumbnail, freq, diff, knn chains, select combobox, save box).
-   Clicking a row thumbnail sends that lsign to Emacs."
+   lsign (thumbnail, freq, diff, knn chains, select combobox, save box)."
   [ui rows]
   (let [{:keys [table photos* widgets*]} ui
         letters (letters-list (:corpus-dir ui))
@@ -251,7 +227,6 @@
             combo (ttk/Combobox table ** :textvariable sel-var
                                 :values (python/tuple letters)  :width 8)
             check (tk/Checkbutton table ** :variable save-var)]
-        (.bind thumb "<Button-1>" (fn [_] (send-lsign! row)))
         (.grid thumb ** :row r  :column 0)
         (.grid freq-label ** :row r  :column 1  :sticky "ew")
         (.grid diff-label ** :row r  :column 2  :sticky "ew")
@@ -264,13 +239,12 @@
     (reset! widgets* @widgets)))
 
 (defn- refresh-glyph!
-  "Show the current glyph in the top 'gliph image' frame and push it to Emacs."
+  "Show the current glyph in the top 'gliph image' frame."
   [ui imagefile]
   (let [image (cv2/imread imagefile cv2/IMREAD_GRAYSCALE)]
     (when-not (nil? image)
       (.configure (:glyph-label ui)
-                  ** :image (matrix-photo (:photos* ui) :glyph image glyph-height))
-      (send-to-emacs! (matrix-to-png-bytes image)))))
+                  ** :image (matrix-photo (:photos* ui) :glyph image glyph-height)))))
 
 (defn- clear-screen!
   "Empty the screen when no glyph is available."
@@ -306,8 +280,8 @@
   [ui]
   (let [f (fd/askopenfilename ** :parent (:root ui)
                               :title "Open glyph image"
-                              :filetypes [("images" "*.png *.jpg *.jpeg *.tif *.tiff")
-                                          ("all files" "*")])]
+                              :filetypes [["images" "*.png *.jpg *.jpeg *.tif *.tiff"]
+                                          ["all files" "*"]])]
     (when-not (str/blank? f)
       (open-input! ui f))))
 
@@ -358,7 +332,8 @@
     (.destroy root)))
 
 (defn- build-menu!
-  "File menu: open image / open directory / quit."
+  "Menu bar: File menu (open image / open directory / quit) plus direct
+   Save, Previous and Next command buttons."
   [root ui]
   (let [menubar (tk/Menu root)
         file-menu (tk/Menu menubar ** :tearoff 0)]
@@ -370,8 +345,18 @@
                     :command (fn [] (open-dir! ui)))
       (.add_separator)
       (.add_command ** :label "Quit"
+                    :accelerator "Ctrl-Q"
                     :command (fn [] (quit-app! ui))))
     (.add_cascade menubar ** :label "File"  :menu file-menu)
+    (.add_command menubar ** :label "Save"
+                  :accelerator "Ctrl-S"
+                  :command (fn [] (save-checked! ui)))
+    (.add_command menubar ** :label "Previous"
+                  :accelerator "Ctrl-Left"
+                  :command (fn [] (prev-glyph! ui)))
+    (.add_command menubar ** :label "Next"
+                  :accelerator "Ctrl-Right"
+                  :command (fn [] (next-glyph! ui)))
     (.config root ** :menu menubar)))
 
 (defn- build-top-panel!
@@ -387,25 +372,6 @@
   "Middle panel: the 'lsigns' table frame."
   [root]
   (tk/LabelFrame root ** :text "lsigns"  :padx 10  :pady 10))
-
-(defn- build-controls-panel!
-  "Bottom control cluster: diamond layout with SAVE on top, PREV and NEXT
-   navigation buttons on the left and right, QUIT at the bottom."
-  [root ui]
-  (let [frame (tk/Frame root ** :pady 10)]
-    (doto (tk/Button frame ** :text "SAVE"  :width 12
-                     :command (fn [] (save-checked! ui)))
-      (.grid ** :row 0  :column 1  :pady 4))
-    (doto (tk/Button frame ** :text "PREV"  :width 12
-                     :command (fn [] (prev-glyph! ui)))
-      (.grid ** :row 1  :column 0  :padx 20  :pady 4))
-    (doto (tk/Button frame ** :text "NEXT"  :width 12
-                     :command (fn [] (next-glyph! ui)))
-      (.grid ** :row 1  :column 2  :padx 20  :pady 4))
-    (doto (tk/Button frame ** :text "QUIT"  :width 12
-                     :command (fn [] (quit-app! ui)))
-      (.grid ** :row 2  :column 1  :pady 4))
-    frame))
 
 ;; module entry points
 
@@ -436,10 +402,13 @@
       (.title "translator checker")
       (.geometry "1000x900"))
     (build-menu! root ui)
-    (.pack (build-controls-panel! root ui) ** :side "bottom"  :fill "x")
     (.pack panel ** :side "top"  :fill "x")
     (.pack table ** :side "top"  :fill "both"  :expand true)
     (.bind root "<Control-o>" (fn [_] (open-image! ui)))
+    (.bind root "<Control-s>" (fn [_] (save-checked! ui)))
+    (.bind root "<Control-Left>" (fn [_] (prev-glyph! ui)))
+    (.bind root "<Control-Right>" (fn [_] (next-glyph! ui)))
+    (.bind root "<Control-q>" (fn [_] (quit-app! ui)))
     (when (seq inputs)
       (load-position! ui))
     (.mainloop root)))

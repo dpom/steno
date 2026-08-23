@@ -51,9 +51,6 @@ source .venv/bin/activate
 ### Task runner (babashka — `bb`)
 ```sh
 bb app <action>          # Run the steno CLI (e.g. `bb app translate`)
-bb kondo [file]          # Lint with clj-kondo (src by default)
-bb format [path]         # Format code with cljfmt (src test resources by default)
-bb style [path]          # Check formatting without fixing
 bb nrepl                 # Start basilisp nREPL server
 bb edn <file>            # Format an .edn file
 ```
@@ -99,7 +96,6 @@ bb edn <file>            # Format an .edn file
 
 ### Formatting
 - Use cljfmt with `.cljfmt.edn` config (matches regex `\.lpy$`)
-- Run `bb format` before committing
 - Indent with spaces (2-space blocks, align function args)
 - Thread macros `->` and `->>` preferred over nesting
 
