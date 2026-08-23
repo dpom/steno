@@ -14,17 +14,6 @@
 
 ;; tasks
 
-(task "style"
-      :doc "check code"
-      :action "bb style")
-
-(task "format"
-      :doc "format code"
-      :action "bb format")
-
-(task "kondo"
-      :doc "lint with kondo"
-      :action "bb kondo")
 
 (provide '.ent)
 ;;; .ent.el ends here
