@@ -1,0 +1,557 @@
+(ns steno.checker
+  "Interactive translator-proposal checker.
+
+   Loads pre-extracted glyph images (single file or directory batch),
+   converts each into a wsign, translates every lsign with the configured
+   translators and lets the reviewer correct the proposals before saving
+   curated corpus entries identical to the automatic ones (ADR-0002).
+
+   Screen layout follows the mockup (specs/translator-checker/
+   GUI-screen.png): top panel with the large 'gliph image' display frame,
+   middle 'lsigns' table with 6 columns (Lsign image, freq, diff, knn,
+   select, save) and a bottom diamond control cluster with SAVE on top,
+   PREV/NEXT on the left/right and QUIT at the bottom."
+  (:require
+   [basilisp.core :refer [format]]
+   [basilisp.io :as bio]
+   [basilisp.string :as str]
+   [steno.converter :as cnv]
+   [steno.imageprocessor :as img]
+   [steno.translator :as tra]
+   [steno.utils :as utl])
+  (:import
+   base64
+   cv2
+   [pathlib :refer [Path]]
+   [subprocess :as sp]
+   [tempfile :as tf]
+   [tkinter :as tk]
+   [tkinter.filedialog :as fd]
+   [tkinter.messagebox :as mb]
+   [tkinter.ttk :as ttk]))
+
+(def thumbnail-height 40)
+(def glyph-height 400)
+(def emacs-timeout-secs 3)
+(def image-suffixes #{"png" "jpg" "jpeg" "tif" "tiff"})
+(def table-headers ["Lsign" "freq" "diff" "knn" "select" "save"])
+
+;; ---------------------------------------------------------------------------
+;; Pure checker core
+;; ---------------------------------------------------------------------------
+
+(defn load-glyph
+  "Load the glyph image at PATH and convert it into a wsign (nil if unreadable)."
+  [path-str]
+  (let [image (cv2/imread path-str cv2/IMREAD_GRAYSCALE)]
+    (when-not (nil? image)
+      (-> image
+          img/process-image
+          cnv/image-to-wsign))))
+
+(defn build-rows
+  "Translate every lsign of WSIGN and build one review row per lsign.
+
+   Each row holds the lsign position, its rendered matrix, the per
+   translator candidate pairs, the combined best match proposal, the
+   selectable letter (pre-filled with the best match) and the save flag."
+  [ctx translators wsign]
+  (map-indexed (fn [pos lsign]
+                 (let [{:keys [letters text]} (tra/translate-lsign ctx translators lsign)]
+                   {:pos pos
+                    :lsign lsign
+                    :matrix (utl/lineseq-to-matrix (:lineseq lsign))
+                    :results (zipmap translators letters)
+                    :best text
+                    :select text
+                    :save? true}))
+               wsign))
+
+(defn format-chain
+  "Format candidate PAIRS as a probability chain, e.g. \"t(0.91) l(0.75)\"."
+  [pairs]
+  (->> pairs
+       (map #(format "%s(%.2f)" (first %) (second %)))
+       (str/join " ")))
+
+(defn format-results
+  "Format every translator entry of RESULTS as a probability chain string."
+  [results]
+  (into {} (map (fn [[name pairs]] [name (format-chain pairs)]) results)))
+
+(defn lsign-entry
+  "Reduce LSIGN to the exact corpus entry fields (ADR-0002 contract)."
+  [imagefile pos lsign]
+  {:ltype (:ltype lsign)
+   :lineseq (:lineseq lsign)
+   :fileimage imagefile
+   :row 0
+   :column 0
+   :pos pos})
+
+(defn entry-filename
+  "Corpus filename of the sign at POS of IMAGEFILE: <image>-00-00-<pos>.edn."
+  [imagefile pos]
+  (format "%s-%02d-%02d-%01d.edn" (utl/get-filename imagefile) 0 0 pos))
+
+(defn entry-path
+  "Destination corpus file for the LETTER chosen for the sign at POS of IMAGEFILE."
+  [corpus-dir letter imagefile pos]
+  (bio/path (bio/path corpus-dir letter) (entry-filename imagefile pos)))
+
+(defn savable-row?
+  "True if ROW gets saved: save box checked and non-empty letter selection."
+  [row]
+  (boolean (and (:save? row) (seq (:select row)))))
+
+(defn save-row!
+  "Persist ROW as a corpus entry under CORPUS-DIR/<letter>/, creating parents
+   on demand. Saving twice the same position replaces the previous entry.
+   Returns the destination path."
+  [logger corpus-dir imagefile {:keys [pos select lsign]}]
+  (let [outfile (entry-path corpus-dir select imagefile pos)]
+    (.mkdir (.-parent outfile) ** :parents true :exist_ok true)
+    (utl/save-edn outfile (lsign-entry imagefile pos lsign))
+    (.info logger "Saved in %s" outfile)
+    outfile))
+
+(defn letters-list
+  "Sorted list of existing corpus letter folders under CORPUS-DIR.
+   Returns an empty vector when CORPUS-DIR does not exist yet."
+  [corpus-dir]
+  (let [dir (Path. corpus-dir)]
+    (if (.exists dir)
+      (->> (iterator-seq (.iterdir dir))
+           (filter #(.is_dir %))
+           (map #(.-name %))
+           sort
+           vec)
+      [])))
+
+(defn image-file?
+  "True if P is an existing file carrying an accepted image suffix."
+  [p]
+  (let [ext (str/lower-case (.-suffix p))
+        ext (if (str/starts-with? ext ".") (subs ext 1) ext)]
+    (and (.is_file p)
+         (contains? image-suffixes ext))))
+
+(defn expand-input
+  "Expand INPUT into a sorted vector of glyph image paths: the file itself
+   or every image file of a directory (review queue in name order)."
+  [input]
+  (let [p (Path. input)]
+    (cond
+      (.is_file p) [input]
+      (.is_dir p) (->> (iterator-seq (.iterdir p))
+                       (filter image-file?)
+                       (map str)
+                       sort
+                       vec)
+      :else [])))
+
+;; ---------------------------------------------------------------------------
+;; Best-effort Emacs bridge
+;; ---------------------------------------------------------------------------
+
+(defn- matrix-to-png-bytes
+  "Encode a matrix as PNG bytes."
+  [mat]
+  (.tobytes (second (cv2/imencode ".png" mat))))
+
+(defn- send-to-emacs!
+  "Send PNG BYTES to Emacs through a temporary file. Best-effort: any
+   failure (missing server, timeout) is swallowed so the GUI keeps working."
+  [png-bytes]
+  (try
+    (let [tmp (tf/NamedTemporaryFile ** :suffix ".png" :mode "wb" :delete false)
+          tmp-path (.-name tmp)]
+      (.write tmp png-bytes)
+      (.flush tmp)
+      (.close tmp)
+      (sp/run ["emacsclient" "-n" "-e"
+               (str "(local/display-image-from-file \"" tmp-path "\")")]
+              ** :timeout emacs-timeout-secs))
+    (catch Exception _
+      nil)))
+
+;; ---------------------------------------------------------------------------
+;; tkinter UI layer (thin, private defs)
+;; ---------------------------------------------------------------------------
+
+(defn- scale-height
+  "Resize MAT proportionally to HEIGHT pixels."
+  [mat height]
+  (let [[h w] (.-shape mat)]
+    (if (= h height)
+      mat
+      (cv2/resize mat
+                  (python/tuple [(int (* w (/ height h))) height])
+                  ** :interpolation cv2/INTER_NEAREST))))
+
+(defn- matrix-photo
+  "Create a Tk PhotoImage from MAT scaled to HEIGHT pixels, keeping a
+   reference in PHOTOS* so Tk does not garbage collect it. Falls back to a
+   temporary PNG file if the direct base64 payload fails."
+  [photos* key mat height]
+  (let [photo (try
+                (tk/PhotoImage ** :data (-> mat
+                                            (scale-height height)
+                                            matrix-to-png-bytes
+                                            (base64/b64encode)
+                                            (.decode "ascii")))
+                (catch Exception _
+                  (let [tmp (tf/NamedTemporaryFile ** :suffix ".png" :mode "wb" :delete false)]
+                    (.write tmp (matrix-to-png-bytes (scale-height mat height)))
+                    (.flush tmp)
+                    (.close tmp)
+                    (tk/PhotoImage ** :file (.-name tmp)))))]
+    (swap! photos* assoc key photo)
+    photo))
+
+(defn- clear-frame!
+  "Destroy every child of FRAME."
+  [frame]
+  (doseq [child (.winfo_children frame)]
+    (.destroy child)))
+
+(defn- current-file
+  "The glyph image file at the current queue position (nil when exhausted)."
+  [ui]
+  (let [{:keys [files idx]} @(:state* ui)]
+    (nth files idx nil)))
+
+(defn- send-lsign!
+  "Send the lsign matrix of ROW to Emacs for closer inspection."
+  [row]
+  (send-to-emacs! (matrix-to-png-bytes (:matrix row))))
+
+(defn- refresh-table!
+  "Rebuild the 'lsigns' table for the current ROWS: one 6-column row per
+   lsign (thumbnail, freq, diff, knn chains, select combobox, save box).
+   Clicking a row thumbnail sends that lsign to Emacs."
+  [ui rows]
+  (let [{:keys [table photos* widgets*]} ui
+        letters (letters-list (:corpus-dir ui))
+        widgets (volatile! [])]
+    (clear-frame! table)
+    (doseq [[col header] (map-indexed vector table-headers)]
+      (doto (tk/Label table ** :text header  :padx 5  :pady 5)
+        (.grid ** :row 0  :column col  :sticky "ew")))
+    (doseq [row rows]
+      (let [r (inc (:pos row))
+            key (keyword (str "row-" (:pos row)))
+            thumb (tk/Label table ** :image (matrix-photo photos* key (:matrix row) thumbnail-height))
+            results (format-results (:results row))
+            freq-label (tk/Label table ** :text (get results "freq")  :anchor "w"  :padx 5)
+            diff-label (tk/Label table ** :text (get results "diff")  :anchor "w"  :padx 5)
+            knn-label (tk/Label table ** :text (get results "knn")  :anchor "w"  :padx 5)
+            sel-var (tk/StringVar ** :value (:select row))
+            save-var (tk/BooleanVar ** :value (boolean (:save? row)))
+            combo (ttk/Combobox table ** :textvariable sel-var
+                                :values (python/tuple letters)  :width 8)
+            check (tk/Checkbutton table ** :variable save-var)]
+        (.bind thumb "<Button-1>" (fn [_] (send-lsign! row)))
+        (.grid thumb ** :row r  :column 0)
+        (.grid freq-label ** :row r  :column 1  :sticky "ew")
+        (.grid diff-label ** :row r  :column 2  :sticky "ew")
+        (.grid knn-label ** :row r  :column 3  :sticky "ew")
+        (.grid combo ** :row r  :column 4  :padx 5)
+        (.grid check ** :row r  :column 5  :padx 5)
+        (vswap! widgets conj {:sel-var sel-var :save-var save-var :row row})))
+    (doseq [col [1 2 3]]
+      (.columnconfigure table col ** :weight 1))
+    (reset! widgets* @widgets)))
+
+(defn- refresh-glyph!
+  "Show the current glyph in the top 'gliph image' frame and push it to Emacs."
+  [ui imagefile]
+  (let [image (cv2/imread imagefile cv2/IMREAD_GRAYSCALE)]
+    (when-not (nil? image)
+      (.configure (:glyph-label ui)
+                  ** :image (matrix-photo (:photos* ui) :glyph image glyph-height))
+      (send-to-emacs! (matrix-to-png-bytes image)))))
+
+(defn- clear-screen!
+  "Empty the screen when no glyph is available."
+  [ui]
+  (clear-frame! (:table ui))
+  (reset! (:widgets* ui) [])
+  (reset! (:photos* ui) {})
+  (.configure (:glyph-label ui) ** :image ""))
+
+(defn- load-position!
+  "(Re)load the glyph at the current queue index: convert, translate and
+   refresh the screen."
+  [ui]
+  (let [imagefile (current-file ui)
+        wsign (when imagefile (load-glyph imagefile))
+        rows (if (and imagefile wsign)
+               (vec (build-rows (:ctx ui) (:translators ui) wsign))
+               [])]
+    (swap! (:state* ui) assoc :rows rows)
+    (refresh-table! ui rows)
+    (if imagefile
+      (refresh-glyph! ui imagefile)
+      (clear-screen! ui))))
+
+(defn- open-input!
+  "Replace the review queue with INPUT (image or directory) and load it."
+  [ui input]
+  (reset! (:state* ui) {:files (vec (expand-input input)) :idx 0 :rows []})
+  (load-position! ui))
+
+(defn- open-image!
+  "Ask for a glyph image file and open it."
+  [ui]
+  (let [f (fd/askopenfilename ** :parent (:root ui)
+                              :title "Open glyph image"
+                              :filetypes [("images" "*.png *.jpg *.jpeg *.tif *.tiff")
+                                          ("all files" "*")])]
+    (when-not (str/blank? f)
+      (open-input! ui f))))
+
+(defn- open-dir!
+  "Ask for a glyph image directory and open it as a batch."
+  [ui]
+  (let [d (fd/askdirectory ** :parent (:root ui)  :title "Open glyph directory")]
+    (when-not (str/blank? d)
+      (open-input! ui d))))
+
+(defn- prev-glyph!
+  "Move back one glyph in the review queue."
+  [ui]
+  (when (pos? (:idx @(:state* ui)))
+    (swap! (:state* ui) update :idx dec)
+    (load-position! ui)))
+
+(defn- next-glyph!
+  "Move forward one glyph in the review queue."
+  [ui]
+  (let [{:keys [files idx]} @(:state* ui)]
+    (when (< idx (dec (count files)))
+      (swap! (:state* ui) update :idx inc)
+      (load-position! ui))))
+
+(defn- collect-row!
+  "Merge the live widget values into ROW."
+  [{:keys [sel-var save-var row]}]
+  (assoc row :select (.get sel-var) :save? (.get save-var)))
+
+(defn- save-checked!
+  "SAVE: persist every checked row with a non-empty letter selection."
+  [ui]
+  (let [savable (filter savable-row? (map collect-row! @(:widgets* ui)))
+        saved-count (count savable)]
+    (doseq [row savable]
+      (save-row! (:logger ui) (:corpus-dir ui) (current-file ui) row))
+    (mb/showinfo ** :parent (:root ui)
+                 :title "Saved"
+                 :message (format "Saved %d signs" saved-count))
+    saved-count))
+
+(defn- quit-app!
+  "QUIT: close the application."
+  [ui]
+  (let [root (:root ui)]
+    (.quit root)
+    (.destroy root)))
+
+(defn- build-menu!
+  "File menu: open image / open directory / quit."
+  [root ui]
+  (let [menubar (tk/Menu root)
+        file-menu (tk/Menu menubar ** :tearoff 0)]
+    (doto file-menu
+      (.add_command ** :label "Open image..."
+                    :accelerator "Ctrl-O"
+                    :command (fn [_] (open-image! ui)))
+      (.add_command ** :label "Open directory..."
+                    :command (fn [_] (open-dir! ui)))
+      (.add_separator)
+      (.add_command ** :label "Quit"
+                    :command (fn [_] (quit-app! ui))))
+    (.add_cascade menubar ** :label "File"  :menu file-menu)
+    (.config root ** :menu menubar)))
+
+(defn- build-top-panel!
+  "Top panel: the large central image display frame labelled 'gliph image'."
+  [root photos*]
+  (let [panel (tk/LabelFrame root ** :text "gliph image"  :padx 10  :pady 10)]
+    {:panel panel
+     :glyph-label (doto (tk/Label panel)
+                    (.pack ** :padx 10  :pady 10))
+     :photos* photos*}))
+
+(defn- build-table-panel!
+  "Middle panel: the 'lsigns' table frame."
+  [root]
+  (tk/LabelFrame root ** :text "lsigns"  :padx 10  :pady 10))
+
+(defn- build-controls-panel!
+  "Bottom control cluster: diamond layout with SAVE on top, PREV and NEXT
+   navigation buttons on the left and right, QUIT at the bottom."
+  [root ui]
+  (let [frame (tk/Frame root ** :pady 10)]
+    (doto (tk/Button frame ** :text "SAVE"  :width 12
+                     :command (fn [_] (save-checked! ui)))
+      (.grid ** :row 0  :column 1  :pady 4))
+    (doto (tk/Button frame ** :text "PREV"  :width 12
+                     :command (fn [_] (prev-glyph! ui)))
+      (.grid ** :row 1  :column 0  :padx 20  :pady 4))
+    (doto (tk/Button frame ** :text "NEXT"  :width 12
+                     :command (fn [_] (next-glyph! ui)))
+      (.grid ** :row 1  :column 2  :padx 20  :pady 4))
+    (doto (tk/Button frame ** :text "QUIT"  :width 12
+                     :command (fn [_] (quit-app! ui)))
+      (.grid ** :row 2  :column 1  :pady 4))
+    frame))
+
+;; module entry points
+
+(defn make-ui
+  "Assemble the UI context map shared by all callbacks."
+  [root ctx translators corpus-dir inputs]
+  (merge (build-top-panel! root (atom {}))
+         {:root root
+          :state* (atom {:files (vec inputs) :idx 0 :rows []})
+          :widgets* (atom {})
+          :ctx ctx
+          :translators translators
+          :corpus-dir corpus-dir}))
+
+(defn run-checker!
+  "Run the interactive checker application.
+
+   CTX is the translation context built once by the check action;
+   TRANSLATORS the selected translator names; INPUTS the initial review
+   queue (expanded glyph image paths); CORPUS-DIR the curated corpus
+   output directory."
+  [{:keys [logger] :as ctx} translators inputs corpus-dir]
+  (let [root (tk/Tk)
+        {:keys [panel] :as ui*} (make-ui root ctx translators corpus-dir inputs)
+        table (build-table-panel! root)
+        ui (assoc ui* :table table :logger logger)]
+    (doto root
+      (.title "translator checker")
+      (.geometry "1000x900"))
+    (build-menu! root ui)
+    (.pack (build-controls-panel! root ui) ** :side "bottom"  :fill "x")
+    (.pack panel ** :side "top"  :fill "x")
+    (.pack table ** :side "top"  :fill "both"  :expand true)
+    (.bind root "<Control-o>" (fn [_] (open-image! ui)))
+    (when (seq inputs)
+      (load-position! ui))
+    (.mainloop root)))
+
+(comment
+
+  (require '[steno.translators.diff]
+           '[steno.translators.freq]
+           '[steno.translators.knn])
+
+  (def config {"freq_references" "resources/freq-references.edn"
+               "diff_references" "resources/diff-references.edn"
+               "knn_references" "resources/knn-references.edn"
+               "knn_k" 3})
+  (def translators ["freq" "diff" "knn"])
+  (def ctx (tra/prepare-translations config translators))
+  (def corpus-dir "resources/corpus")
+
+  ;; 1.2 glyph loading: a real extracted glyph converts into a wsign
+  (def glyph-file "tmp/yoga1_12/yoga1_12-01-11.png")
+
+  (def wsign (load-glyph glyph-file))
+  (count wsign)
+  ;; => >= 1
+  (mapv (juxt :ltype count) (map :lineseq wsign))
+  ;; => non-empty vector of [ltype lineseq-size] pairs
+
+  (nil? (load-glyph "does/not/exist.png"))
+  ;; => true
+
+  ;; 1.3 row-model builder
+  (def rows (vec (build-rows ctx translators wsign)))
+  (count rows)
+  ;; => (count wsign)
+
+  (def row (first rows))
+  (:pos row)
+  ;; => 0
+  (keys (:results row))
+  ;; => ("freq" "diff" "knn") in some order
+  (every? vector? (vals (:results row)))
+  ;; => true, each translator contributes a vector of [letter match] pairs
+  (= (:select row) (:best row))
+  ;; => true, selector pre-filled with the best match
+  (:save? row)
+  ;; => true
+
+  ;; 1.4 result formatter
+  (format-chain [["t" 0.91] ["l" 0.75]])
+  ;; => "t(0.91) l(0.75)"
+  (format-chain [])
+  ;; => ""
+  (format-chain [["ge" 0.5]])
+  ;; => "ge(0.50)"
+  (format-results {"freq" [["t" 0.91]] "diff" [["t" 1.0]]})
+  ;; => {"freq" "t(0.91)", "diff" "t(1.00)"}
+
+  ;; 1.5 corpus save data (ADR-0002): annotation stripping
+  (lsign-entry "yoga1_12-01-11.png" 2
+               {:ltype 1 :lineseq [[0 0 128] [0 1 136]] :numseq [136] :letters [[["t" 1.0]]]})
+  ;; => {:ltype 1, :lineseq [[0 0 128] [0 1 136]],
+  ;;     :fileimage "yoga1_12-01-11.png", :row 0, :column 0, :pos 2}
+
+  (entry-filename "yoga1_12-01-11.png" 2)
+  ;; => "yoga1_12-01-11-00-00-2.edn"
+
+  (str (entry-path "resources/corpus" "t" "yoga1_12-01-11.png" 2))
+  ;; => "resources/corpus/t/yoga1_12-01-11-00-00-2.edn"
+
+  ;; saving creates the letter folder and replaces on re-save
+  (import logging)
+  (def tmp-corpus "/tmp/opencode/checker-corpus")
+  (def logger (logging/getLogger "checker-tests"))
+
+  (save-row! logger
+             tmp-corpus "yoga1_12-01-11.png"
+             {:pos 2 :select "ţ" :lsign {:ltype 1 :lineseq [[0 0 128]]}})
+  (letters-list tmp-corpus)
+  ;; => ["ţ"]
+  (utl/load-edn (str (entry-path tmp-corpus "ţ" "yoga1_12-01-11.png" 2)))
+  ;; => {:ltype 1, :lineseq [[0 0 128]], :fileimage "yoga1_12-01-11.png",
+  ;;     :row 0, :column 0, :pos 2}
+  (save-row! logger
+             tmp-corpus "yoga1_12-01-11.png"
+             {:pos 2 :select "ţ" :lsign {:ltype 0 :lineseq [[5 5 128]]}})
+  (utl/load-edn (str (entry-path tmp-corpus "ţ" "yoga1_12-01-11.png" 2)))
+  ;; => replaced entry: {:ltype 0, ..., :pos 2} — same single file, not duplicated
+
+  ;; 1.6 letters list against the project corpus
+  (letters-list corpus-dir)
+  ;; => sorted vector of existing letter folders
+
+  ;; input expansion
+  (expand-input "resources/config.yml")
+  ;; => ["resources/config.yml"]
+  (expand-input "does/not/exist")
+  ;; => []
+  (count (expand-input "tmp/yoga1_12"))
+  ;; => number of png images in the batch
+
+  (image-file? (Path. "resources/config.yml"))
+  ;; => false
+  (image-file? (Path. "tmp/yoga1_12/yoga1_12-01-11.png"))
+  ;; => true
+
+  ;; 1.7 skip filter
+  (savable-row? {:save? true :select "t"})
+  ;; => true
+  (savable-row? {:save? false :select "t"})
+  ;; => false, unchecked box skips the row
+  (savable-row? {:save? true :select ""})
+  ;; => false, empty selection skips the row
+
+  ;;
+  )

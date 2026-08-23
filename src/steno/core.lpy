@@ -4,6 +4,7 @@
    [basilisp.io :as bio]
    [basilisp.pprint :as pprint]
    [clojure.string :as str]
+   [steno.checker :as chk]
    [steno.converter :as cnv]
    [steno.corpus :as corpus]
    [steno.extractor :as ext]
@@ -153,8 +154,22 @@
     (.info logger "Renormalize %s corpus" corpus-dir)
     (corpus/walk-corpus! corpus-dir identity renormalize-lsigns!)))
 
+(defn action-check
+  "Interactive validation of translator proposals on glyph images."
+  [config]
+  (let [infile (get config "input")
+        outdir (get config "output" default-corpus-dir)
+        translators (get config "translators")
+        logger (:logger config)]
+    (.info logger "Check %s using %s" infile translators)
+    (chk/run-checker! (tra/prepare-translations config translators)
+                      translators
+                      (chk/expand-input infile)
+                      outdir)))
+
 (def actions
   {"help"               action-help
+   "check"              action-check
    "list-config"        action-list-config
    "make-corpus"        action-make-corpus
    "make-references"    action-make-references

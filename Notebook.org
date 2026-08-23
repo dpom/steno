@@ -6937,5 +6937,25 @@ freq-ref
 
 - incerc sa inteleg codul din translatorul knn:
   #+begin_src clojure
-  
+  (require '[steno.translators.knn :as knn])
+
+  (knn/get-diff [136 136 136 8] [136 136 136 8])
+  ;; => 32
+
+  (python/bin 136)
+  ;; => "0b10001000"
+
+
+  (bit-xor 136 136)
+  ;; => 0
+
+  (bit-not (bit-xor 136 136))
+  ;; => -1
+
+  (nth knn/one-bit-num -1)
+  ;; => 8
+
+
+
+
   #+end_src
