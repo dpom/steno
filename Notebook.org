@@ -6955,7 +6955,28 @@ freq-ref
   (nth knn/one-bit-num -1)
   ;; => 8
 
-
-
-
   #+end_src
+
+* 2026-08-24
+
+- am terminat de implementat o noua comanda =check= care deschide un GUI cu imagini gliph si traducerea lor
+- cu ajutorul acestei comenzi pot pune la punct o procedura de lucru pentru imbunatatirea corpusului si referintelor:
+  1. Scanez un document steno -> =steno.png=
+  2. Extrag gliph-urile
+     #+begin_src shell
+bb app save-glyphs -i steno.png -o tmp/steno
+     #+end_src
+  3. Iterez prin gliph-uri folosind:
+     #+begin_src shell
+bb app check -i tmp/steno
+     #+end_src
+     pentru fiecare gliph:
+     1. pentru fiecare =lsign=:
+        1. verific traducerile si setez traducerea corecta
+        2. daca =lsign= este relevant check save
+        3. salvez toate =lsign= selectate in corpus
+     2. daca gliph curent a fost procesat complet il sterg daca nu il las pentru procesari ulterioare
+  4. Regenerez referintele cu noul corpus:
+     #+begin_src shell
+bb app make-references
+     #+end_src

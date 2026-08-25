@@ -22,12 +22,12 @@
   (:import
    base64
    cv2
-    [pathlib :refer [Path]]
-    [tempfile :as tf]
-    [tkinter :as tk]
-    [matplotlib.figure :as mfig]
-    [matplotlib.backends.backend_tkagg :as tkagg]
-    [tkinter.filedialog :as fd]
+   [pathlib :refer [Path]]
+   [tempfile :as tf]
+   [tkinter :as tk]
+   [matplotlib.figure :as mfig]
+   [matplotlib.backends.backend_tkagg :as tkagg]
+   [tkinter.filedialog :as fd]
    [tkinter.messagebox :as mb]
    [tkinter.ttk :as ttk]))
 
@@ -242,11 +242,13 @@
 (defn- refresh-glyph!
   "Show the current glyph in the top 'gliph image' frame with x/y axes."
   [ui imagefile]
-  (let [image (cv2/imread imagefile cv2/IMREAD_GRAYSCALE)]
-    (when-not (nil? image)
-      (let [ax (:glyph-ax ui)]
+  (let [orig-image (cv2/imread imagefile cv2/IMREAD_GRAYSCALE)]
+    (when-not (nil? orig-image)
+      (let [image (img/process-image orig-image)
+            ax (:glyph-ax ui)]
         (.clear ax)
         (.imshow ax image ** :cmap "gray")
+        (.set_title ax imagefile)
         (.set_xlabel ax "x")
         (.set_ylabel ax "y")
         (.axis ax "on")
@@ -324,8 +326,8 @@
         file (nth files idx nil)]
     (when (and file (.exists (Path. file)))
       (when (mb/askyesno ** :parent (:root ui)
-                          :title "Delete glyph"
-                          :message (str "Delete " file "?"))
+                         :title "Delete glyph"
+                         :message (str "Delete " file "?"))
         (.unlink (Path. file))
         (let [new-files (vec (keep-indexed (fn [i f] (when (not= i idx) f)) files))
               new-idx (if (empty? new-files) 0 (min idx (dec (count new-files))))]

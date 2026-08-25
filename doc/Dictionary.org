@@ -1,10 +1,11 @@
 * Project Dictionary
 
-- cell :: vector [x y]
 - binary matrix :: 2d matrix containing only 0 and 1
+- cell :: vector [x y]
 - cnum :: cell number (byte) - neighborhood map - structure: E SE S SV V NV N NE
-- lineseq :: sequence of adjacent cells represented as [x y cnum]
-- ltype :: line type: 0 - loop, 1 - line
 - cnumseq :: sequence of adjacent cell cnums
+- gliph :: a stenografic symbol (usualy a word)
+- lineseq :: sequence of adjacent cells represented as [x y cnum]
 - lsign :: a map containing a lineseq, a ltype, and line translation
+- ltype :: line type: 0 - loop, 1 - line
 - wsign :: a sequence of lsign which could be translated in a word
