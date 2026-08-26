@@ -6980,3 +6980,1345 @@ bb app check -i tmp/steno
      #+begin_src shell
 bb app make-references
      #+end_src
+
+* 2026-08-25
+
+- incerc o noua abordare pentru detectia formelor grafice elementare (linie, semicerc, oval si cerc):
+  #+begin_src clojure
+(import
+ cv2
+ [numpy :as np]
+ [skimage.morphology :as sm])
+
+
+(defn- get-neighbors-count
+  "Calculeaza numarul de vecini pentru fiecare pixel dintr-un schelet 2D."
+  [skel-bin]
+  (let [kernel (np/array [[1 1 1]
+                          [1 0 1]
+                          [1 1 1]] np/uint8)]
+    (cv2/filter2D skel-bin cv2/CV_8U kernel)))
+
+(defn extrage-elemente-grafice
+  "Extrage elementele grafice din imagine si le returneaza intr-un vector
+   ordonat de la stanga la dreapta si de sus in jos."
+  [cale-imagine]
+  (let [;; 1. Incarcare si binarizare
+        img (cv2/imread cale-imagine cv2/IMREAD_GRAYSCALE)
+        thresh (.get (cv2/threshold img 127 255 cv2/THRESH_BINARY_INV) 1)
+
+        ;; 2. Skeletonization (subtiere)
+        thresh-bin (np/floor_divide thresh 255)
+        skel (sm/skeletonize thresh-bin)
+        skel-uint8 (np/uint8 skel)
+
+        ;; 3. Identificare si eliminare puncte de intersectie (vecini > 2)
+        neighbors (get-neighbors-count skel-uint8)
+        junctions (np/logical_and skel (np/greater neighbors 2))
+
+        ;; Taiem scheletul la nivelul joncțiunilor pentru a separa componentele
+        skel-broken (np/logical_and skel (np/logical_not junctions))
+        skel-broken-uint8 (np/uint8 skel-broken)
+
+        ;; 4. Etichetare componente conexe (segmentare elemente)
+        num-labels (get (cv2/connectedComponents skel-broken-uint8) 0)
+        labels (get (cv2/connectedComponents skel-broken-uint8) 1)
+
+        ;; 5. Extragere elemente si calculare coordonate pentru sortare
+        raw-elements (atom [])]
+
+    (doseq [i (range 1 num-labels)]
+      (let [mask (np/equal labels i)
+            ;; Filtram zgomotele foarte mici (pixeli izolati)
+            pixel-count (np/sum mask)]
+        (when (> pixel-count 5)
+          (let [coords (np/where mask)
+                min-y (np/min (get coords 0))
+                min-x (np/min (get coords 1))
+                element-img (np/zeros_like img)]
+            ;; Copiem pixelii elementului curent pe o masca separata
+            (aset element-img mask 255)
+            (swap! raw-elements conj {:min-y min-y
+                                      :min-x min-x
+                                      :image element-img})))))
+
+    ;; 6. Sortare: de la sus la jos (min-y) si de la stanga la dreapta (min-x)
+    (let [sorted-elements (sort-by (fn [elem] [(:min-y elem) (:min-x elem)]) @raw-elements)]
+      ;; Returneaza vectorul doar cu imaginile elementelor extrase
+      (vec (map :image sorted-elements)))))
+
+(defn extrage-elemente-grafice
+  "Extrage elementele grafice din imagine si le returneaza intr-un vector
+   ordonat de la stanga la dreapta si de sus in jos."
+  [cale-imagine]
+  (let [img (cv2/imread cale-imagine cv2/IMREAD_GRAYSCALE)
+
+        ;; cv2.threshold returneaza un tuple Python (retval, threshold_image)
+        ;; Folosim (nth ...) pentru accesarea elementelor din tuple
+        thresh (second (cv2/threshold img 127 255 cv2/THRESH_BINARY_INV))
+
+        ;; Skeletonization
+        thresh-bin (np/floor_divide thresh 255)
+        skel (sm/skeletonize thresh-bin)
+        skel-uint8 (np/uint8 skel)
+
+        ;; Eliminare jonctiuni (pixeli cu mai mult de 2 vecini)
+        neighbors (get-neighbors-count skel-uint8)
+        junctions (np/logical_and skel (np/greater neighbors 2))
+        skel-broken (np/logical_and skel (np/logical_not junctions))
+        skel-broken-uint8 (np/uint8 skel-broken)
+
+        ;; cv2.connectedComponents returneaza un tuple Python (num_labels, labels)
+        cc-res (cv2/connectedComponents skel-broken-uint8)
+        num-labels (first cc-res)
+        labels (second cc-res)
+
+        raw-elements (atom [])]
+
+    (doseq [i (range 1 num-labels)]
+      (let [mask (np/equal labels i)
+            pixel-count (np/sum mask)]
+        (when (> pixel-count 5)
+          (let [coords (np/where mask)
+                ;; numpy.where returneaza un tuple (y_coords, x_coords)
+                min-y (np/min (first coords))
+                min-x (np/min (second coords))
+                element-img (np/zeros_like img)]
+
+            ;; Atribuire masca in NumPy
+            (aset element-img mask 255)
+
+            (swap! raw-elements conj {:min-y min-y
+                                      :min-x min-x
+                                      :image element-img})))))
+
+    ;; Sortare sus -> jos (min-y) si stanga -> dreapta (min-x)
+    (let [sorted-elements (sort-by (fn [elem] [(:min-y elem) (:min-x elem)]) @raw-elements)]
+      (vec (map :image sorted-elements)))))
+
+
+
+;; Executie
+(def elemente (extrage-elemente-grafice "tmp/yoga_001_1/yoga_001_1-02-00.png"))
+(count elemente)
+;; => 8
+
+(require '[steno.show :as show])
+
+(show/show-image (first elemente))
+
+(show/show-image (second elemente))
+
+(show/show-image (nth elemente ))
+
+(def el-01-00 (extrage-elemente-grafice "tmp/yoga_001_1/yoga_001_1-01-00.png"))
+(count el-01-00)
+;; => 37
+
+
+
+(show/show-image (nth el-01-00 13))
+
+
+(defn extrage-elemente-grafice
+  "Extrage elementele grafice din imagine.
+   Limițează marimea minima si grupeaza segmentele mici cu cele adiacente."
+  [cale-imagine & {:keys [min-area merge-dist] :or {min-area 15 merge-dist 5}}]
+  (let [img (cv2/imread cale-imagine cv2/IMREAD_GRAYSCALE)
+        thresh (second (cv2/threshold img 127 255 cv2/THRESH_BINARY_INV))
+
+        ;; 1. Subtiere (Skeletonization)
+        thresh-bin (np/floor_divide thresh 255)
+        skel (sm/skeletonize thresh-bin)
+        skel-uint8 (np/uint8 skel)
+
+        ;; 2. Separare preliminara prin eliminarea jonctiunilor
+        neighbors (get-neighbors-count skel-uint8)
+        junctions (np/logical_and skel (np/greater neighbors 2))
+        skel-broken (np/logical_and skel (np/logical_not junctions))
+
+        ;; 3. Dilatam usor segmentele pentru a reconecta componentele extrem de apropiate
+        kernel-merge (cv2/getStructuringElement cv2/MORPH_ELLIPSE [merge-dist merge-dist])
+        dilated-broken (cv2/dilate (np/uint8 skel-broken) kernel-merge)
+
+        ;; Aplicam scheletul original peste componentele unite
+        skel-grouped (np/logical_and skel (np/greater dilated-broken 0))
+
+        ;; 4. Etichetare componente conexe dupa grupare
+        cc-res (cv2/connectedComponents (np/uint8 skel-grouped))
+        num-labels (first cc-res)
+        labels (second cc-res)
+
+        raw-elements (atom [])]
+
+    (doseq [i (range 1 num-labels)]
+      (let [mask (np/equal labels i)
+            pixel-count (np/sum mask)]
+
+        ;; Limiteaza inferior marimea elementului (Ignora daca sub min-area)
+        (when (>= pixel-count min-area)
+          (let [coords (np/where mask)
+                min-y (np/min (first coords))
+                min-x (np/min (second coords))
+                element-img (np/zeros_like img)]
+
+            (aset element-img mask 255)
+            (swap! raw-elements conj {:min-y min-y
+                                      :min-x min-x
+                                      :image element-img})))))
+
+    ;; 5. Sortare sus -> jos si stanga -> dreapta
+    (let [sorted-elements (sort-by (fn [elem] [(:min-y elem) (:min-x elem)]) @raw-elements)]
+      (vec (map :image sorted-elements)))))
+
+
+(def el-02-00 (extrage-elemente-grafice "tmp/yoga_001_1/yoga_001_1-02-00.png"))
+(count el-02-00)
+;; => 3
+
+(show/show-image (nth el-02-00 2))
+
+(def el-01-00 (extrage-elemente-grafice "tmp/yoga_001_1/yoga_001_1-01-00.png"))
+(count el-01-00)
+;; => 7
+
+(show/show-image (nth el-01-00 6))
+
+(defn extrage-elemente-grafice
+  "Extrage segmentele elementare dintr-o formă curbată continuă
+   folosind punctele de inflexiune (schimbare de direcție / colțuri)."
+  [cale-imagine & {:keys [min-area] :or {min-area 20}}]
+  (let [img (cv2/imread cale-imagine cv2/IMREAD_GRAYSCALE)
+        thresh (second (cv2/threshold img 127 255 cv2/THRESH_BINARY_INV))
+
+        ;; 1. Găsim conturul extern al formei
+        contours-res (cv2/findContours thresh cv2/RETR_EXTERNAL cv2/CHAIN_APPROX_NONE)
+        ;; În OpenCV 4+, findContours returnează [contours, hierarchy]
+        contours (first contours-res)]
+
+    (if (empty? contours)
+      []
+      (let [;; Luăm cel mai mare contur (forma principală)
+            cnt (let [cnts (vec contours)]
+                  (reduce (fn [c1 c2]
+                            (if (> (cv2/contourArea c2) (cv2/contourArea c1)) c2 c1))
+                          cnts))
+
+            ;; 2. Aproximare Douglas-Peucker pentru a simplifica curba în segmente liniare
+            ;; Modificarea epsilon-ului (al doilea argument) controlează finisajul segmentării
+            epsilon (* 0.03 (cv2/arcLength cnt true))
+            approx (cv2/approxPolyDP cnt epsilon true)
+
+            ;; Convertim punctele aproximate într-un vector de coordonate
+            pts (mapv (fn [pt] [(get (get pt 0) 0) (get (get pt 0) 1)]) (vec approx))
+
+            raw-elements (atom [])]
+
+        ;; 3. Împărțim conturul general în segmente individuale bazate pe punctele de inflexiune găsite
+        (when (> (count pts) 1)
+          (doseq [i (range (dec (count pts)))]
+            (let [p1 (get pts i)
+                  p2 (get pts (inc i))
+                  element-img (np/zeros_like img)
+
+                  ;; Desenăm linia/segmentul curent pe o mască nouă
+                  _ (cv2/line element-img
+                              (tuple (first p1) (second p1))
+                              (tuple (first p2) (second p2))
+                              255
+                              :thickness 3)
+
+                  ;; Intersectăm segmentul idealizat cu forma originală binarizată
+                  masked-segment (np/bitwise_and element-img thresh)
+                  pixel-count (np/sum (np/greater masked-segment 0))]
+
+              (when (>= pixel-count min-area)
+                (let [coords (np/where (np/greater masked-segment 0))
+                      min-y (np/min (first coords))
+                      min-x (np/min (second coords))]
+                  (swap! raw-elements conj {:min-y min-y
+                                            :min-x min-x
+                                            :image masked-segment}))))))
+
+        ;; 4. Sortare de la stânga la dreapta / sus la jos
+        (let [sorted-elements (sort-by (fn [elem] [(:min-y elem) (:min-x elem)]) @raw-elements)]
+          (vec (map :image sorted-elements)))))))
+
+
+(def el-01-00 (extrage-elemente-grafice "tmp/yoga_001_1/yoga_001_1-01-00.png"))
+(count el-01-00)
+
+
+(defn- coords->tuple
+  "Converteste un vector [x y] intr-un tuple Python valid."
+  [pt]
+  (python/tuple [(int (first pt)) (int (second pt))]))
+
+(defn extrage-elemente-grafice
+  "Extrage elementele grafice (drepte, semicircuri) dintr-o forma curba/steno continua
+   si le returneaza intr-un vector ordonat (top-down, left-right)."
+  [cale-imagine & {:keys [min-area angle-threshold] :or {min-area 15 angle-threshold 0.6}}]
+  (let [img (cv2/imread cale-imagine cv2/IMREAD_GRAYSCALE)
+        thresh (second (cv2/threshold img 127 255 cv2/THRESH_BINARY_INV))
+
+        ;; 1. Obținem scheletul (traseul de 1px)
+        thresh-bin (np/floor_divide thresh 255)
+        skel (sm/skeletonize thresh-bin)
+
+        ;; Extragere pixeli din schelet
+        y-x-coords (np/where skel)
+        y-pts (vec (first y-x-coords))
+        x-pts (vec (second y-x-coords))
+
+        ;; Punctele ordonate de-a lungul formei (stânga -> dreapta / sus -> jos)
+        pts-raw (mapv (fn [x y] [x y]) x-pts y-pts)
+        pts (vec (sort-by (fn [p] [(second p) (first p)]) pts-raw))
+        num-pts (count pts)]
+
+    (if (< num-pts 10)
+      []
+      (let [;; 2. Identificare puncte de inflexiune/colțuri prin unghiul local
+            split-indices (atom [0])
+            step 4] ;; pasul pentru calculul vectorilor de panta
+
+        (doseq [i (range step (- num-pts step))]
+          (let [[x1 y1] (get pts (- i step))
+                [x2 y2] (get pts i)
+                [x3 y3] (get pts (+ i step))
+
+                ;; Vectori de direcție
+                v1 [(- x2 x1) (- y2 y1)]
+                v2 [(- x3 x2) (- y3 y2)]
+
+                ;; Produsul scalar și normele vectorilor
+                dot (+ (* (first v1) (first v2)) (* (second v1) (second v2)))
+                norm1 (np/sqrt (+ (* (first v1) (first v1)) (* (second v1) (second v1))))
+                norm2 (np/sqrt (+ (* (first v2) (first v2)) (* (second v2) (second v2))))]
+
+            (when (and (> norm1 0) (> norm2 0))
+              (let [cos-angle (/ dot (* norm1 norm2))]
+                ;; Dacă schimbarile de direcție sunt bruște (colț/joncțiune de curbă)
+                (when (< cos-angle angle-threshold)
+                  (when (> (- i (last @split-indices)) 8)
+                    (swap! split-indices conj i)))))))
+
+        (swap! split-indices conj (dec num-pts))
+
+        ;; 3. Reconstrucția segmentelor individuale (drepte / semicircuri)
+        (let [raw-elements (atom [])
+              indices @split-indices]
+
+          (doseq [k (range (dec (count indices)))]
+            (let [start-idx (get indices k)
+                  end-idx (get indices (inc k))
+                  segment-pts (subvec pts start-idx (inc end-idx))
+
+                  element-img (np/zeros_like img)]
+
+              ;; Desenăm traseul exact al segmentului
+              (doseq [j (range (dec (count segment-pts)))]
+                (let [p1 (coords->tuple (get segment-pts j))
+                      p2 (coords->tuple (get segment-pts (inc j)))]
+                  (cv2/line element-img p1 p2 255 :thickness 3)))
+
+              ;; Aplicăm masca pe forma originală pentru a păstra grosimea inițială
+              (let [masked-segment (np/bitwise_and element-img thresh)
+                    pixel-count (np/sum (np/greater masked-segment 0))]
+
+                (when (>= pixel-count min-area)
+                  (let [coords (np/where (np/greater masked-segment 0))
+                        min-y (np/min (first coords))
+                        min-x (np/min (second coords))]
+                    (swap! raw-elements conj {:min-y min-y
+                                              :min-x min-x
+                                              :image masked-segment}))))))
+
+          ;; 4. Sortare finală după poziția în imagine
+          (let [sorted-elements (sort-by (fn [elem] [(:min-y elem) (:min-x elem)]) @raw-elements)]
+            (vec (map :image sorted-elements))))))))
+
+(def el-01-00 (extrage-elemente-grafice "tmp/yoga_001_1/yoga_001_1-01-00.png"))
+(count el-01-00)
+
+(defn- coords->tuple
+  "Converteste coordonatele [x y] intr-un tuple Python cu int-uri native."
+  [pt]
+  (python/tuple [(int (first pt)) (int (second pt))]))
+
+(defn extrage-elemente-grafice
+  "Extrage elementele grafice (drepte, semicircuri) dintr-o forma curba/steno continua
+   si le returneaza intr-un vector ordonat (top-down, left-right)."
+  [cale-imagine & {:keys [min-area angle-threshold] :or {min-area 15 angle-threshold 0.6}}]
+  (let [img (cv2/imread cale-imagine cv2/IMREAD_GRAYSCALE)
+        thresh (second (cv2/threshold img 127 255 cv2/THRESH_BINARY_INV))
+
+        ;; 1. Scheletizare
+        thresh-bin (np/floor_divide thresh 255)
+        skel (sm/skeletonize thresh-bin)
+
+        ;; Coordonate pixeli schelet
+        y-x-coords (np/where skel)
+        y-pts (vec (first y-x-coords))
+        x-pts (vec (second y-x-coords))
+
+        pts-raw (mapv (fn [x y] [(int x) (int y)]) x-pts y-pts)
+        pts (vec (sort-by (fn [p] [(second p) (first p)]) pts-raw))
+        num-pts (count pts)]
+
+    (if (< num-pts 10)
+      []
+      (let [split-indices (atom [0])
+            step 4]
+
+        ;; 2. Detectare schimbari de directie (unghi local)
+        (doseq [i (range step (- num-pts step))]
+          (let [[x1 y1] (get pts (- i step))
+                [x2 y2] (get pts i)
+                [x3 y3] (get pts (+ i step))
+
+                v1 [(- x2 x1) (- y2 y1)]
+                v2 [(- x3 x2) (- y3 y2)]
+
+                dot (+ (* (first v1) (first v2)) (* (second v1) (second v2)))
+                norm1 (np/sqrt (+ (* (first v1) (first v1)) (* (second v1) (second v1))))
+                norm2 (np/sqrt (+ (* (first v2) (first v2)) (* (second v2) (second v2))))]
+
+            (when (and (> norm1 0) (> norm2 0))
+              (let [cos-angle (/ dot (* norm1 norm2))]
+                (when (< cos-angle angle-threshold)
+                  (when (> (- i (last @split-indices)) 8)
+                    (swap! split-indices conj i)))))))
+
+        (swap! split-indices conj (dec num-pts))
+
+        ;; 3. Reconstructie segmente
+        (let [raw-elements (atom [])
+              indices @split-indices]
+
+          (doseq [k (range (dec (count indices)))]
+            (let [start-idx (get indices k)
+                  end-idx (get indices (inc k))
+                  segment-pts (subvec pts start-idx (inc end-idx))
+                  element-img (np/zeros_like img)]
+
+              ;; Desenare traseu folosind argumente pozitionale
+              ;; Semnatura: cv2.line(img, pt1, pt2, color, thickness)
+              (doseq [j (range (dec (count segment-pts)))]
+                (let [p1 (coords->tuple (get segment-pts j))
+                      p2 (coords->tuple (get segment-pts (inc j)))]
+                  (cv2/line element-img p1 p2 255 3)))
+
+              (let [masked-segment (np/bitwise_and element-img thresh)
+                    pixel-count (np/sum (np/greater masked-segment 0))]
+
+                (when (>= pixel-count min-area)
+                  (let [coords (np/where (np/greater masked-segment 0))
+                        min-y (np/min (first coords))
+                        min-x (np/min (second coords))]
+                    (swap! raw-elements conj {:min-y min-y
+                                              :min-x min-x
+                                              :image masked-segment}))))))
+
+          ;; 4. Sortare
+          (let [sorted-elements (sort-by (fn [elem] [(:min-y elem) (:min-x elem)]) @raw-elements)]
+            (vec (map :image sorted-elements))))))))
+
+(def el-01-00 (extrage-elemente-grafice "tmp/yoga_001_1/yoga_001_1-01-00.png"))
+(count el-01-00)
+;; => 38
+
+
+(defn- ordoneaza-traseu-schelet
+  "Ordoneaza pixelii din schelet ca o secventa continua conectata cap-la-cap."
+  [pts-vec]
+  (if (empty? pts-vec)
+    []
+    (loop [unvisited (set (rest pts-vec))
+           current (first pts-vec)
+           path [current]]
+      (if (empty? unvisited)
+        path
+        (let [;; Gaseste cel mai apropiat pixel nevizitat
+              next-pt (apply min-key
+                             (fn [[x y]]
+                               (let [dx (- x (first current))
+                                     dy (- y (second current))]
+                                 (+ (* dx dx) (* dy dy))))
+                             unvisited)]
+          (recur (disj unvisited next-pt)
+                 next-pt
+                 (conj path next-pt)))))))
+
+(defn extrage-elemente-grafice
+  "Extrage exact elementele grafice primare dintr-o forma continua."
+  [cale-imagine & {:keys [min-area smooth-window cos-threshold]
+                   :or {min-area 20 smooth-window 7 cos-threshold 0.4}}]
+  (let [img (cv2/imread cale-imagine cv2/IMREAD_GRAYSCALE)
+        thresh (second (cv2/threshold img 127 255 cv2/THRESH_BINARY_INV))
+
+        ;; 1. Netezire imagine initiala pentru eliminarea zgomotului de pe margini
+        kernel-blur (cv2/getStructuringElement cv2/MORPH_ELLIPSE [3 3])
+        thresh-clean (cv2/morphologyEx thresh cv2/MORPH_OPEN kernel-blur)
+
+        ;; 2. Scheletizare
+        thresh-bin (np/floor_divide thresh-clean 255)
+        skel (sm/skeletonize thresh-bin)
+
+        y-x-coords (np/where skel)
+        y-pts (vec (first y-x-coords))
+        x-pts (vec (second y-x-coords))
+
+        pts-raw (mapv (fn [x y] [(int x) (int y)]) x-pts y-pts)
+        ;; Ordonare topologiva continua
+        pts (ordoneaza-traseu-schelet pts-raw)
+        num-pts (count pts)]
+
+    (if (< num-pts (* smooth-window 3))
+      []
+      (let [split-indices (atom [0])
+            w smooth-window]
+
+        ;; 3. Detectare puncte de inflexiune majore (colturi/schimbari bruse de curbura)
+        (doseq [i (range w (- num-pts w))]
+          (let [[x1 y1] (get pts (- i w))
+                [x2 y2] (get pts i)
+                [x3 y3] (get pts (+ i w))
+
+                v1 [(- x2 x1) (- y2 y1)]
+                v2 [(- x3 x2) (- y3 y2)]
+
+                dot (+ (* (first v1) (first v2)) (* (second v1) (second v2)))
+                norm1 (np/sqrt (+ (* (first v1) (first v1)) (* (second v1) (second v1))))
+                norm2 (np/sqrt (+ (* (first v2) (first v2)) (* (second v2) (second v2))))]
+
+            (when (and (> norm1 0) (> norm2 0))
+              (let [cos-angle (/ dot (* norm1 norm2))]
+                ;; Salvam doar inflecțiunile foarte pronuntate
+                (when (< cos-angle cos-threshold)
+                  (when (> (- i (last @split-indices)) (* w 2))
+                    (swap! split-indices conj i)))))))
+
+        (swap! split-indices conj (dec num-pts))
+
+        ;; 4. Reconstructie masca pentru cele 3 segmente
+        (let [raw-elements (atom [])
+              indices @split-indices]
+
+          (doseq [k (range (dec (count indices)))]
+            (let [start-idx (get indices k)
+                  end-idx (get indices (inc k))
+                  segment-pts (subvec pts start-idx (inc end-idx))
+                  element-img (np/zeros_like img)]
+
+              (doseq [j (range (dec (count segment-pts)))]
+                (let [p1 (python/tuple [(int (first (get segment-pts j)))
+                                        (int (second (get segment-pts j)))])
+                      p2 (python/tuple [(int (first (get segment-pts (inc j))))
+                                        (int (second (get segment-pts (inc j))))])]
+                  (cv2/line element-img p1 p2 255 4)))
+
+              (let [masked-segment (np/bitwise_and element-img thresh-clean)
+                    pixel-count (np/sum (np/greater masked-segment 0))]
+
+                (when (>= pixel-count min-area)
+                  (let [coords (np/where (np/greater masked-segment 0))
+                        min-y (np/min (first coords))
+                        min-x (np/min (second coords))]
+                    (swap! raw-elements conj {:min-y min-y
+                                              :min-x min-x
+                                              :image masked-segment}))))))
+
+          ;; 5. Sortare de sus in jos
+          (let [sorted-elements (sort-by (fn [elem] [(:min-y elem) (:min-x elem)]) @raw-elements)]
+            (vec (map :image sorted-elements))))))))
+
+(def el-01-00 (extrage-elemente-grafice "tmp/yoga_001_1/yoga_001_1-01-00.png"))
+(count el-01-00)
+;; => 18
+
+(def el-02-00 (extrage-elemente-grafice "tmp/yoga_001_1/yoga_001_1-02-00.png"))
+(count el-02-00)
+;; => 8
+
+(show/show-image (nth el-01-00 7))
+
+(import
+ cv2
+ [numpy :as np]
+ [skimage.morphology :as skimage-morphology]
+ [networkx :as nx]
+ )
+
+(require '[steno.show :as show])
+
+
+(defn- build-skeleton-graph
+  "Construieste un graf NetworkX direct din pixelii scheletului 2D."
+  [skel]
+  (let [G (nx/Graph)
+        coords (np/where skel)
+        y-pts (vec (first coords))
+        x-pts (vec (second coords))
+        pts-set (set (map (fn [x y] [(int x) (int y)]) x-pts y-pts))]
+
+    (doseq [[x y] pts-set]
+      (.add_node G (python/tuple [x y]))
+      ;; Conectam pixelul cu toti cei 8 vecini adiacenti din schelet
+      (doseq [dx [-1 0 1]
+              dy [-1 0 1]]
+        (when-not (and (= dx 0) (= dy 0))
+          (let [nx-pt [(+ x dx) (+ y dy)]]
+            (when (contains? pts-set nx-pt)
+              (.add_edge G (python/tuple [x y]) (python/tuple [nx-pt 0] (nx-pt 1))))))))
+    G))
+
+(defn extrage-elemente-grafice
+  "1. Filtreaza zgomotul -> 2. Scheletizeaza -> 3. Extrage segmentele primare prin Grafuri."
+  [cale-imagine & {:keys [min-length] :or {min-length 10}}]
+  (let [img (cv2/imread cale-imagine cv2/IMREAD_GRAYSCALE)
+        thresh (second (cv2/threshold img 127 255 cv2/THRESH_BINARY_INV))
+
+        ;; STEP 1: Eliminare zgomot marginal prin operatii morfologice
+        kernel (cv2/getStructuringElement cv2/MORPH_ELLIPSE [3 3])
+        thresh-clean (cv2/morphologyEx thresh cv2/MORPH_OPEN kernel)
+
+        ;; STEP 2: SKELETIZARE (Inainte de orice analiza topologica)
+        thresh-bin (np/floor_divide thresh-clean 255)
+        skel (skimage-morphology/skeletonize thresh-bin)
+
+        ;; STEP 3: Constructie Graf din Schelet
+        G (build-skeleton-graph skel)
+
+        ;; Identificare noduri critice (capete cu grad 1 sau colțuri/ramificații cu grad > 2)
+        nodes (vec (.nodes G))
+        critical-nodes (filter (fn [node]
+                                 (let [deg (.degree G node)]
+                                   (or (= deg 1) (> deg 2))))
+                               nodes)
+
+        ;; STEP 4: Extragere drumuri/segmente unice intre nodurile critice
+        raw-elements (atom [])]
+
+    ;; Eliminam temporar nodurile de intersectie (>2) pentru a izola muchiile
+    (let [junctions (filter (fn [n] (> (.degree G n) 2)) nodes)
+          G-sub (.copy G)]
+      (doseq [j junctions]
+        (.remove_node G-sub j))
+
+      ;; Fiecare componenta conexa rămasă în graf este un element grafic elementar!
+      (doseq [comp (nx/connected_components G-sub)]
+        (when (>= (count comp) min-length)
+          (let [element-img (np/zeros_like img)]
+            ;; Desenam pixelii componentei pe o masca
+            (doseq [node comp]
+              (let [x (first node)
+                    y (second node)]
+                (aset element-img y x 255)))
+
+            ;; Dilatam 1px pentru a recupera continuitatea si mascam cu imaginea curatata
+            (def elem-dilated (cv2/dilate element-img kernel :iterations 2))
+            (def masked-segment (np/bitwise_and elem-dilated thresh-clean))
+
+            (let [coords (np/where (np/greater masked-segment 0))
+                  min-y (np/min (first coords))
+                  min-x (np/min (second coords))]
+              (swap! raw-elements conj {:min-y min-y
+                                        :min-x min-x
+                                        :image masked-segment}))))))
+
+    ;; STEP 5: Ordonare Top-Down / Left-Right
+    (let [sorted-elements (sort-by (fn [elem] [(:min-y elem) (:min-x elem)]) @raw-elements)]
+      (vec (map :image sorted-elements)))))
+
+(def el-02-00 (extrage-elemente-grafice "tmp/yoga_001_1/yoga_001_1-02-00.png"))
+(count el-02-00)
+
+(import
+ [skimage.morphology :as skimage-morphology]
+ [skimage.graph :as skimage-graph]
+ [networkx :as nx]
+ [numpy :as np]
+ cv2)
+
+(defn extrage-elemente-grafice
+  "Extrage elementele grafice (segmente, arce) dintr-o imagine folosind
+   Scheletizarea si construirea automata a grafului via scikit-image."
+  [cale-imagine & {:keys [min-length] :or {min-length 8}}]
+  (let [img (cv2/imread cale-imagine cv2/IMREAD_GRAYSCALE)
+        thresh (second (cv2/threshold img 127 255 cv2/THRESH_BINARY_INV))
+
+        ;; 1. Curățare zgomot marginal
+        kernel (cv2/getStructuringElement cv2/MORPH_ELLIPSE [3 3])
+        thresh-clean (cv2/morphologyEx thresh cv2/MORPH_OPEN kernel)
+
+        ;; 2. SKELETIZARE (Subțiere la 1px)
+        thresh-bin (np/floor_divide thresh-clean 255)
+        skel (skimage-morphology/skeletonize thresh-bin)
+
+        ;; 3. Conversie automată a scheletului în Graf NetworkX
+        graph-data (skimage-graph/pixel_graph skel ** :edge_dist 1.5)
+        adj-matrix (first graph-data)
+        nodes-coords (second graph-data)
+
+        G (nx/from_scipy_sparse_array adj-matrix)
+
+        ;; 4. Izolarea segmentelor elementare (eliminăm nodurile cu grad > 2)
+        nodes (vec (.nodes G))
+        junctions (filter (fn [n] (> (.degree G n) 2)) nodes)
+        G-sub (.copy G)]
+
+    (doseq [j junctions]
+      (.remove_node G-sub j))
+
+    (let [raw-elements (atom [])]
+      (doseq [comp (nx/connected_components G-sub)]
+        (when (>= (count comp) min-length)
+          (let [element-img (np/zeros_like img)]
+
+            (doseq [node-idx comp]
+              (let [coord (get nodes-coords node-idx)
+                    y (int (get coord 0))
+                    x (int (get coord 1))]
+                (aset element-img y x 255)))
+
+            (let [elem-dilated (cv2/dilate element-img kernel ** :iterations 2)
+                  masked-segment (np/bitwise_and elem-dilated thresh-clean)
+                  coords (np/where (np/greater masked-segment 0))]
+
+              (when (> (np/sum (np/greater masked-segment 0)) 0)
+                (let [min-y (np/min (first coords))
+                      min-x (np/min (second coords))]
+                  (swap! raw-elements conj {:min-y min-y
+                                            :min-x min-x
+                                            :image masked-segment})))))))
+
+      ;; 5. Ordonare top-down / left-right
+      (let [sorted-elements (sort-by (fn [elem] [(:min-y elem) (:min-x elem)]) @raw-elements)]
+        (vec (map :image sorted-elements))))))
+
+
+(defn extrage-elemente-grafice
+  "Extrage elementele grafice (segmente, arce) dintr-o imagine folosind
+   Scheletizarea si construirea automata a grafului via scikit-image."
+  [cale-imagine & {:keys [min-length] :or {min-length 8}}]
+  (let [img (cv2/imread cale-imagine cv2/IMREAD_GRAYSCALE)
+        thresh (second (cv2/threshold img 127 255 cv2/THRESH_BINARY_INV))
+
+        ;; 1. Curățare zgomot marginal
+        kernel (cv2/getStructuringElement cv2/MORPH_ELLIPSE [3 3])
+        thresh-clean (cv2/morphologyEx thresh cv2/MORPH_OPEN kernel)
+
+        ;; 2. SKELETIZARE (Subțiere la 1px)
+        thresh-bin (np/floor_divide thresh-clean 255)
+        skel (skimage-morphology/skeletonize thresh-bin)
+
+        ;; 3. Conversie automată a scheletului în Graf (folosim python/kw pentru :edge_dist)
+        graph-data (skimage-graph/pixel_graph skel (python/kw :edge_dist 1.5))
+        adj-matrix (first graph-data)
+        nodes-coords (second graph-data)
+
+        G (nx/from_scipy_sparse_array adj-matrix)
+
+        ;; 4. Izolarea segmentelor elementare (eliminăm nodurile cu grad > 2)
+        nodes (vec (.nodes G))
+        junctions (filter (fn [n] (> (.degree G n) 2)) nodes)
+        G-sub (.copy G)]
+
+    (doseq [j junctions]
+      (.remove_node G-sub j))
+
+    (let [raw-elements (atom [])]
+      (doseq [comp (nx/connected_components G-sub)]
+        (when (>= (count comp) min-length)
+          (let [element-img (np/zeros_like img)]
+
+            (doseq [node-idx comp]
+              (let [coord (get nodes-coords node-idx)
+                    y (int (get coord 0))
+                    x (int (get coord 1))]
+                (aset element-img y x 255)))
+
+            ;; Dilatare cu argumentul opțional corectat prin python/kw
+            (let [elem-dilated (cv2/dilate element-img kernel (python/kw :iterations 2))
+                  masked-segment (np/bitwise_and elem-dilated thresh-clean)
+                  coords (np/where (np/greater masked-segment 0))]
+
+              (when (> (np/sum (np/greater masked-segment 0)) 0)
+                (let [min-y (np/min (first coords))
+                      min-x (np/min (second coords))]
+                  (swap! raw-elements conj {:min-y min-y
+                                            :min-x min-x
+                                            :image masked-segment})))))))
+
+      ;; 5. Ordonare top-down / left-right
+      (let [sorted-elements (sort-by (fn [elem] [(:min-y elem) (:min-x elem)]) @raw-elements)]
+        (vec (map :image sorted-elements))))))
+
+
+(ns shape-extractor.core
+  (:import [cv2 :as cv2]
+           [numpy :as np]
+           [networkx :as nx]
+           [skimage.morphology :as skimage-morphology]
+           [skimage.graph :as skimage-graph]))
+
+(defn extrage-elemente-grafice
+  "Extrage elementele grafice (segmente, arce) dintr-o imagine folosind
+   Scheletizarea si construirea automata a grafului via scikit-image."
+  [cale-imagine & {:keys [min-length] :or {min-length 8}}]
+  (let [img (cv2/imread cale-imagine cv2/IMREAD_GRAYSCALE)
+        thresh (second (cv2/threshold img 127 255 cv2/THRESH_BINARY_INV))
+
+        ;; 1. Curățare zgomot marginal
+        kernel (cv2/getStructuringElement cv2/MORPH_ELLIPSE [3 3])
+        thresh-clean (cv2/morphologyEx thresh cv2/MORPH_OPEN kernel)
+
+        ;; 2. SKELETIZARE (Subțiere la 1px)
+        thresh-bin (np/floor_divide thresh-clean 255)
+        skel (skimage-morphology/skeletonize thresh-bin)
+
+        ;; 3. Conversie automată a scheletului în Graf (folosim syntaxa ** :edge_dist)
+        graph-data (skimage-graph/pixel_graph skel ** :edge_dist 1.5)
+        adj-matrix (first graph-data)
+        nodes-coords (second graph-data)
+
+        G (nx/from_scipy_sparse_array adj-matrix)
+
+        ;; 4. Izolarea segmentelor elementare (eliminăm nodurile cu grad > 2)
+        nodes (vec (.nodes G))
+        junctions (filter (fn [n] (> (.degree G n) 2)) nodes)
+        G-sub (.copy G)]
+
+    (doseq [j junctions]
+      (.remove_node G-sub j))
+
+    (let [raw-elements (atom [])]
+      (doseq [comp (nx/connected_components G-sub)]
+        (when (>= (count comp) min-length)
+          (let [element-img (np/zeros_like img)]
+
+            (doseq [node-idx comp]
+              (let [coord (get nodes-coords node-idx)
+                    y (int (get coord 0))
+                    x (int (get coord 1))]
+                (aset element-img y x 255)))
+
+            ;; Dilatare folosind sintaxa ** :iterations
+            (let [elem-dilated (cv2/dilate element-img kernel ** :iterations 2)
+                  masked-segment (np/bitwise_and elem-dilated thresh-clean)
+                  coords (np/where (np/greater masked-segment 0))]
+
+              (when (> (np/sum (np/greater masked-segment 0)) 0)
+                (let [min-y (np/min (first coords))
+                      min-x (np/min (second coords))]
+                  (swap! raw-elements conj {:min-y min-y
+                                            :min-x min-x
+                                            :image masked-segment})))))))
+
+      ;; 5. Ordonare top-down / left-right
+      (let [sorted-elements (sort-by (fn [elem] [(:min-y elem) (:min-x elem)]) @raw-elements)]
+        (vec (map :image sorted-elements))))))
+
+
+(import
+ cv2
+ [numpy :as np]
+ [networkx :as nx]
+ [skimage.morphology :as skmorph]
+ [skimage.graph :as skgraph])
+
+(defn extrage-elemente-grafice
+  "Extrage elementele grafice (segmente, arce) dintr-o imagine folosind
+   Scheletizarea si construirea automata a grafului via scikit-image."
+  [cale-imagine & {:keys [min-length] :or {min-length 8}}]
+  (let [img (cv2/imread cale-imagine cv2/IMREAD_GRAYSCALE)
+        thresh (second (cv2/threshold img 127 255 cv2/THRESH_BINARY_INV))
+
+        ;; 1. Curatare zgomot marginal
+        kernel (cv2/getStructuringElement cv2/MORPH_ELLIPSE [3 3])
+        thresh-clean (cv2/morphologyEx thresh cv2/MORPH_OPEN kernel)
+
+        ;; 2. SKELETIZARE (Subtiere la 1px)
+        thresh-bin (np/floor_divide thresh-clean 255)
+        skel (skmorph/skeletonize thresh-bin)
+
+        ;; 3. Conversie automata a scheletului in Graf (kwargs transmisi ca map prin **)
+        graph-data (skgraph/pixel_graph skel ** :connectivity 2)
+        adj-matrix (first graph-data)
+        nodes-coords (second graph-data)
+
+        G (nx/from_scipy_sparse_array adj-matrix)
+
+        ;; 4. Izolarea segmentelor elementare (eliminam nodurile cu grad > 2)
+        nodes (vec (.nodes G))
+        junctions (filter (fn [n] (> (.degree G n) 2)) nodes)
+        G-sub (.copy G)]
+
+    (doseq [j junctions]
+      (.remove_node G-sub j))
+
+    (let [raw-elements (atom [])]
+      (doseq [comp (nx/connected_components G-sub)]
+        (when (>= (count comp) min-length)
+          (let [element-img (np/zeros_like img)]
+
+            (doseq [node-idx comp]
+              (let [coord (get nodes-coords node-idx)
+                    y (int (get coord 0))
+                    x (int (get coord 1))]
+                (aset element-img y x 255)))
+
+            ;; Dilatare cu kwargs sub forma de map
+            (let [elem-dilated (cv2/dilate element-img kernel ** :iterations 2)
+                  masked-segment (np/bitwise_and elem-dilated thresh-clean)
+                  coords (np/where (np/greater masked-segment 0))]
+
+              (when (> (np/sum (np/greater masked-segment 0)) 0)
+                (let [min-y (np/min (first coords))
+                      min-x (np/min (second coords))]
+                  (swap! raw-elements conj {:min-y min-y
+                                            :min-x min-x
+                                            :image masked-segment})))))))
+
+      ;; 5. Ordonare top-down / left-right
+      (let [sorted-elements (sort-by (fn [elem] [(:min-y elem) (:min-x elem)]) @raw-elements)]
+        (vec (map :image sorted-elements))))))
+
+
+(def cale-imagine "tmp/yoga_001_1/yoga_001_1-02-00.png")
+(def img (cv2/imread cale-imagine cv2/IMREAD_GRAYSCALE))
+(def thresh (second (cv2/threshold img 127 255 cv2/THRESH_BINARY_INV)))
+
+(def kernel (cv2/getStructuringElement cv2/MORPH_ELLIPSE [3 3]))
+(def         thresh-clean (cv2/morphologyEx thresh cv2/MORPH_OPEN kernel))
+(def         thresh-bin (np/floor_divide thresh-clean 255))
+(def         skel (skmorph/skeletonize thresh-bin))
+
+
+(def graph-data (skgraph/pixel_graph skel))
+(def adj-matrix (first graph-data))
+(def nodes-coords (second graph-data))
+
+
+
+(import skimage)
+
+
+(dir skimage)
+;; => #py ["__version__" "color" "data" "draw" "exposure" "feature" "filters" "future" "graph" "io" "measure" "metrics" "morphology" "registration" "restoration" "segmentation" "transform" "util"]
+
+(dir skimage/graph)
+;; => #py ["MCP" "MCP_Connect" "MCP_Flexible" "MCP_Geometric" "RAG" "central_pixel" "cut_normalized" "cut_threshold" "merge_hierarchical" "pixel_graph" "rag_boundary" "rag_mean_color" "route_through_array" "shortest_path" "show_rag"]
+
+
+
+(.pixel_graph skimage/graph skel)
+
+(import
+ cv2
+ [numpy :as np]
+ [networkx :as nx]
+ [skimage :as skimage]
+ [skimage.morphology :as skmorph]
+ )
+
+(defn extrage-elemente-grafice
+  "Extrage elementele grafice (segmente, arce) dintr-o imagine folosind
+   Scheletizarea si construirea automata a grafului via scikit-image."
+  [cale-imagine & {:keys [min-length] :or {min-length 8}}]
+  (let [img (cv2/imread cale-imagine cv2/IMREAD_GRAYSCALE)
+        thresh (second (cv2/threshold img 127 255 cv2/THRESH_BINARY_INV))
+
+        ;; 1. Curatare zgomot marginal
+        kernel (cv2/getStructuringElement cv2/MORPH_ELLIPSE [3 3])
+        thresh-clean (cv2/morphologyEx thresh cv2/MORPH_OPEN kernel)
+
+        ;; 2. SKELETIZARE (Subtiere la 1px)
+        thresh-bin (np/floor_divide thresh-clean 255)
+        skel (skmorph/skeletonize thresh-bin)
+
+        ;; 3. Conversie automata a scheletului in Graf
+        graph-data (.pixel_graph skimage/graph skel ** :connectivity 2)
+        adj-matrix (first graph-data)
+        nodes-coords (second graph-data)
+
+        G (nx/from_scipy_sparse_array adj-matrix)
+
+        ;; 4. Izolarea segmentelor elementare (eliminam nodurile cu grad > 2)
+        nodes (vec (.nodes G))
+        junctions (filter (fn [n] (> (.degree G n) 2)) nodes)
+        G-sub (.copy G)]
+
+    (doseq [j junctions]
+      (.remove_node G-sub j))
+
+    (let [raw-elements (atom [])]
+      (doseq [comp (nx/connected_components G-sub)]
+        (when (>= (count comp) min-length)
+          (let [element-img (np/zeros_like img)]
+
+            (doseq [node-idx comp]
+              (let [coord (get nodes-coords node-idx)
+                    y (int (get coord 0))
+                    x (int (get coord 1))]
+                (aset element-img y x 255)))
+
+            ;; Dilatare cu kwargs sub forma de map
+            (let [elem-dilated (cv2/dilate element-img kernel ** :iterations 2)
+                  masked-segment (np/bitwise_and elem-dilated thresh-clean)
+                  coords (np/where (np/greater masked-segment 0))]
+
+              (when (> (np/sum (np/greater masked-segment 0)) 0)
+                (let [min-y (np/min (first coords))
+                      min-x (np/min (second coords))]
+                  (swap! raw-elements conj {:min-y min-y
+                                            :min-x min-x
+                                            :image masked-segment})))))))
+
+      ;; 5. Ordonare top-down / left-right
+      (let [sorted-elements (sort-by (fn [elem] [(:min-y elem) (:min-x elem)]) @raw-elements)]
+        (vec (map :image sorted-elements))))))
+
+(def el-02-00 (extrage-elemente-grafice "tmp/yoga_001_1/yoga_001_1-02-00.png"))
+(count el-02-00)
+
+
+(import
+ cv2
+ [numpy :as np]
+ [networkx :as nx]
+ [skimage :as skimage]
+ [skimage.morphology :as skmorph])
+
+(defn extrage-elemente-grafice
+  "Extrage elementele grafice (segmente, arce) dintr-o imagine folosind
+   Scheletizarea si construirea automata a grafului via scikit-image."
+  [cale-imagine & {:keys [min-length] :or {min-length 8}}]
+  (let [img (cv2/imread cale-imagine cv2/IMREAD_GRAYSCALE)
+        thresh (second (cv2/threshold img 127 255 cv2/THRESH_BINARY_INV))
+
+        ;; 1. Curatare zgomot marginal
+        kernel (cv2/getStructuringElement cv2/MORPH_ELLIPSE [3 3])
+        thresh-clean (cv2/morphologyEx thresh cv2/MORPH_OPEN kernel)
+
+        ;; 2. SKELETIZARE (Subtiere la 1px)
+        thresh-bin (np/floor_divide thresh-clean 255)
+        skel (skmorph/skeletonize thresh-bin)
+
+        ;; 3. Conversie automata a scheletului in Graf
+        graph-data (.pixel_graph skimage/graph skel ** :connectivity 2)
+        adj-matrix (first graph-data)
+        nodes-coords (second graph-data)
+
+        G (nx/from_scipy_sparse_array adj-matrix)
+
+        ;; 4. Izolarea segmentelor elementare (eliminam nodurile cu grad > 2)
+        nodes (vec (.nodes G))
+        junctions (filter (fn [n] (> (.degree G n) 2)) nodes)
+        G-sub (.copy G)]
+
+    (doseq [j junctions]
+      (.remove_node G-sub j))
+
+    (let [raw-elements (atom [])]
+      ;; Am adaugat (vec ...) in jurul generatorului Python intors de connected_components
+      (doseq [comp (vec (nx/connected_components G-sub))]
+        (when (>= (count comp) min-length)
+          (let [element-img (np/zeros_like img)]
+
+            (doseq [node-idx comp]
+              (let [coord (get nodes-coords node-idx)
+                    y (int (get coord 0))
+                    x (int (get coord 1))]
+                (aset element-img y x 255)))
+
+            ;; Dilatare cu kwargs sub forma de map
+            (let [elem-dilated (cv2/dilate element-img kernel ** :iterations 2)
+                  masked-segment (np/bitwise_and elem-dilated thresh-clean)
+                  coords (np/where (np/greater masked-segment 0))]
+
+              (when (> (np/sum (np/greater masked-segment 0)) 0)
+                (let [min-y (np/min (first coords))
+                      min-x (np/min (second coords))]
+                  (swap! raw-elements conj {:min-y min-y
+                                            :min-x min-x
+                                            :image masked-segment})))))))
+
+      ;; 5. Ordonare top-down / left-right
+      (let [sorted-elements (sort-by (fn [elem] [(:min-y elem) (:min-x elem)]) @raw-elements)]
+        (vec (map :image sorted-elements))))))
+
+(def el-02-00 (extrage-elemente-grafice "tmp/yoga_001_1/yoga_001_1-02-00.png"))
+
+(import
+ cv2
+ [numpy :as np]
+ [networkx :as nx]
+ [skimage :as skimage]
+ [skimage.morphology :as skmorph])
+
+(defn extrage-elemente-grafice
+  "Extrage elementele grafice (segmente, arce) dintr-o imagine folosind
+   Scheletizarea si construirea automata a grafului via scikit-image."
+  [cale-imagine & {:keys [min-length] :or {min-length 8}}]
+  (let [img (cv2/imread cale-imagine cv2/IMREAD_GRAYSCALE)
+        thresh (second (cv2/threshold img 127 255 cv2/THRESH_BINARY_INV))
+
+        ;; 1. Curatare zgomot marginal
+        kernel (cv2/getStructuringElement cv2/MORPH_ELLIPSE [3 3])
+        thresh-clean (cv2/morphologyEx thresh cv2/MORPH_OPEN kernel)
+
+        ;; 2. SKELETIZARE (Subtiere la 1px)
+        thresh-bin (np/floor_divide thresh-clean 255)
+        skel (skmorph/skeletonize thresh-bin)
+
+        ;; 3. Conversie automata a scheletului in Graf
+        graph-data (.pixel_graph skimage/graph skel ** :connectivity 2)
+        adj-matrix (first graph-data)
+        nodes-coords (second graph-data)
+
+        G (nx/from_scipy_sparse_array adj-matrix)
+
+        ;; 4. Izolarea segmentelor elementare (eliminam nodurile cu grad > 2)
+        nodes (vec (.nodes G))
+        junctions (filter (fn [n] (> (.degree G n) 2)) nodes)
+        G-sub (.copy G)]
+
+    ;; Eliminam joncțiunile
+    (doseq [j junctions]
+      (.remove_node G-sub j))
+
+    (let [raw-elements (atom [])]
+      (doseq [comp (vec (nx/connected_components G-sub))]
+        (when (>= (count comp) min-length)
+          (let [element-img (np/zeros_like img)]
+
+            ;; Iteram prin nodurile componentei curente
+            (doseq [node-idx comp]
+              ;; Extragere sigura a coordonatelor (y, x) din matricea NumPy
+              (let [y-val (get (get nodes-coords node-idx) 0)
+                    x-val (get (get nodes-coords node-idx) 1)]
+                (when (and (some? y-val) (some? x-val))
+                  (let [y (int y-val)
+                        x (int x-val)]
+                    (aset element-img y x 255)))))
+
+            ;; Reconstrucție masca si verificare daca segmentul contine pixeli
+            (let [elem-dilated (cv2/dilate element-img kernel ** :iterations 2)
+                  masked-segment (np/bitwise_and elem-dilated thresh-clean)
+                  coords (np/where (np/greater masked-segment 0))
+                  y-coords (first coords)
+                  x-coords (second coords)]
+
+              (when (and (> (count y-coords) 0) (> (count x-coords) 0))
+                (let [min-y (np/min y-coords)
+                      min-x (np/min x-coords)]
+                  (swap! raw-elements conj {:min-y min-y
+                                            :min-x min-x
+                                            :image masked-segment})))))))
+
+      ;; 5. Ordonare top-down / left-right
+      (let [sorted-elements (sort-by (fn [elem] [(:min-y elem) (:min-x elem)]) @raw-elements)]
+        (vec (map :image sorted-elements))))))
+
+(def el-02-00 (extrage-elemente-grafice "tmp/yoga_001_1/yoga_001_1-02-00.png"))
+(count el-02-00)
+;; => 0
+
+(import
+ cv2
+ [numpy :as np]
+ [networkx :as nx]
+ [skimage :as skimage]
+ [skimage.morphology :as skmorph])
+
+(defn extrage-elemente-grafice
+  "Extrage elementele grafice (segmente, arce) dintr-o imagine folosind
+   Scheletizarea si construirea automata a grafului via scikit-image."
+  [cale-imagine & {:keys [min-length] :or {min-length 8}}]
+  (let [img (cv2/imread cale-imagine cv2/IMREAD_GRAYSCALE)
+        thresh (second (cv2/threshold img 127 255 cv2/THRESH_BINARY_INV))
+
+        ;; 1. Curatare zgomot marginal
+        kernel (cv2/getStructuringElement cv2/MORPH_ELLIPSE [3 3])
+        thresh-clean (cv2/morphologyEx thresh cv2/MORPH_OPEN kernel)
+
+        ;; 2. SKELETIZARE (Subtiere la 1px)
+        thresh-bin (np/floor_divide thresh-clean 255)
+        skel (skmorph/skeletonize thresh-bin)
+
+        ;; 3. Conversie automata a scheletului in Graf
+        graph-data (.pixel_graph skimage/graph skel ** :connectivity 2)
+        adj-matrix (first graph-data)
+        nodes-coords (second graph-data)
+
+        G (nx/from_scipy_sparse_array adj-matrix)
+
+        ;; 4. Izolarea segmentelor elementare (eliminam nodurile cu grad > 2)
+        nodes (vec (.nodes G))
+        junctions (filter (fn [n] (> (.degree G n) 2)) nodes)
+        G-sub (.copy G)]
+
+    ;; Eliminam joncțiunile
+    (doseq [j junctions]
+      (.remove_node G-sub j))
+
+    (let [raw-elements (atom [])]
+      (doseq [comp (vec (nx/connected_components G-sub))]
+        (when (>= (count comp) min-length)
+          (let [element-img (np/zeros_like img)]
+
+            ;; Reconstructie masca pixel cu pixel
+            (doseq [node-idx comp]
+              (let [coord (get nodes-coords (int node-idx))
+                    y (int (get coord 0))
+                    x (int (get coord 1))]
+                (aset element-img y x 255)))
+
+            ;; Reconstructie grosime initiala
+            (let [elem-dilated (cv2/dilate element-img kernel ** :iterations 2)
+                  masked-segment (np/bitwise_and elem-dilated thresh-clean)
+                  pixel-count (int (np/sum (np/greater masked-segment 0)))]
+
+              ;; Verificare bazata pe np/sum (fara functia Clojure `count` pe ndarray)
+              (when (> pixel-count 0)
+                (let [coords (np/where (np/greater masked-segment 0))
+                      min-y (int (np/min (first coords)))
+                      min-x (int (np/min (second coords)))]
+                  (swap! raw-elements conj {:min-y min-y
+                                            :min-x min-x
+                                            :image masked-segment})))))))
+
+      ;; 5. Ordonare top-down / left-right
+      (let [sorted-elements (sort-by (fn [elem] [(:min-y elem) (:min-x elem)]) @raw-elements)]
+        (vec (map :image sorted-elements))))))
+
+(def el-02-00 (extrage-elemente-grafice "tmp/yoga_001_1/yoga_001_1-02-00.png"))
+
+(import
+ cv2
+ [numpy :as np]
+ [skimage.morphology :as skmorph])
+
+(defn- get-neighbors-count [skel-bin]
+  (let [kernel (np/array [[1 1 1]
+                          [1 0 1]
+                          [1 1 1]] np/uint8)]
+    (cv2/filter2D skel-bin cv2/CV_8U kernel)))
+
+(defn extrage-elemente-grafice
+  "Extrage elementele grafice (segmente, arce) dintr-o imagine folosind
+   Scheletizarea si izolarea prin componente conexe OpenCV."
+  [cale-imagine & {:keys [min-length] :or {min-length 8}}]
+  (let [img (cv2/imread cale-imagine cv2/IMREAD_GRAYSCALE)
+        thresh (second (cv2/threshold img 127 255 cv2/THRESH_BINARY_INV))
+
+        ;; 1. Curatare zgomot marginal
+        kernel (cv2/getStructuringElement cv2/MORPH_ELLIPSE [3 3])
+        thresh-clean (cv2/morphologyEx thresh cv2/MORPH_OPEN kernel)
+
+        ;; 2. SKELETIZARE (Subtiere la 1px)
+        thresh-bin (np/floor_divide thresh-clean 255)
+        skel (skmorph/skeletonize thresh-bin)
+        skel-uint8 (np/uint8 skel)
+
+        ;; 3. Identificare si eliminare jonctiuni (pixeli cu mai mult de 2 vecini)
+        neighbors (get-neighbors-count skel-uint8)
+        junctions (np/logical_and skel (np/greater neighbors 2))
+
+        ;; Dilatam usor jonctiunile pentru a rupe curbele curat in punctele de inflexiune
+        junctions-dilated (cv2/dilate (np/uint8 junctions) kernel ** :iterations 1)
+        skel-broken (np/logical_and skel (np/equal junctions-dilated 0))
+        skel-broken-uint8 (np/uint8 skel-broken)
+
+        ;; 4. Etichetare componente conexe prin OpenCV
+        cc-res (cv2/connectedComponents skel-broken-uint8)
+        num-labels (first cc-res)
+        labels (second cc-res)
+
+        raw-elements (atom [])]
+
+    (doseq [i (range 1 num-labels)]
+      (let [mask (np/equal labels i)
+            pixel-count (int (np/sum mask))]
+
+        (when (>= pixel-count min-length)
+          (let [element-img (np/zeros_like img)]
+            ;; Copiem segmentul de 1px
+            (aset element-img mask 255)
+
+            ;; Dilatam inapoi pentru a-i reda grosimea originala a liniei
+            (let [elem-dilated (cv2/dilate element-img kernel ** :iterations 2)
+                  masked-segment (np/bitwise_and elem-dilated thresh-clean)
+                  coords (np/where (np/greater masked-segment 0))
+                  y-coords (first coords)
+                  x-coords (second coords)]
+
+              (when (> (int (np/sum (np/greater masked-segment 0))) 0)
+                (let [min-y (int (np/min y-coords))
+                      min-x (int (np/min x-coords))]
+                  (swap! raw-elements conj {:min-y min-y
+                                            :min-x min-x
+                                            :image masked-segment}))))))))
+
+    ;; 5. Sortare top-down / left-right
+    (let [sorted-elements (sort-by (fn [elem] [(:min-y elem) (:min-x elem)]) @raw-elements)]
+      (vec (map :image sorted-elements)))))
+
+(def el-02-00 (extrage-elemente-grafice "tmp/yoga_001_1/yoga_001_1-02-00.png"))
+(count el-02-00)
+;; => 3
+
+(show/show-image (nth el-02-00 2))
+
+(def el-01-00 (extrage-elemente-grafice "tmp/yoga_001_1/yoga_001_1-01-00.png"))
+(count el-01-00)
+;; => 4
+
+(show/show-image (nth el-01-00 3))
+
+
+  #+end_src
+* 2026-08-26
+
+- solutia de ieri nu a dat rezultatele dorite
+- incerc sa imi dau seama de ce:
+  #+begin_src clojure
+  (import
+   cv2
+   [numpy :as np]
+   [skimage.morphology :as skmorph]
+   [skimage.util :as skiu])
+
+  (require '[steno.show :as show])
+
+  (def cale-imagine "tmp/yoga_001_1/yoga_001_1-01-00.png")
+  (def image (cv2/imread cale-imagine cv2/IMREAD_GRAYSCALE))
+
+  (show/show-image image)
+
+  (def img2 (second (cv2/threshold image 127 255 cv2/THRESH_BINARY_INV)))
+
+  (show/show-two-images [image img2])
+
+  (def kernel (cv2/getStructuringElement cv2/MORPH_ELLIPSE [3 3]))
+  (def img3 (cv2/morphologyEx img2 cv2/MORPH_OPEN kernel))
+
+  (show/show-two-images [img2 img3])
+
+  (def img4 (np/floor_divide img3 255))
+
+  (show/show-two-images [img3 img4])
+
+  (def img5 (cv2/bitwise_not img4))
+
+  (show/show-two-images [img4 img5])
+
+  (def img6 (skmorph/skeletonize img4))
+
+  (show/show-two-images [img4 img6])
+
+  (def img7 (skiu/img_as_ubyte img6))
+
+  (show/show-two-images [img6 img7])
+  #+end_src

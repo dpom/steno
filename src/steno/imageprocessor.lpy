@@ -9,11 +9,12 @@
 (defn process-image
   "Process the IMAGE in order to obtain a clear 1 pixel thick stenogram."
   [image]
-  (-> image
-      (cv2/bitwise_not) ; invert image
-      (cv2/blur [5,5]) ; smooth the image
-      (skim/skeletonize) ; skeltonize
-      (skiu/img_as_ubyte)))
+  (let [kernel (cv2/getStructuringElement cv2/MORPH_ELLIPSE [3 3])]
+    (-> (second (cv2/threshold image 127 255 cv2/THRESH_BINARY_INV))
+        (cv2/morphologyEx cv2/MORPH_OPEN kernel)
+        (np/floor_divide  255)
+        (skim/skeletonize)
+        (skiu/img_as_ubyte))))
 
 (comment
 

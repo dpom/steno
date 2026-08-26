@@ -22,8 +22,8 @@
         }:
         let
           mypkgs = mynixpkgs.packages.${system};
-          python = pkgs.python312;
-          tkinter = pkgs.python312Packages.tkinter;
+          python = pkgs.python311;
+          tkinter = pkgs.python311Packages.tkinter;
         in
         {
           devShells.default = pkgs.mkShell {

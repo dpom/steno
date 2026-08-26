@@ -21,8 +21,8 @@
       (.flush tmp)
       (.close tmp)
 
-      (let [lisp-cmd (str "(local/display-image-from-file \"" tmp-path "\")")]
-        (sp/run ["emacsclient" "-n" "-e" lisp-cmd]))
+       (let [lisp-cmd (str "(local/display-image-from-file \"" tmp-path "\")")]
+         (sp/run ["emacsclient" "-e" lisp-cmd]))
 
       (catch Exception e
         (println "Error sending to Emacs:" (str e))))))
@@ -45,9 +45,11 @@
 (defn show-two-images
   "Display two images side by side."
   [[img1 img2]]
-  (let [[_ axs] (plt/subplots 1 2 ** :figsize [10 5])]
+  (let [[_ axs] (plt/subplots 1 2 ** :figsize [10 5])
+        axs (if (instance? np/ndarray axs) (vec (.flatten axs)) [axs])]
     (.imshow (first axs) img1 ** :cmap "gray")
     (.imshow (second axs) img2 ** :cmap "gray")
+    (plt/tight_layout)
     (display-image-stream (figure-to-bytes))))
 
 (defn show-matrix
@@ -59,7 +61,8 @@
 (defn show-two-matrices
   "Display two matrices side by side."
   [[img1 img2]]
-  (let [[_ axs] (plt/subplots 1 2 ** :figsize [10 5])]
+  (let [[_ axs] (plt/subplots 1 2 ** :figsize [10 5])
+        axs (if (instance? np/ndarray axs) (vec (.flatten axs)) [axs])]
     (.imshow (first axs) img1 ** :cmap "gray" :vmin 0 :vmax 1)
     (.imshow (second axs) img2 ** :cmap "gray" :vmin 0 :vmax 1)
     (plt/tight_layout)
