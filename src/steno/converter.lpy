@@ -70,11 +70,38 @@
           [#{} 0]
           directions))
 
+(def ortho-dirs
+  "The four orthogonal (4-connected) directions."
+  [[0  1]  ; E
+   [1  0]  ; S
+   [0 -1]  ; V
+   [-1  0] ; N
+   ])
+
+(def diag-dirs
+  "The four diagonal directions (used only when a pixel has no orthogonal neighbor)."
+  [[1  1]
+   [1 -1]
+   [-1 -1]
+   [-1  1]])
+
 (defn- fg-neighbors
-  "8-connected foreground neighbor coordinates of CELL in the binary MAT."
+  "4-connected foreground neighbor coordinates of CELL in the binary MAT. A
+   diagonal fallback keeps pixels connected when the only links are diagonal
+   (e.g. isolated steps in an 8-connected skeleton)."
   [mat cell]
-  (let [[ns _] (get-cell-number-and-neighbors mat cell)]
-    (vec ns)))
+  (let [orth (->> ortho-dirs
+                  (map #(get-neighbor mat cell %))
+                  (filter (fn [[_ v]] (not (zero? v))))
+                  (map first)
+                  (vec))]
+    (if (seq orth)
+      orth
+      (->> diag-dirs
+           (map #(get-neighbor mat cell %))
+           (filter (fn [[_ v]] (not (zero? v))))
+           (map first)
+           (vec)))))
 
 (defn- skeleton-graph
   "Build the skeleton graph: cell -> vector of 8-connected foreground neighbors."
@@ -95,59 +122,22 @@
   [graph cell]
   (count (g-neighbors graph cell)))
 
-(defn- occupied-dirs
-  "Set of direction indices (0..7) of this cell's foreground neighbors."
-  [mat cell]
-  (let [[_ num] (get-cell-number-and-neighbors mat cell)]
-    (->> (range 8)
-         (filter #(not (zero? (bit-and num (nth pos %)))))
-         (set))))
-
-(defn- branch-count
-  "Number of stroke branches at CELL: connected components of its occupied
-   directions on the 8-cycle (consecutive directions merge; opposite directions
-   do not). Distinguishes a real junction (>= 3) from a bend/straight pixel."
-  [mat cell]
-  (let [occ (set (occupied-dirs mat cell))]
-    (if (empty? occ)
-      0
-      (loop [stack (vec occ) visited #{} comps 0]
-        (if (empty? stack)
-          comps
-          (let [start (first stack)]
-            (if (contains? visited start)
-              (recur (vec (rest stack)) visited comps)
-              (let [seen (loop [front [start] seen (conj visited start)]
-                              (if (empty? front)
-                                seen
-                                (let [x (first front)
-                                      nbrs [(mod (dec x) 8) (mod (inc x) 8)]
-                                      nxt (filter #(and (contains? occ %)
-                                                        (not (contains? seen %)))
-                                                  nbrs)]
-                                  (recur (into (vec (rest front)) nxt) (conj seen x)))))]
-                (recur (vec (rest stack)) seen (inc comps))))))))))
-
 (defn- break-node?
-  "True for a stroke endpoint (one branch, one neighbor) or a junction (>= 3
-   branches). Bends and straight pixels are interior (branch count 1 with two
-   neighbors, or 2 opposite branches)."
-  [mat cell]
-  (let [occ (occupied-dirs mat cell)
-        bc (branch-count mat cell)
-        n (count occ)]
-    (or (and (= bc 1) (= n 1))
-        (>= bc 3))))
+  "True for a stroke endpoint (degree 1) or a junction (degree >= 3) in the
+   4-connected GRAPH. Bends and straight pixels (degree 2) are interior."
+  [graph cell]
+  (let [d (node-degree graph cell)]
+    (or (= d 1) (>= d 3))))
 
 (defn- walk-segment
   "Walk a path from START (first interior pixel) away from PREV until hitting a
    break node, an already-visited pixel, or a dead end. Returns the pixel list
    (excluding PREV) and the terminal cell."
-  [mat graph visited start prev]
+  [graph visited start prev]
   (loop [cur start
          prv prev
          acc []]
-    (if (break-node? mat cur)
+    (if (break-node? graph cur)
       {:pixels (conj acc cur) :end cur}
       (let [nxt (first (->> (g-neighbors graph cur)
                             (remove #(= % prv))
@@ -180,17 +170,17 @@
 (defn- group-into-lsigns
   "Convert collected segments to lineseqs. Two chords sharing the same two
    junctions form one loop lsign; everything else is a linear lsign. Drop
-   degenerate (< 2 pixel) segments."
+   empty segments."
   [mat segments]
   (let [by-pair (group-by (fn [s] (set (:ends s))) segments)]
     (mapcat (fn [segs]
               (if (= (count segs) 2)
                 (let [[a b] segs
                       pixels (vec (concat (:pixels a)
-                                         (drop-last (rest (reverse (:pixels b))))))]
+                                          (drop-last (rest (reverse (:pixels b))))))]
                   [(pixels->lineseq mat pixels)])
                 (->> segs
-                     (filter #(>= (count (:pixels %)) 2))
+                     (filter #(pos? (count (:pixels %))))
                      (map #(pixels->lineseq mat (:pixels %))))))
             (vals by-pair))))
 
@@ -203,12 +193,13 @@
         visited (volatile! #{})
         segments (volatile! [])]
     (doseq [c (keys graph)]
-      (when (break-node? mat c)
+      (when (break-node? graph c)
         (doseq [n (->> (g-neighbors graph c)
                        (remove #(contains? @visited %)))]
-          (let [{:keys [pixels end]} (walk-segment mat graph visited n c)]
+          (let [{:keys [pixels end]} (walk-segment graph visited n c)]
             (vswap! visited into pixels)
-            (vswap! segments conj {:pixels (conj pixels c) :ends [c end]})))))
+            (vswap! segments conj {:pixels (conj pixels c) :ends [c end]})))
+        (vswap! visited conj c)))
     (doseq [c (keys graph)]
       (when (not (contains? @visited c))
         (let [pixels (walk-loop graph visited c)]
@@ -506,13 +497,26 @@
 
 ;; module entry points
 
-(defn image-to-wsign
-  "Convert an image in a wsign (a sequence of lsign)"
+(defn image-to-wsign-legacy
+  "Legacy tracer-based conversion. Kept for A/B comparison against the graph
+   decomposition method."
   [image]
   (->> image
        image-to-matrix
        matrix-to-lineseq
        lineseqs-to-wsign
+       (map normalize1-lsign)
+       (sort-by #(first (:lineseq %)) compare-cell)
+       (mapv normalize2-lsign)))
+
+(defn image-to-wsign
+  "Convert an image in a wsign (a sequence of lsign) using skeleton-graph
+   decomposition bounded by junctions and endpoints."
+  [image]
+  (->> image
+       image-to-matrix
+       decompose-lsigns
+       (map lineseq-to-lsign)
        (map normalize1-lsign)
        (sort-by #(first (:lineseq %)) compare-cell)
        (mapv normalize2-lsign)))
