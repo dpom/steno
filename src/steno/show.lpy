@@ -52,6 +52,19 @@
     (plt/tight_layout)
     (display-image-stream (figure-to-bytes))))
 
+(defn show-three-images
+  "Display three images side by side, optionally with a TITLE."
+  ([imgs] (show-three-images imgs ""))
+  ([[img1 img2 img3] title]
+   (let [[fig axs] (plt/subplots 1 3 ** :figsize [15 5])
+         axs (if (instance? np/ndarray axs) (vec (.flatten axs)) [axs])]
+     (.imshow (nth axs 0) img1 ** :cmap "gray")
+     (.imshow (nth axs 1) img2 ** :cmap "gray")
+     (.imshow (nth axs 2) img3 ** :cmap "gray")
+     (.suptitle fig title)
+     (plt/tight_layout)
+     (display-image-stream (figure-to-bytes)))))
+
 (defn show-matrix
   "Display a binary matrix."
   [mat]

@@ -8322,3 +8322,77 @@ bb app make-references
 
   (show/show-two-images [img6 img7])
   #+end_src
+* 2026-08-27
+
+- compar cele 2 metode de procesare a imaginii:
+  #+begin_src clojure
+  (import
+   cv2
+   [numpy :as np]
+   [skimage.morphology :as skim]
+   [skimage.util :as skiu])
+
+  (require '[steno.show :as show])
+
+(defn process-image1
+  "Process the IMAGE in order to obtain a clear 1 pixel thick stenogram."
+  [image]
+  (let [kernel (cv2/getStructuringElement cv2/MORPH_ELLIPSE [3 3])]
+    (-> (second (cv2/threshold image 127 255 cv2/THRESH_BINARY_INV))
+        (cv2/morphologyEx cv2/MORPH_OPEN kernel)
+        (np/floor_divide  255)
+        (skim/skeletonize)
+        (skiu/img_as_ubyte))))
+
+ (defn process-image2
+  "Process the IMAGE in order to obtain a clear 1 pixel thick stenogram."
+  [image]
+  (-> image
+      (cv2/bitwise_not) ; invert image
+      (cv2/blur [5,5]) ; smooth the image
+      (skim/skeletonize) ; skeltonize
+      (skiu/img_as_ubyte)))
+
+  (defn- skeleton-score
+   "Lower means a cleaner skeleton. Penalise thick (merged) strokes, which
+    survive a 3x3 erosion, and an excessive number of disconnected fragments."
+   [skel]
+   (let [u (skiu/img_as_ubyte skel)
+         kernel (cv2/getStructuringElement cv2/MORPH_RECT [3 3])
+         thick (cv2/countNonZero (cv2/erode u kernel))
+         [n _] (cv2/connectedComponents u nil 8)]
+     (+ (int n) (* 2 (int thick)))))
+
+ (defn process-image-best
+  "Pick, per glyph, the better of process-image1 and process-image2 using a
+   skeleton-quality score (fewer thick/merged strokes and fewer fragments
+   wins). Returns the chosen 1-pixel skeleton."
+  [image]
+  (let [p1 (process-image1 image)
+        p2 (process-image2 image)]
+    (if (<= (skeleton-score p1) (skeleton-score p2))
+      p1
+      p2)))
+
+  (defn compare
+    "Show process-image1, process-image2 and the chosen process-image-best
+     side by side in a single panel; the title names the winner."
+    [imagefile]
+    (let [image (cv2/imread imagefile cv2/IMREAD_GRAYSCALE)
+          p1 (process-image1 image)
+          p2 (process-image2 image)
+          best (process-image-best image)
+          chosen (if (= best p1) "process-image1" "process-image2")]
+    (show/show-three-images
+     [p1 p2 best]
+     (str "best = " chosen))))
+
+  (compare "tmp/yoga_001_1/yoga_001_1-01-00.png")
+
+  (compare "tmp/yoga_001_1/yoga_001_1-01-04.png")
+
+  (compare "tmp/yoga_001_1/yoga_001_1-02-00.png")
+
+    (compare "tmp/yoga_001_1/yoga_001_1-04-00.png")
+
+  #+end_src

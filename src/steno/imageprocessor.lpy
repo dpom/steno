@@ -6,8 +6,9 @@
    [skimage.morphology :as skim]
    [skimage.util :as skiu]))
 
-(defn process-image
-  "Process the IMAGE in order to obtain a clear 1 pixel thick stenogram."
+(defn process-image1
+  "Process the IMAGE with a threshold + opening strategy to obtain a clear
+   1 pixel thick stenogram. Cleaner per stroke, but may drop thin strokes."
   [image]
   (let [kernel (cv2/getStructuringElement cv2/MORPH_ELLIPSE [3 3])]
     (-> (second (cv2/threshold image 127 255 cv2/THRESH_BINARY_INV))
@@ -15,6 +16,43 @@
         (np/floor_divide  255)
         (skim/skeletonize)
         (skiu/img_as_ubyte))))
+
+(defn process-image2
+  "Process the IMAGE with an invert + blur strategy to obtain a clear 1 pixel
+   thick stenogram. More complete, but blur may merge nearby strokes."
+  [image]
+  (-> image
+      (cv2/bitwise_not)
+      (cv2/blur [5 5])
+      (skim/skeletonize)
+      (skiu/img_as_ubyte)))
+
+(defn- skeleton-score
+  "Lower means a cleaner skeleton. Penalise thick (merged) strokes, which
+   survive a 3x3 erosion, and an excessive number of disconnected fragments."
+  [skel]
+  (let [u (skiu/img_as_ubyte skel)
+        kernel (cv2/getStructuringElement cv2/MORPH_RECT [3 3])
+        thick (cv2/countNonZero (cv2/erode u kernel))
+        [n _] (cv2/connectedComponents u nil 8)]
+    (+ (int n) (* 2 (int thick)))))
+
+(defn process-image-best
+  "Pick, per glyph, the better of process-image1 and process-image2 using a
+   skeleton-quality score (fewer thick/merged strokes and fewer fragments
+   wins). Returns the chosen 1-pixel skeleton."
+  [image]
+  (let [p1 (process-image1 image)
+        p2 (process-image2 image)]
+    (if (<= (skeleton-score p1) (skeleton-score p2))
+      p1
+      p2)))
+
+(defn process-image
+  "Process the IMAGE into a clear 1 pixel thick stenogram by auto-selecting
+   the better of the two skeletonization strategies (ADR-0001)."
+  [image]
+  (process-image-best image))
 
 (comment
 
