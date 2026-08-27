@@ -145,10 +145,11 @@
    degenerate (< 2 pixel) segments."
   [mat segments]
   (let [by-pair (group-by (fn [s] (set (:ends s))) segments)]
-    (mapcat (fn [[_ segs]]
+    (mapcat (fn [segs]
               (if (= (count segs) 2)
                 (let [[a b] segs
-                      pixels (vec (concat (:pixels a) (reverse (:pixels b))))]
+                      pixels (vec (concat (:pixels a)
+                                         (drop-last (rest (reverse (:pixels b))))))]
                   [(pixels->lineseq mat pixels)])
                 (->> segs
                      (filter #(>= (count (:pixels %)) 2))
@@ -176,7 +177,7 @@
           (vswap! visited into pixels)
           (vswap! segments conj {:pixels pixels
                                  :ends [(first pixels) (first pixels)]}))))
-    (group-into-lsigns mat @segments)))
+    (vec (group-into-lsigns mat @segments))))
 
 (defn- get-start-cells
   "Find the cells where the word could start."
