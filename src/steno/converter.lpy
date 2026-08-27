@@ -95,21 +95,59 @@
   [graph cell]
   (count (g-neighbors graph cell)))
 
+(defn- occupied-dirs
+  "Set of direction indices (0..7) of this cell's foreground neighbors."
+  [mat cell]
+  (let [[_ num] (get-cell-number-and-neighbors mat cell)]
+    (->> (range 8)
+         (filter #(not (zero? (bit-and num (nth pos %)))))
+         (set))))
+
+(defn- branch-count
+  "Number of stroke branches at CELL: connected components of its occupied
+   directions on the 8-cycle (consecutive directions merge; opposite directions
+   do not). Distinguishes a real junction (>= 3) from a bend/straight pixel."
+  [mat cell]
+  (let [occ (set (occupied-dirs mat cell))]
+    (if (empty? occ)
+      0
+      (loop [stack (vec occ) visited #{} comps 0]
+        (if (empty? stack)
+          comps
+          (let [start (first stack)]
+            (if (contains? visited start)
+              (recur (vec (rest stack)) visited comps)
+              (let [seen (loop [front [start] seen (conj visited start)]
+                              (if (empty? front)
+                                seen
+                                (let [x (first front)
+                                      nbrs [(mod (dec x) 8) (mod (inc x) 8)]
+                                      nxt (filter #(and (contains? occ %)
+                                                        (not (contains? seen %)))
+                                                  nbrs)]
+                                  (recur (into (vec (rest front)) nxt) (conj seen x)))))]
+                (recur (vec (rest stack)) seen (inc comps))))))))))
+
 (defn- break-node?
-  "True for a stroke endpoint (degree 1) or junction (degree >= 3)."
-  [graph cell]
-  (let [d (node-degree graph cell)]
-    (or (<= d 1) (>= d 3))))
+  "True for a stroke endpoint (one branch, one neighbor) or a junction (>= 3
+   branches). Bends and straight pixels are interior (branch count 1 with two
+   neighbors, or 2 opposite branches)."
+  [mat cell]
+  (let [occ (occupied-dirs mat cell)
+        bc (branch-count mat cell)
+        n (count occ)]
+    (or (and (= bc 1) (= n 1))
+        (>= bc 3))))
 
 (defn- walk-segment
   "Walk a path from START (first interior pixel) away from PREV until hitting a
    break node, an already-visited pixel, or a dead end. Returns the pixel list
    (excluding PREV) and the terminal cell."
-  [graph visited start prev]
+  [mat graph visited start prev]
   (loop [cur start
          prv prev
          acc []]
-    (if (break-node? graph cur)
+    (if (break-node? mat cur)
       {:pixels (conj acc cur) :end cur}
       (let [nxt (first (->> (g-neighbors graph cur)
                             (remove #(= % prv))
@@ -165,10 +203,10 @@
         visited (volatile! #{})
         segments (volatile! [])]
     (doseq [c (keys graph)]
-      (when (break-node? graph c)
+      (when (break-node? mat c)
         (doseq [n (->> (g-neighbors graph c)
                        (remove #(contains? @visited %)))]
-          (let [{:keys [pixels end]} (walk-segment graph visited n c)]
+          (let [{:keys [pixels end]} (walk-segment mat graph visited n c)]
             (vswap! visited into pixels)
             (vswap! segments conj {:pixels (conj pixels c) :ends [c end]})))))
     (doseq [c (keys graph)]
