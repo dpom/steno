@@ -70,6 +70,114 @@
           [#{} 0]
           directions))
 
+(defn- fg-neighbors
+  "8-connected foreground neighbor coordinates of CELL in the binary MAT."
+  [mat cell]
+  (let [[ns _] (get-cell-number-and-neighbors mat cell)]
+    (vec ns)))
+
+(defn- skeleton-graph
+  "Build the skeleton graph: cell -> vector of 8-connected foreground neighbors."
+  [mat]
+  (let [rows (count mat)
+        cols (count (first mat))]
+    (into {}
+          (for [i (range rows)
+                j (range cols)
+                :when (= 1 (get-in mat [i j]))]
+            [[i j] (fg-neighbors mat [i j])]))))
+
+(defn- g-neighbors
+  [graph cell]
+  (get graph cell []))
+
+(defn- node-degree
+  [graph cell]
+  (count (g-neighbors graph cell)))
+
+(defn- break-node?
+  "True for a stroke endpoint (degree 1) or junction (degree >= 3)."
+  [graph cell]
+  (let [d (node-degree graph cell)]
+    (or (<= d 1) (>= d 3))))
+
+(defn- walk-segment
+  "Walk a path from START (first interior pixel) away from PREV until hitting a
+   break node, an already-visited pixel, or a dead end. Returns the pixel list
+   (excluding PREV) and the terminal cell."
+  [graph visited start prev]
+  (loop [cur start
+         prv prev
+         acc []]
+    (if (break-node? graph cur)
+      {:pixels (conj acc cur) :end cur}
+      (let [nxt (first (->> (g-neighbors graph cur)
+                            (remove #(= % prv))
+                            (remove #(contains? @visited %))))]
+        (if nxt
+          (recur nxt cur (conj acc cur))
+          {:pixels (conj acc cur) :end cur})))))
+
+(defn- walk-loop
+  "Walk a closed loop (component with no break nodes) from START."
+  [graph visited start]
+  (loop [cur start
+         prv nil
+         acc []]
+    (let [nxt (first (->> (g-neighbors graph cur)
+                          (remove #(= % prv))
+                          (remove #(contains? @visited %))))]
+      (if (and nxt (not= nxt start))
+        (recur nxt cur (conj acc cur))
+        (conj acc cur)))))
+
+(defn- pixels->lineseq
+  "Turn a pixel path into a lineseq of [x y n] cells (n = direction number)."
+  [mat pixels]
+  (mapv (fn [c]
+          (let [[_ n] (get-cell-number-and-neighbors mat c)]
+            (conj c n)))
+        pixels))
+
+(defn- group-into-lsigns
+  "Convert collected segments to lineseqs. Two chords sharing the same two
+   junctions form one loop lsign; everything else is a linear lsign. Drop
+   degenerate (< 2 pixel) segments."
+  [mat segments]
+  (let [by-pair (group-by (fn [s] (set (:ends s))) segments)]
+    (mapcat (fn [[_ segs]]
+              (if (= (count segs) 2)
+                (let [[a b] segs
+                      pixels (vec (concat (:pixels a) (reverse (:pixels b))))]
+                  [(pixels->lineseq mat pixels)])
+                (->> segs
+                     (filter #(>= (count (:pixels %)) 2))
+                     (map #(pixels->lineseq mat (:pixels %))))))
+            (vals by-pair))))
+
+(defn- decompose-lsigns
+  "Decompose a binary matrix (1/0) into a vector of lineseqs, one per lsign,
+   bounded by skeleton junctions/endpoints; loops are cycles between two
+   junctions."
+  [mat]
+  (let [graph (skeleton-graph mat)
+        visited (volatile! #{})
+        segments (volatile! [])]
+    (doseq [c (keys graph)]
+      (when (break-node? graph c)
+        (doseq [n (->> (g-neighbors graph c)
+                       (remove #(contains? @visited %)))]
+          (let [{:keys [pixels end]} (walk-segment graph visited n c)]
+            (vswap! visited into pixels)
+            (vswap! segments conj {:pixels (conj pixels c) :ends [c end]})))))
+    (doseq [c (keys graph)]
+      (when (not (contains? @visited c))
+        (let [pixels (walk-loop graph visited c)]
+          (vswap! visited into pixels)
+          (vswap! segments conj {:pixels pixels
+                                 :ends [(first pixels) (first pixels)]}))))
+    (group-into-lsigns mat @segments)))
+
 (defn- get-start-cells
   "Find the cells where the word could start."
   [mat]
