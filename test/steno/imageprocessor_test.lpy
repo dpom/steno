@@ -1,0 +1,37 @@
+(require '[steno.imageprocessor :as img])
+(import [cv2] [numpy :as np])
+
+(defn- check!
+  [cond msg]
+  (when-not cond
+    (throw (Exception. msg))))
+
+;; A vertical stroke broken by a 2px gap (two fragments)
+(def broken
+  (np/array [[0 0 255 0 0]
+             [0 0 255 0 0]
+             [0 0   0 0 0]
+             [0 0 255 0 0]
+             [0 0 255 0 0]] ** :dtype np/uint8))
+;; NOTE: cv2/connectedComponents returns n_labels INCLUDING the background,
+;; so a 2-fragment image yields 3 labels and a repaired single stroke yields 2.
+(check! (= 3 (first (cv2/connectedComponents broken nil 8)))
+        "broken stroke must start as 2 components (+1 background label)")
+(def fixed (img/repair-skeleton broken))
+(check! (= 2 (first (cv2/connectedComponents fixed nil 8)))
+        "repair must reconnect to 1 component (+1 background label)")
+(check! (= 255 (int (aget fixed 2 2)))
+        "bridge must fill the gap pixel (2,2)")
+
+;; A clean continuous stroke must be left unchanged
+(def clean
+  (np/array [[0 0 255 0 0]
+             [0 0 255 0 0]
+             [0 0 255 0 0]
+             [0 0 255 0 0]
+             [0 0 255 0 0]] ** :dtype np/uint8))
+(def clean-fixed (img/repair-skeleton clean))
+(check! (np/array_equal clean clean-fixed)
+        "clean stroke must be unchanged by repair")
+
+(println "imageprocessor repair checks PASSED")
