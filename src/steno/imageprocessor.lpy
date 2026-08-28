@@ -180,8 +180,6 @@
 
   (show/show-glyph-matrix mtx2)
 
-  (def mtx (extr/extract-glyphs "test/resources/template.png"))
-
   (defn show-repair
     [row col glyph]
     (let [skel (process-image (:roi glyph))]
