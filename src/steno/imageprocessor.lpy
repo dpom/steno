@@ -149,14 +149,20 @@
 
 (defn process-image
   "Process the IMAGE into a clear 1 pixel thick stenogram by auto-selecting
-   the better of the two skeletonization strategies (ADR-0001)."
+   the better of the two skeletonization strategies (ADR-0001), then repairing
+   over-thinning gaps so a single stroke stays continuous."
   [image]
-  (process-image-best image))
+  (let [best (process-image-best image)
+        repaired (repair-skeleton best)]
+    (if (<= (skeleton-score repaired) (skeleton-score best))
+      repaired
+      best)))
 
 (comment
 
   (require
    '[steno.extractor :as extr]
+   '[steno.converter :as cnv]
    '[steno.show :as show]
    '[steno.utils :as utl])
 
@@ -173,6 +179,19 @@
   (def mtx2 (utl/map-glyph-matrix mtx pimage))
 
   (show/show-glyph-matrix mtx2)
+
+  (def mtx (extr/extract-glyphs "test/resources/template.png"))
+
+  (defn show-repair
+    [row col glyph]
+    (let [skel (process-image (:roi glyph))]
+      {:row row :col col :wsign (cnv/image-to-wsign skel)}))
+
+  (def mtx-r (utl/map-glyph-matrix mtx show-repair))
+
+  ;; Inspect a previously fragmented glyph: it should now yield one
+  ;; continuous lsign instead of several short ones.
+  (show/show-glyph-matrix mtx-r)
 
 ;;
   )
