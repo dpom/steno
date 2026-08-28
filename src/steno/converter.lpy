@@ -1,8 +1,13 @@
 (ns steno.converter
   "Convert images in numeric sequences"
   (:require
-   [basilisp.set :as set])
-  (:import cv2))
+   [basilisp.edn :as edn]
+   [basilisp.set :as set]
+   [basilisp.string :as str]
+   [steno.imageprocessor :as img])
+  (:import
+   [cv2]
+   [pathlib :refer [Path]]))
 
 (def directions
   [[0  1] ; E
@@ -70,49 +75,64 @@
           [#{} 0]
           directions))
 
-(def ortho-dirs
-  "The four orthogonal (4-connected) directions."
+(def all-dirs
+  "The eight 8-connected directions (orthogonals + diagonals). Real Duployer
+    skeletons are 8-connected, so the graph must use all eight to keep true
+    junctions intact (a 4-connected graph shatters junctions into degree-2
+    fragments and over-segments)."
   [[0  1]  ; E
    [1  0]  ; S
    [0 -1]  ; V
    [-1  0] ; N
-   ])
+   [1  1]  ; SE
+   [1 -1]  ; SV
+   [-1 -1] ; NV
+   [-1  1]]) ; NE
 
-(def diag-dirs
-  "The four diagonal directions (used only when a pixel has no orthogonal neighbor)."
-  [[1  1]
-   [1 -1]
-   [-1 -1]
-   [-1  1]])
+(defn- diagonal-shortcut?
+  "True when the diagonal step from CELL in direction [dr dc] is a spurious
+    shortcut rather than a genuine isolated diagonal step. A diagonal edge is
+    spurious when either of the two orthogonal 'filler' pixels that would close
+    the 2x2 corner is foreground: then the two endpoints are already connected
+    orthogonally around the corner, and keeping the diagonal would create a
+    short chord that over-segments strokes."
+  [mat [r c] [dr dc]]
+  (let [filler-a (get-neighbor mat [r c] [dr 0])
+        filler-b (get-neighbor mat [r c] [0 dc])]
+    (or (not (zero? (second filler-a)))
+        (not (zero? (second filler-b))))))
 
 (defn- fg-neighbors
-  "4-connected foreground neighbor coordinates of CELL in the binary MAT. A
-   diagonal fallback keeps pixels connected when the only links are diagonal
-   (e.g. isolated steps in an 8-connected skeleton)."
+  "8-connected foreground neighbor coordinates of CELL in the binary MAT.
+    Diagonal edges that are spurious corner shortcuts (either orthogonal filler
+    pixel is foreground) are dropped so the graph behaves like 4-connectivity
+    for drawn shapes while preserving genuine isolated diagonal steps in real
+    8-connected skeletons."
   [mat cell]
-  (let [orth (->> ortho-dirs
-                  (map #(get-neighbor mat cell %))
-                  (filter (fn [[_ v]] (not (zero? v))))
-                  (map first)
-                  (vec))]
-    (if (seq orth)
-      orth
-      (->> diag-dirs
-           (map #(get-neighbor mat cell %))
-           (filter (fn [[_ v]] (not (zero? v))))
-           (map first)
-           (vec)))))
+  (->> all-dirs
+       (map #(get-neighbor mat cell %))
+       (filter (fn [[n v]]
+                 (when (not (zero? v))
+                   (let [[dr dc] (map - n cell)]
+                     (if (and (not= dr 0) (not= dc 0))
+                       (not (diagonal-shortcut? mat cell [dr dc]))
+                       true)))))
+       (map first)
+       (vec)))
 
 (defn- skeleton-graph
   "Build the skeleton graph: cell -> vector of 8-connected foreground neighbors."
   [mat]
   (let [rows (count mat)
         cols (count (first mat))]
-    (into {}
-          (for [i (range rows)
-                j (range cols)
-                :when (= 1 (get-in mat [i j]))]
-            [[i j] (fg-neighbors mat [i j])]))))
+    (reduce (fn [g idx]
+              (let [i (quot idx cols)
+                    j (rem idx cols)]
+                (if (= 1 (get-in mat [i j]))
+                  (assoc g [i j] (fg-neighbors mat [i j]))
+                  g)))
+            {}
+            (range (* rows cols)))))
 
 (defn- g-neighbors
   [graph cell]
@@ -124,40 +144,47 @@
 
 (defn- break-node?
   "True for a stroke endpoint (degree 1) or a junction (degree >= 3) in the
-   4-connected GRAPH. Bends and straight pixels (degree 2) are interior."
+   8-connected GRAPH. Bends and straight pixels (degree 2) are interior."
   [graph cell]
   (let [d (node-degree graph cell)]
     (or (= d 1) (>= d 3))))
 
 (defn- walk-segment
   "Walk a path from START (first interior pixel) away from PREV until hitting a
-   break node, an already-visited pixel, or a dead end. Returns the pixel list
-   (excluding PREV) and the terminal cell."
+   break node, an already-visited pixel, a re-entered pixel, or a dead end.
+   Returns the pixel list (excluding PREV) and the terminal cell."
   [graph visited start prev]
-  (loop [cur start
-         prv prev
-         acc []]
-    (if (break-node? graph cur)
-      {:pixels (conj acc cur) :end cur}
-      (let [nxt (first (->> (g-neighbors graph cur)
-                            (remove #(= % prv))
-                            (remove #(contains? @visited %))))]
-        (if nxt
-          (recur nxt cur (conj acc cur))
-          {:pixels (conj acc cur) :end cur})))))
+  (let [seen (volatile! #{})]
+    (loop [cur start
+           prv prev
+           acc []]
+      (vswap! seen conj cur)
+      (if (break-node? graph cur)
+        {:pixels (conj acc cur) :end cur}
+        (let [nxt (first (->> (g-neighbors graph cur)
+                              (remove #(= % prv))
+                              (remove #(contains? @visited %))
+                              (remove #(contains? @seen %))))]
+          (if nxt
+            (recur nxt cur (conj acc cur))
+            {:pixels (conj acc cur) :end cur}))))))
 
 (defn- walk-loop
-  "Walk a closed loop (component with no break nodes) from START."
+  "Walk a closed loop (component with no break nodes) from START. A local SEEN
+   set guarantees termination even when the component contains sub-cycles."
   [graph visited start]
-  (loop [cur start
-         prv nil
-         acc []]
-    (let [nxt (first (->> (g-neighbors graph cur)
-                          (remove #(= % prv))
-                          (remove #(contains? @visited %))))]
-      (if (and nxt (not= nxt start))
-        (recur nxt cur (conj acc cur))
-        (conj acc cur)))))
+  (let [seen (volatile! #{})]
+    (loop [cur start
+           prv nil
+           acc []]
+      (vswap! seen conj cur)
+      (let [nxt (first (->> (g-neighbors graph cur)
+                            (remove #(= % prv))
+                            (remove #(contains? @visited %))
+                            (remove #(contains? @seen %))))]
+        (if (and nxt (not= nxt start))
+          (recur nxt cur (conj acc cur))
+          (conj acc cur))))))
 
 (defn- pixels->lineseq
   "Turn a pixel path into a lineseq of [x y n] cells (n = direction number)."
@@ -510,8 +537,18 @@
        (mapv normalize2-lsign)))
 
 (defn image-to-wsign
-  "Convert an image in a wsign (a sequence of lsign) using skeleton-graph
-   decomposition bounded by junctions and endpoints."
+  "DEFAULT wsign converter: legacy tracer-based decomposition. The graph
+   decomposition method (image-to-wsign-graph) currently over-segments
+   8-connected real skeletons and is kept experimental for further work."
+  [image]
+  (image-to-wsign-legacy image))
+
+(defn image-to-wsign-graph
+  "Experimental skeleton-graph decomposition bounded by junctions/endpoints.
+   NOTE: real Duployer skeletons are 8-connected, so a 4-connected graph
+   shatters junctions into degree-2 fragments and over-segments badly
+   (e.g. a 4-stroke glyph splits into 82 lsigns). Kept for future work
+   using 8-connectivity with branch-count junction detection."
   [image]
   (->> image
        image-to-matrix
@@ -520,6 +557,59 @@
        (map normalize1-lsign)
        (sort-by #(first (:lineseq %)) compare-cell)
        (mapv normalize2-lsign)))
+
+(defn- wsign-score
+  "Compare two wsigns: 1.0 when lsign counts and ltype multisets match,
+   otherwise a value scaled down by the count difference."
+  [a b]
+  (let [ca (count a) cb (count b)]
+    (if (and (= ca cb)
+             (= (frequencies (map :ltype a))
+                (frequencies (map :ltype b))))
+      1.0
+      (/ 1.0 (+ 1 (abs (- ca cb)))))))
+
+(defn- corpus-by-fileimage
+  "Read CORPUS-DIR and group curated entries into wsigns keyed by :fileimage.
+   Reads EDN corpus files directly to avoid a circular dependency on
+   steno.corpus (which depends on this namespace)."
+  [corpus-dir]
+  (->> (.rglob (Path. corpus-dir) "*")
+       iterator-seq
+       (filter #(.is_file %))
+       (filter #(str/ends-with? (.-name %) ".edn"))
+       (map #(edn/read-string (slurp (str %))))
+       (group-by :fileimage)
+       (map (fn [[k es]]
+              [k (->> es
+                      (sort-by :pos)
+                      (mapv #(select-keys % [:ltype :lineseq])))]))
+       (into {})))
+
+(defn compare-glyph-batch
+  "For every glyph PNG under GLYPH-DIR, print legacy and graph lsign counts and,
+    when a curated corpus entry (under CORPUS-DIR) matches the glyph path, the
+    match score of each extractor against the curated wsign."
+  [glyph-dir corpus-dir]
+  (let [curated (corpus-by-fileimage corpus-dir)
+        files (->> (.rglob (Path. glyph-dir) "*.png")
+                   iterator-seq
+                   (filter #(.is_file %))
+                   (map str)
+                   sort)]
+    (doseq [f files]
+      (let [img (cv2/imread f cv2/IMREAD_GRAYSCALE)
+            skel (img/process-image img)
+            legacy (image-to-wsign-legacy skel)
+            graph (image-to-wsign-graph skel)
+            entry (get curated f)]
+        (println (format "%s  legacy=%d graph=%d curated=%s"
+                         f (count legacy) (count graph)
+                         (if entry (count entry) "NA")))
+        (when entry
+          (println (format "   score graph=%.2f legacy=%.2f"
+                           (wsign-score graph entry)
+                           (wsign-score legacy entry))))))))
 
 (comment
 
@@ -558,5 +648,10 @@
 
   (show/show-lsign (nth (:wsign wsign) 1))
 
-;;
+  ;; ---------------------------------------------------------------------------
+  ;; extraction-eval: legacy vs graph decomposition vs curated corpus
+  ;; Requires: (require '[steno.corpus :as corpus] '[pathlib :refer [Path]])
+  ;; (compare-glyph-batch "tmp/yoga_001_1" "resources/corpus")
+
+  ;;
   )

@@ -21,11 +21,11 @@
              [0 0 1 0 0]
              [0 0 1 0 0]]))
 
-(assert (= 3 (count (cnv/image-to-wsign fork)))
+(assert (= 3 (count (cnv/image-to-wsign-graph fork)))
         "T-junction must yield 3 linear lsigns")
-(let [w (cnv/image-to-wsign loopm)]
+(let [w (cnv/image-to-wsign-graph loopm)]
   (assert (= 1 (count w)) "square ring must yield 1 lsign")
   (assert (= 0 (:ltype (first w))) "ring must be ltype 0 (loop)"))
-(assert (= 4 (count (cnv/image-to-wsign cross)))
+(assert (= 4 (count (cnv/image-to-wsign-graph cross)))
         "cross must yield 4 linear lsigns, not 1")
 (println "converter graph-extraction tests passed")
