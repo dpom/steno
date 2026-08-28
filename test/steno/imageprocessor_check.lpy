@@ -20,6 +20,8 @@
 (def fixed (img/repair-skeleton broken))
 (check! (= 2 (first (cv2/connectedComponents fixed nil 8)))
         "repair must reconnect to 1 component (+1 background label)")
+(check! (= 255 (int (aget fixed 2 2)))
+        "bridge must fill the gap pixel (2,2)")
 
 ;; A clean continuous stroke must be left unchanged
 (def clean

@@ -45,11 +45,15 @@
   (.astype (np/greater img 0) np/uint8))
 
 (defn- neighbor-counts
-  "8-connected foreground neighbour count for every pixel."
+  "8-connected foreground neighbour count for every pixel. Outside the image is
+   treated as background (zero-padded) so stroke endpoints on the image border
+   are still detected as degree-1."
   [bin-img]
   (let [kernel (np/ones [3 3] np/uint8)
-        summed (cv2/filter2D bin-img -1 kernel)]
-    (np/subtract summed bin-img)))
+        padded (cv2/copyMakeBorder bin-img 1 1 1 1 cv2/BORDER_CONSTANT 0)
+        summed (cv2/filter2D padded -1 kernel)
+        cropped (aget summed (python/tuple [(python/slice 1 -1) (python/slice 1 -1)]))]
+    (np/subtract cropped bin-img)))
 
 (defn- endpoint-coords
   "Coordinates of degree-1 foreground pixels (dangling ends)."
