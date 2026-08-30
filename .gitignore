@@ -23,5 +23,6 @@ wheels/
 /tmp/
 #*
 /Steno.org
-/.clj-kondo/
 /.lsp/
+/.clj-kondo/*
+!/.clj-kondo/config.edn

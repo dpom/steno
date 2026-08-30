@@ -12,7 +12,7 @@ Purpose: steno is a personal project to digitalize stenographic (shorthand) writ
 
 Language: The project is written in Basilisp (.lpy files), which is a Clojure dialect that runs on top of the Python VM. It uses Python libraries (OpenCV, numpy, scikit-image, matplotlib) via interop. The entry point is a thin Python shim (src/steno/__init__.py) that bootstraps into Basilisp.
 
-- Dictionary of project concepts: doc/Dictionary.org
+- Dictionary of project concepts: docs/Dictionary.org
 - Source files: src/steno/*.lpy (8 source files + 1 __init__.py)
 - Test files: test/steno/*.lpy (1 test file)
 - Config: pyproject.toml declares basilisp>=0.5.0 as a dependency
@@ -51,6 +51,9 @@ source .venv/bin/activate
 ### Task runner (babashka — `bb`)
 ```sh
 bb app <action>          # Run the steno CLI (e.g. `bb app translate`)
+bb kondo [file]          # Lint with clj-kondo (src by default)
+bb format [path]         # Format code with cljfmt (src test resources by default)
+bb style [path]          # Check formatting without fixing
 bb nrepl                 # Start basilisp nREPL server
 bb edn <file>            # Format an .edn file
 ```
@@ -96,6 +99,7 @@ bb edn <file>            # Format an .edn file
 
 ### Formatting
 - Use cljfmt with `.cljfmt.edn` config (matches regex `\.lpy$`)
+- Run `bb format` before committing
 - Indent with spaces (2-space blocks, align function args)
 - Thread macros `->` and `->>` preferred over nesting
 

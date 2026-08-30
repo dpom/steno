@@ -3,12 +3,10 @@
    ;; [basilisp.edn :as edn]
    [basilisp.io :as bio]
    [basilisp.pprint :as pprint]
-   [clojure.string :as str]
    [steno.checker :as chk]
    [steno.converter :as cnv]
    [steno.corpus :as corpus]
    [steno.extractor :as ext]
-   [steno.imageprocessor :as img]
    [steno.translator :as tra]
    [steno.translators.diff]
    [steno.translators.freq]
@@ -16,13 +14,9 @@
    [steno.utils :as utl])
   (:import
    [argparse :as arg]
-   cv2
    [logging :as log]
-   os
-   [os.path :as path]
-   [pathlib :refer [Path]]
-   [pyaml_env :as yml]
-   uuid))
+   pathlib
+   [pyaml_env :as yml]))
 
 (def default-corpus-dir "resources/corpus")
 (def default-references-dir "resources")
@@ -87,7 +81,7 @@
         outdir (get config "output" default-corpus-dir)
         translators (get config "translators")
         logger (:logger config)]
-    (.mkdir (Path. outdir) ** :parents true :exist_ok true)
+    (.mkdir (pathlib/Path. outdir) ** :parents true :exist_ok true)
     (.info logger "Make corpus %s using %s" infile translators)
     (let [ctx (tra/prepare-translations config translators)
           mtx (ext/extract-glyphs infile)
@@ -119,7 +113,7 @@
         outdir (get config "output" default-references-dir)
         translators (get config "translators")
         logger (:logger config)]
-    (.mkdir (Path. outdir) ** :parents true :exist_ok true)
+    (.mkdir (pathlib/Path. outdir) ** :parents true :exist_ok true)
     (doseq [tr translators]
       (.info logger "Make references for %s" tr)
       (let [references (tra/build-references tr config corpus-dir)
@@ -134,12 +128,12 @@
         outdir (get config "output")
         mtx (ext/extract-glyphs infile)
         name (utl/get-filename infile)]
-    (.mkdir (Path. outdir) ** :parents true :exist_ok true)
+    (.mkdir (pathlib/Path. outdir) ** :parents true :exist_ok true)
     (ext/save-glyphs! mtx name outdir)))
 
 (defn renormalize-lsigns!
   [dir]
-  (let [lsign-files (->> (iterator-seq (.rglob (Path. dir) "*.edn")))]
+  (let [lsign-files (->> (iterator-seq (.rglob (pathlib/Path. dir) "*.edn")))]
     (doseq [lf lsign-files]
       (->> lf
            utl/load-edn

@@ -8396,3 +8396,97 @@ bb app make-references
     (compare "tmp/yoga_001_1/yoga_001_1-04-00.png")
 
   #+end_src
+- cu ajutorul AI am combinat cele doua metode de procesare a imaginii
+
+* 2026-08-28
+
+- cu ajutorul AI ([[file:.agent-shell/transcripts/2026-08-26-12-06-23.md][Sesiune AI]]) am explorat noi metode de extragere =wsigns= din imagini, in final am descoperit ca metoda gasita de mine initial este cea mai performanta
+- noua metoda de procesare a imaginilor genereaza o noua problema. Cateodata skeletizarea este prea agresiva, sign obtinut nu mai este continuu si procesul de extragere seopreste la primul gap:
+  #+begin_src clojure
+  (require
+   '[steno.show :as show]
+   '[steno.imageprocessor :as imgproc]
+   '[steno.converter :as conv])
+
+(import
+   cv2
+   [numpy :as np]
+   [skimage.morphology :as skmorph]
+   [skimage.util :as skiu])
+
+  (def cale-imagine "tmp/yoga_001_1/yoga_001_1-01-02.png")
+  (def image (cv2/imread cale-imagine cv2/IMREAD_GRAYSCALE))
+
+  (def proc-image (imgproc/process-image image))
+
+  (show/show-two-images [image proc-image])
+
+  (def wsign (conv/image-to-wsign proc-image))
+  (count wsign)
+  ;; => 1
+
+  (def best (imgproc/process-image-best image))
+  (def repaired (imgproc/repair-skeleton best))
+
+  ;; best score:
+  (imgproc/skeleton-score best)
+  ;; => 4
+  ;; repaired score:
+  (imgproc/skeleton-score repaired)
+  ;; => 4
+
+  ;; components before:
+  (imgproc/component-count best)
+  ;; => 4
+
+  ;; components after:
+  (imgproc/component-count repaired)
+  ;; => 4
+
+  (let [eps (imgproc/endpoint-coords best)]
+    (println "endpoints:" (count eps))
+    (println "sample:" (take 5 eps)))
+  ;; endpoints: 9
+  ;; sample: ([1 129] [15 140] [15 191] [23 142] [92 22])
+
+  (if-let [ep (first (imgproc/endpoint-coords best))]
+    (println "nearest for" ep
+             (imgproc/nearest-foreground best ep #{}))
+    (println "no endpoints found"))
+  ;; nearest for [1 129] [2 128]
+
+(def repaired (imgproc/repair-skeleton best))
+
+
+  (show/show-two-images [best repaired])
+
+  (import [numpy :as np])
+
+  (def diff (np/where (np/invert (np/array_equal best repaired)) 1 0))
+
+(let [diff (np/where (np/array_equal best repaired) 1 0)]
+  (show/show-image diff))
+
+  (let [diff (np/where (np/not_equal best repaired) 1 0)]
+    (show/show-image diff))
+
+  (let [eps  (imgproc/endpoint-coords best)
+        img  best
+        gaps (atom [])]
+    (doseq [e eps]
+      (let [N (imgproc/continuation-neighbor img e)
+            excl (if N #{N} #{})]
+        (doseq [y (range (max 0 (- (first e) 20)) (min (.- img shape 0) (+ (first e) 21)))
+                x (range (max 0 (- (second e) 20)) (min (.- img shape 1) (+ (second e) 21)))]
+          (let [fg? (> (int (aget img y x)) 0)
+                  same? (and (= y (first e)) (= x (second e)))
+                  excl? (contains? excl [y x])]
+          (when (and fg? (not same?) (not excl?))
+            ;; compute Euclidean distance
+            (let [d (+ (* (- y (first e)) (- y (first e)))
+                       (* (- x (second e)) (- x (second e))))]
+              (swap! gaps conj [(first e) (second e) (first N) (second N) d])))))))
+  0(println "Nearest other pixel for every endpoint:"
+           @gaps))
+
+  #+end_src

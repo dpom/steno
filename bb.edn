@@ -1,9 +1,37 @@
 {:paths ["src"]
  :tasks
- {:requires ([babashka.process :refer [shell process check]]
+ {:requires ([babashka.fs :as fs]
+             [babashka.process :refer [shell process check]]
              [clojure.java.io :as io])
   nrepl  {:doc  "Start the REPL"
           :task (shell "basilisp nrepl-server")}
+  kondo  {:doc  "Run kondo linter on default or specific file"
+          :task (let [[src-file] *command-line-args*]
+                  (if-not src-file
+                    (let [target-dir "src"
+                          _ (println (str "Caut fișiere .lpy în: " target-dir "..."))
+                          files (->> (fs/glob target-dir "**")
+                                     (filter fs/regular-file?)
+                                     (filter (fn [f] (contains? #{"lpy"} (fs/extension f))))
+                                     (map str))]
+                      (if (seq files)
+                        (do
+                          (println (str "Găsite " (count files) " fișiere. Rulez clj-kondo...\n"))
+                          (apply shell {:continue true} "clj-kondo" "--lang" "clj" "--lint" files))
+                        (println "Nu am găsit fișiere .lpy sau .py de analizat.")))
+                    (shell {:continue true} "clj-kondo" "--lang" "clj" "--lint" src-file)))}
+  style  {:doc  "Check code style on default or specific file"
+          :task (let [[src-file] *command-line-args*]
+                  (shell (str "cljfmt check "
+                              (if (empty? src-file)
+                                "src resources"
+                                src-file))))}
+  format {:doc  "Format codebase on default or specific file"
+          :task (let [[src-file] *command-line-args*]
+                  (shell  (str "cljfmt fix "
+                               (if (empty? src-file)
+                                 "src resources"
+                                 src-file))))}
   edn    {:doc "Format an edn file"
           :task (let [[edn-file] *command-line-args*
                       edn (slurp edn-file)]

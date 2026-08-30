@@ -1,5 +1,7 @@
 (ns steno.imageprocessor
   "Prepare the page image"
+  (:require
+   [steno.spec :as spec])
   (:import
    cv2
    [numpy :as np]
@@ -29,22 +31,18 @@
 
 (def gap-radius
   "Max pixel distance from an endpoint within which a bridge may be drawn."
-  3)
+  20)
 
 (def max-iterations
   "Cap on bridging passes per glyph (stops early if component count stabilises)."
   2)
-
-(def all-dirs-8
-  "The eight 8-connected directions."
-  [[0  1] [1  1] [1  0] [1 -1] [0 -1] [-1 -1] [-1  0] [-1  1]])
 
 (defn- bin-u8
   "Foreground mask of a 0/255 skeleton as uint8 0/1."
   [img]
   (.astype (np/greater img 0) np/uint8))
 
-(defn- neighbor-counts
+(defn neighbor-counts
   "8-connected foreground neighbour count for every pixel. Outside the image is
    treated as background (zero-padded) so stroke endpoints on the image border
    are still detected as degree-1."
@@ -55,7 +53,7 @@
         cropped (aget summed (python/tuple [(python/slice 1 -1) (python/slice 1 -1)]))]
     (np/subtract cropped bin-img)))
 
-(defn- endpoint-coords
+(defn endpoint-coords
   "Coordinates of degree-1 foreground pixels (dangling ends)."
   [img]
   (let [bin-img (bin-u8 img)
@@ -64,10 +62,10 @@
         [rs cs] (np/where cond)]
     (map (fn [r c] [(int r) (int c)]) rs cs)))
 
-(defn- continuation-neighbor
+(defn continuation-neighbor
   "The single foreground neighbour of an endpoint (the along-stroke direction)."
   [img [r c]]
-  (->> all-dirs-8
+  (->> spec/all-directions
        (some (fn [[dr dc]]
                (let [nr (+ r dr) nc (+ c dc)
                      h (first (.- img shape)) w (second (.- img shape))]
@@ -75,7 +73,7 @@
                             (> (int (aget img nr nc)) 0))
                    [nr nc]))))))
 
-(defn- nearest-foreground
+(defn nearest-foreground
   "Nearest other foreground pixel to [r c] within `gap-radius`, excluding EXCLUDE.
    Returns [y x] or nil."
   [img [r c] exclude]
@@ -87,18 +85,18 @@
       (if (>= y y1)
         best
         (let [[b bd] (loop [x x0 b best bd best-d]
-                      (if (>= x x1)
-                        [b bd]
-      (let [same? (and (= y r) (= x c))
-            excl? (contains? exclude [y x])
-            fg? (> (int (aget img y x)) 0)
-            d (+ (* (- y r) (- y r)) (* (- x c) (- x c)))]
-                          (if (and (not same?) (not excl?) fg? (< d bd))
-                            (recur (inc x) [y x] d)
-                            (recur (inc x) b bd)))))]
+                       (if (>= x x1)
+                         [b bd]
+                         (let [same? (and (= y r) (= x c))
+                               excl? (contains? exclude [y x])
+                               fg? (> (int (aget img y x)) 0)
+                               d (+ (* (- y r) (- y r)) (* (- x c) (- x c)))]
+                           (if (and (not same?) (not excl?) fg? (< d bd))
+                             (recur (inc x) [y x] d)
+                             (recur (inc x) b bd)))))]
           (recur (inc y) b bd))))))
 
-(defn- component-count
+(defn component-count
   "Number of 8-connected components in a 0/255 image."
   [img]
   (first (cv2/connectedComponents img nil 8)))
@@ -126,7 +124,7 @@
                   img
                   (recur (inc it) new-n))))))))))
 
-(defn- skeleton-score
+(defn skeleton-score
   "Lower means a cleaner skeleton. Penalise thick (merged) strokes, which
    survive a 3x3 erosion, and an excessive number of disconnected fragments."
   [skel]

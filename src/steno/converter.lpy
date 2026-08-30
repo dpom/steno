@@ -4,36 +4,15 @@
    [basilisp.edn :as edn]
    [basilisp.set :as set]
    [basilisp.string :as str]
-   [steno.imageprocessor :as img])
+   [steno.imageprocessor :as img]
+   [steno.spec :as spec])
   (:import
-   [cv2]
-   [pathlib :refer [Path]]))
+   cv2
+   pathlib))
 
-(def directions
-  [[0  1] ; E
-   [1  1] ; SE
-   [1  0] ; S
-   [1 -1] ; SV
-   [0 -1] ; V
-   [-1 -1] ; NV
-   [-1  0] ; N
-   [-1  1] ; NE
-   ])
-
-(def ^{:doc "Direction position in the cell number"} pos
-  [2r10000000 ; E
-   2r01000000 ; SE
-   2r00100000 ; S
-   2r00010000 ; SV
-   2r00001000 ; V
-   2r00000100  ; NV
-   2r00000010  ; N
-   2r00000001] ; NE
-  )
-
-(def dummy-cell [-1 -1])
-
-(def ^{:doc "Factor that determines how close two cells must be to be neighbors (sum of dx and dy)"} neighbor-factor 10)
+(def neighbor-factor
+  "Factor that determines how close two cells must be to be neighbors (sum of dx and dy)"
+  10)
 
 (def lineseq-min-size 10)
 
@@ -45,7 +24,7 @@
   (let [[rows cols _] (.- img shape)]
     (mapv (fn [i]
             (mapv (fn [j]
-                    (if (bool (zero? (+ (aget img i j)))) 0 1))
+                    (if (python/bool (zero? (+ (aget img i j)))) 0 1))
                   (range 0 cols)))
           (range 0 rows))))
 
@@ -54,7 +33,7 @@
   [mat row column]
   (try
     (aget mat row column)
-    (catch Exception e
+    (catch Exception _e
       0)))
 
 (defn- get-neighbor
@@ -73,21 +52,9 @@
             (let [[np v] (get-neighbor mat cell dir)]
               [(if (zero? v) neighbors (conj neighbors np)) (+ (* num 2) v)]))
           [#{} 0]
-          directions))
+          spec/all-directions))
 
-(def all-dirs
-  "The eight 8-connected directions (orthogonals + diagonals). Real Duployer
-    skeletons are 8-connected, so the graph must use all eight to keep true
-    junctions intact (a 4-connected graph shatters junctions into degree-2
-    fragments and over-segments)."
-  [[0  1]  ; E
-   [1  0]  ; S
-   [0 -1]  ; V
-   [-1  0] ; N
-   [1  1]  ; SE
-   [1 -1]  ; SV
-   [-1 -1] ; NV
-   [-1  1]]) ; NE
+ ; NE
 
 (defn- diagonal-shortcut?
   "True when the diagonal step from CELL in direction [dr dc] is a spurious
@@ -109,7 +76,7 @@
     for drawn shapes while preserving genuine isolated diagonal steps in real
     8-connected skeletons."
   [mat cell]
-  (->> all-dirs
+  (->> spec/all-directions
        (map #(get-neighbor mat cell %))
        (filter (fn [[n v]]
                  (when (not (zero? v))
@@ -264,7 +231,7 @@
                (if (< new-sum sum)
                  [cell new-sum]
                  [min-cell sum])))
-           [dummy-cell (float "inf")]
+           [spec/dummy-cell (float "inf")]
            start-cells)))
 
 (defn- get-first-one
@@ -280,7 +247,7 @@
               new-row (if (= new-col max-col) (inc row) row)
               new-col (if (= new-row row) new-col 0)]
           (if (= new-row max-row)
-            dummy-cell
+            spec/dummy-cell
             (recur new-row new-col)))))))
 
 (defn- get-start-cell
@@ -574,7 +541,7 @@
    Reads EDN corpus files directly to avoid a circular dependency on
    steno.corpus (which depends on this namespace)."
   [corpus-dir]
-  (->> (.rglob (Path. corpus-dir) "*")
+  (->> (.rglob (pathlib/Path. corpus-dir) "*")
        iterator-seq
        (filter #(.is_file %))
        (filter #(str/ends-with? (.-name %) ".edn"))
@@ -592,7 +559,7 @@
     match score of each extractor against the curated wsign."
   [glyph-dir corpus-dir]
   (let [curated (corpus-by-fileimage corpus-dir)
-        files (->> (.rglob (Path. glyph-dir) "*.png")
+        files (->> (.rglob (pathlib/Path. glyph-dir) "*.png")
                    iterator-seq
                    (filter #(.is_file %))
                    (map str)
@@ -624,7 +591,6 @@
 
   (require
    '[steno.extractor :as extr]
-   '[steno.imageprocessor :as img]
    '[steno.show :as show]
    '[steno.utils :as utl])
 

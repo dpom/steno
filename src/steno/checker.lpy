@@ -22,7 +22,7 @@
   (:import
    base64
    cv2
-   [pathlib :refer [Path]]
+   pathlib
    [tempfile :as tf]
    [tkinter :as tk]
    [matplotlib.figure :as mfig]
@@ -118,7 +118,7 @@
   "Sorted list of existing corpus letter folders under CORPUS-DIR.
    Returns an empty vector when CORPUS-DIR does not exist yet."
   [corpus-dir]
-  (let [dir (Path. corpus-dir)]
+  (let [dir (pathlib/Path. corpus-dir)]
     (if (.exists dir)
       (->> (iterator-seq (.iterdir dir))
            (filter #(.is_dir %))
@@ -139,7 +139,7 @@
   "Expand INPUT into a sorted vector of glyph image paths: the file itself
    or every image file of a directory (review queue in name order)."
   [input]
-  (let [p (Path. input)]
+  (let [p (pathlib/Path. input)]
     (cond
       (.is_file p) [input]
       (.is_dir p) (->> (iterator-seq (.iterdir p))
@@ -240,28 +240,28 @@
     (reset! widgets* @widgets)))
 
 (defn- refresh-glyph!
-   "Show the current glyph in the top 'gliph image' frame side by side:
+  "Show the current glyph in the top 'gliph image' frame side by side:
     the original image on the left and the processed image on the right,
     both with x/y axes."
-   [ui imagefile]
-   (let [orig-image (cv2/imread imagefile cv2/IMREAD_GRAYSCALE)]
-     (when-not (nil? orig-image)
-       (let [proc-image (img/process-image orig-image)
-             orig-ax (:glyph-orig-ax ui)
-             proc-ax (:glyph-proc-ax ui)]
-         (.clear orig-ax)
-         (.imshow orig-ax orig-image ** :cmap "gray")
-         (.set_title orig-ax "original")
-         (.set_xlabel orig-ax "x")
-         (.set_ylabel orig-ax "y")
-         (.axis orig-ax "on")
-         (.clear proc-ax)
-         (.imshow proc-ax proc-image ** :cmap "gray")
-         (.set_title proc-ax imagefile)
-         (.set_xlabel proc-ax "x")
-         (.set_ylabel proc-ax "y")
-         (.axis proc-ax "on")
-         (.draw (:glyph-canvas ui))))))
+  [ui imagefile]
+  (let [orig-image (cv2/imread imagefile cv2/IMREAD_GRAYSCALE)]
+    (when-not (nil? orig-image)
+      (let [proc-image (img/process-image orig-image)
+            orig-ax (:glyph-orig-ax ui)
+            proc-ax (:glyph-proc-ax ui)]
+        (.clear orig-ax)
+        (.imshow orig-ax orig-image ** :cmap "gray")
+        (.set_title orig-ax "original")
+        (.set_xlabel orig-ax "x")
+        (.set_ylabel orig-ax "y")
+        (.axis orig-ax "on")
+        (.clear proc-ax)
+        (.imshow proc-ax proc-image ** :cmap "gray")
+        (.set_title proc-ax imagefile)
+        (.set_xlabel proc-ax "x")
+        (.set_ylabel proc-ax "y")
+        (.axis proc-ax "on")
+        (.draw (:glyph-canvas ui))))))
 
 (defn- clear-screen!
   "Empty the screen when no glyph is available."
@@ -271,11 +271,11 @@
   (reset! (:photos* ui) {})
   (let [orig-ax (:glyph-orig-ax ui)
         proc-ax (:glyph-proc-ax ui)]
-     (.clear orig-ax)
-     (.axis orig-ax "off")
-     (.clear proc-ax)
-     (.axis proc-ax "off")
-     (.draw (:glyph-canvas ui))))
+    (.clear orig-ax)
+    (.axis orig-ax "off")
+    (.clear proc-ax)
+    (.axis proc-ax "off")
+    (.draw (:glyph-canvas ui))))
 
 (defn- load-position!
   "(Re)load the glyph at the current queue index: convert, translate and
@@ -336,11 +336,11 @@
   [ui]
   (let [{:keys [files idx]} @(:state* ui)
         file (nth files idx nil)]
-    (when (and file (.exists (Path. file)))
+    (when (and file (.exists (pathlib/Path. file)))
       (when (mb/askyesno ** :parent (:root ui)
                          :title "Delete glyph"
                          :message (str "Delete " file "?"))
-        (.unlink (Path. file))
+        (.unlink (pathlib/Path. file))
         (let [new-files (vec (keep-indexed (fn [i f] (when (not= i idx) f)) files))
               new-idx (if (empty? new-files) 0 (min idx (dec (count new-files))))]
           (swap! (:state* ui) assoc :files new-files :idx new-idx :rows [])
@@ -402,22 +402,22 @@
     (.config root ** :menu menubar)))
 
 (defn- build-top-panel!
-   "Top panel: the large central image display frame labelled 'gliph image',
+  "Top panel: the large central image display frame labelled 'gliph image',
     rendered through a matplotlib canvas showing two x/y axes side by side:
     the original image on the left and the processed image on the right."
-   [root photos*]
-   (let [panel (tk/LabelFrame root ** :text "gliph image"  :padx 10  :pady 10)
-         fig (mfig/Figure ** :figsize (python/tuple [10 5]))
-         canvas (tkagg/FigureCanvasTkAgg fig panel)
-         orig-ax (.add_subplot fig 1 2 1)
-         proc-ax (.add_subplot fig 1 2 2)]
-     (.pack (.get_tk_widget canvas) ** :padx 10  :pady 10)
-     {:panel panel
-      :glyph-fig fig
-      :glyph-orig-ax orig-ax
-      :glyph-proc-ax proc-ax
-      :glyph-canvas canvas
-      :photos* photos*}))
+  [root photos*]
+  (let [panel (tk/LabelFrame root ** :text "gliph image"  :padx 10  :pady 10)
+        fig (mfig/Figure ** :figsize (python/tuple [10 5]))
+        canvas (tkagg/FigureCanvasTkAgg fig panel)
+        orig-ax (.add_subplot fig 1 2 1)
+        proc-ax (.add_subplot fig 1 2 2)]
+    (.pack (.get_tk_widget canvas) ** :padx 10  :pady 10)
+    {:panel panel
+     :glyph-fig fig
+     :glyph-orig-ax orig-ax
+     :glyph-proc-ax proc-ax
+     :glyph-canvas canvas
+     :photos* photos*}))
 
 (defn- build-table-panel!
   "Middle panel: the 'lsigns' table frame."
@@ -561,9 +561,9 @@
   (count (expand-input "tmp/yoga1_12"))
   ;; => number of png images in the batch
 
-  (image-file? (Path. "resources/config.yml"))
+  (image-file? (pathlib/Path. "resources/config.yml"))
   ;; => false
-  (image-file? (Path. "tmp/yoga1_12/yoga1_12-01-11.png"))
+  (image-file? (pathlib/Path. "tmp/yoga1_12/yoga1_12-01-11.png"))
   ;; => true
 
   ;; 1.7 skip filter

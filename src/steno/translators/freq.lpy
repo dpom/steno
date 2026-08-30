@@ -72,7 +72,7 @@
   (->> corpus
        (mapcat #(keys (:freq %)))
        (frequencies)
-       (filter (fn [[k v]] (> v (/ (count corpus) 2))))
+       (filter (fn [[_ v]] (> v (/ (count corpus) 2))))
        (map first)
        (sort)))
 

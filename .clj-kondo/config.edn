@@ -1,0 +1,38 @@
+{:linters
+ {:unresolved-symbol
+  {:level              :error
+   :exclude-namespaces [python py]
+   :exclude            [aslice **]}
+
+  :unresolved-namespace
+  {:level :off}
+
+  :unresolved-var
+  {:level :off}
+
+  :type-mismatch
+  {:level :off}
+
+  :syntax
+  {:level :off}
+
+  :invalid-arity
+  {:skip-args [py/import python/import]}}
+
+ ;; Oprește erorile 'Expected: class symbol' pentru importurile de module Python în ns :import
+ :import-type
+ {:level :off}
+
+ :hooks
+ {:analyze-call
+  {;; Mapează accesul de atribut (.- img shape)
+   .- hooks.basilisp/lint-attr
+
+   ;; Mapează simbolul/macro-ul kwargs **
+   ** hooks.basilisp/lint-kwargs}}
+
+ :lint-as
+ {python/import        clojure.core/use
+  python/defmodule     clojure.core/comment
+  basilisp.core/import clojure.core/use
+  pathlib/Path         clojure.core/comment}}

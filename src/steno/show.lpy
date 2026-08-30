@@ -5,9 +5,7 @@
   (:import
    [io :as io]
    [numpy :as np]
-   [matplotlib :as matp]
    [matplotlib.pyplot :as plt]
-   [os :as os]
    [subprocess :as sp]
    [tempfile :as tf]))
 
@@ -21,8 +19,8 @@
       (.flush tmp)
       (.close tmp)
 
-       (let [lisp-cmd (str "(local/display-image-from-file \"" tmp-path "\")")]
-         (sp/run ["emacsclient" "-e" lisp-cmd]))
+      (let [lisp-cmd (str "(local/display-image-from-file \"" tmp-path "\")")]
+        (sp/run ["emacsclient" "-e" lisp-cmd]))
 
       (catch Exception e
         (println "Error sending to Emacs:" (str e))))))

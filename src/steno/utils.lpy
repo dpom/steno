@@ -2,15 +2,11 @@
   (:require
    [basilisp.pprint :as p]
    [basilisp.edn :as edn]
-   [basilisp.io :as bio]
-   [basilisp.core :as core])
+   [basilisp.io :as bio])
   (:import
    [multiprocessing :refer [Process]]
    [numpy :as np]
-   os
-   [os.path :as path]
-   [pyaml_env :as yml]
-   uuid))
+   [os.path :as path]))
 
 (defn start-proc
   "Start FUNC with ARG in a thread process and return its id."

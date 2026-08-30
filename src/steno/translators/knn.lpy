@@ -3,9 +3,7 @@
   (:require
    [steno.corpus :as corpus]
    [steno.translator :as tra]
-   [steno.utils :as utl])
-  (:import
-   [statistics :as st]))
+   [steno.utils :as utl]))
 
 (def ctx-key :knn-references)
 
@@ -162,8 +160,6 @@
 ;; completely different sequences return 0
   (get-diff [0 0 0 0] [255 255 255 255])
   ;; => 0
-
-  (require '[steno.translator :as tra])
 
 ;; translates a lsign producing letter matches
   (let [corpus-dir "resources/corpus"
