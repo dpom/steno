@@ -118,7 +118,7 @@
   "Sorted list of existing corpus letter folders under CORPUS-DIR.
    Returns an empty vector when CORPUS-DIR does not exist yet."
   [corpus-dir]
-  (let [dir (pathlib/Path. corpus-dir)]
+  (let [dir (pathlib/Path corpus-dir)]
     (if (.exists dir)
       (->> (iterator-seq (.iterdir dir))
            (filter #(.is_dir %))
@@ -139,7 +139,7 @@
   "Expand INPUT into a sorted vector of glyph image paths: the file itself
    or every image file of a directory (review queue in name order)."
   [input]
-  (let [p (pathlib/Path. input)]
+  (let [p (pathlib/Path input)]
     (cond
       (.is_file p) [input]
       (.is_dir p) (->> (iterator-seq (.iterdir p))
@@ -336,11 +336,11 @@
   [ui]
   (let [{:keys [files idx]} @(:state* ui)
         file (nth files idx nil)]
-    (when (and file (.exists (pathlib/Path. file)))
+    (when (and file (.exists (pathlib/Path file)))
       (when (mb/askyesno ** :parent (:root ui)
                          :title "Delete glyph"
                          :message (str "Delete " file "?"))
-        (.unlink (pathlib/Path. file))
+        (.unlink (pathlib/Path file))
         (let [new-files (vec (keep-indexed (fn [i f] (when (not= i idx) f)) files))
               new-idx (if (empty? new-files) 0 (min idx (dec (count new-files))))]
           (swap! (:state* ui) assoc :files new-files :idx new-idx :rows [])
@@ -561,9 +561,9 @@
   (count (expand-input "tmp/yoga1_12"))
   ;; => number of png images in the batch
 
-  (image-file? (pathlib/Path. "resources/config.yml"))
+  (image-file? (pathlib/Path "resources/config.yml"))
   ;; => false
-  (image-file? (pathlib/Path. "tmp/yoga1_12/yoga1_12-01-11.png"))
+  (image-file? (pathlib/Path "tmp/yoga1_12/yoga1_12-01-11.png"))
   ;; => true
 
   ;; 1.7 skip filter

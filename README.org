@@ -56,16 +56,15 @@ uv sync
 
 The application could be run with the command:
 #+begin_src shell
-bb app <params>
+bb app <action> [<options>]
 #+end_src
 
-To see the =params= available run:
+To see the =actions= and =options= available run:
 #+begin_src shell
-bb app -h
+bb app help
 #+end_src
 
 ** Development
-
 
 To format the code run:
 #+begin_src shell
@@ -76,12 +75,6 @@ To lint the code run:
 #+begin_src shell
 bb kondo
 #+end_src
-
-To make sure that no unformatted commits with lint errors end up in the main branch run initially:
-#+begin_src shell
-git config --local  core.hooksPath ./githooks
-#+end_src
-The ~pre-push~ script will block the push if there are style or lint errors in code.
 
 ** References
 

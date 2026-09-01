@@ -8490,3 +8490,191 @@ bb app make-references
            @gaps))
 
   #+end_src
+* 2026-08-30
+
+- am restaurat task-urile kondo, style si format din =bb.edn= si am reusit sa configurez clj-kondo sa nu mai aiba false positive pentru sintaxa basilisp (mai putin =.-=).
+
+* 2026-08-31
+
+- ma reintorc la functia de corectare schelet gliph:
+  #+begin_src clojure
+ (require
+   '[steno.show :as show]
+   '[steno.imageprocessor :as imgproc]
+   '[steno.converter :as conv])
+
+ (import
+   cv2
+   [numpy :as np]
+   [skimage.morphology :as skmorph]
+   [skimage.util :as skiu])
+
+ (def cale-imagine "tmp/yoga_001_1/yoga_001_1-01-02.png")
+ (def image (cv2/imread cale-imagine cv2/IMREAD_GRAYSCALE))
+
+ (show/show-image image)
+
+ (def best (imgproc/process-image-best image))
+
+ (show/show-two-images [image best])
+
+ (imgproc/component-count best)
+ ;; => 4
+
+ (python/type image)
+ ;; => <class 'numpy.ndarray'>
+
+ (type image)
+ ;; => <class 'numpy.ndarray'>
+
+ (.- image shape)
+ ;; => #py (107 199)
+
+ (.- best shape)
+ ;; => #py (107 199)
+
+ (first best)
+ ;; => array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ ;;           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ ;;           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ ;;           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ ;;           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ ;;           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ ;;           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ ;;           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ ;;           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ ;;           0], dtype=uint8)
+
+ (second best)
+
+ (def eps (imgproc/endpoint-coords best))
+ ;; => ([1 129] [15 140] [15 191] [23 142] [92 22] [95 9] [95 16] [99 6] [102 3])
+
+
+ (show/show-image best)
+
+ (def tmp-image (np/copy best))
+
+ (show/show-image tmp-image)
+
+ (cv2/line tmp-image [140 15] [142 23]  255 1)
+
+ (def eps (imgproc/endpoint-coords best))
+ ;; => ([129 1] [140 15] [191 15] [142 23] [22 92] [9 95] [16 95] [6 99] [3 102])
+
+ (cv2/norm [140 15] [142 23] cv2/NORM_L2)
+
+ (import math)
+
+ (math/dist [140 15] [142 23])
+ ;; => 8.246211251235321
+
+ (np.linalg/norm (- (np/array [140 15]) (np/array [142 23])))
+ ;; => np.float64(8.246211251235321)
+
+ (math/ceil (math/dist [140 15] [142 23]))
+ ;; => 9
+
+
+
+(dir math)
+;; => #py ["__doc__" "__file__" "__loader__" "__name__" "__package__" "__spec__" "acos" "acosh" "asin" "asinh" "atan" "atan2" "atanh" "cbrt" "ceil" "comb" "copysign" "cos" "cosh" "degrees" "dist" "e" "erf" "erfc" "exp" "exp2" "expm1" "fabs" "factorial" "floor" "fmod" "frexp" "fsum" "gamma" "gcd" "hypot" "inf" "isclose" "isfinite" "isinf" "isnan" "isqrt" "lcm" "ldexp" "lgamma" "log" "log10" "log1p" "log2" "modf" "nan" "nextafter" "perm" "pi" "pow" "prod" "radians" "remainder" "sin" "sinh" "sqrt" "tan" "tanh" "tau" "trunc" "ulp"]
+
+ (= [1 1] [1 1])
+ ;; => true
+
+ (doseq [x eps
+         y eps]
+   (when (and (not= x y) (< (math/ceil (math/dist x y)) 10))
+     (cv2/line tmp-image x y 255 1)))
+
+(def gap-distance 10)
+
+ (defn repair-skeleton!
+   "Bridge small gaps in a 1px skeleton IMAGE by connecting nearby dangling endpoints. The function modify the original image."
+   ([image] (repair-skeleton! image gap-distance))
+   ([image max-gap]
+   (let [eps (imgproc/endpoint-coords image)]
+     (when (> (count eps) 2)
+       (doseq [p1 eps
+               p2 eps]
+         (when (and (not= p1 p2) (< (math/ceil (math/dist p1 p2)) max-gap))
+           (cv2/line image p1 p2 255 1)))))
+    image))
+
+  (def tmp-image (np/copy best))
+
+ (repair-skeleton! tmp-image)
+
+ (show/show-image tmp-image)
+
+ (set (for [p1 eps p2 eps
+       :when (and (not= p1 p2) (< (math/ceil (math/dist p1 p2)) gap-distance))]
+   #{p1 p2}))
+ ;; => #{#{[9 95] [16 95]} #{[6 99] [3 102]} #{[22 92] [16 95]} #{[140 15] [142 23]} #{[6 99] [9 95]}}
+
+(let [[a b] #{2 3}]
+  (println "a:" a)
+  (println "b:" b)
+  )
+
+
+  (defn repair-skeleton!
+   "Bridge small gaps in a 1px skeleton IMAGE by connecting nearby dangling endpoints. The function modify the original image."
+   ([image] (repair-skeleton! image gap-distance))
+   ([image max-gap]
+   (let [eps (imgproc/endpoint-coords image)]
+     (when (> (count eps) 2)
+       (doseq [ps (set (for [p1 eps
+                             p2 eps
+                             :when (and (not= p1 p2)
+                                        (< (math/ceil (math/dist p1 p2)) max-gap))]
+                         #{p1 p2}))]
+         (cv2/line image (first ps) (second ps) 255 1))))))
+
+ (def components (cv2/connectedComponents best))
+ (def matrix-labels (second components))
+ (first components)
+ ;; => 4
+
+ (count matrix-labels)
+ ;; => 107
+
+ (aget matrix-labels 95 9)
+ ;; => np.int32(2)
+
+
+ (aget matrix-labels 95 16)
+ ;; => np.int32(2)
+
+ (aget matrix-labels 15 140)
+ ;; => np.int32(1)
+
+
+
+ (defn connected? [matrix-label [x1 y1] [x2 y2]]
+   (let [label1 (aget matrix-labels y1 x1)
+         label2 (aget matrix-labels y2 x2)]
+     (= label1 label2)))
+
+  (defn repair-skeleton!
+   "Bridge small gaps in a 1px skeleton IMAGE by connecting nearby dangling endpoints. The function modify the original image."
+   ([image] (repair-skeleton! image gap-distance))
+   ([image max-gap]
+   (let [eps (imgproc/endpoint-coords image)]
+     (when (> (count eps) 2)
+       (let [[_ matrix-labels] (cv2/connectedComponents image)]
+         (doseq [ps (set (for [p1 eps
+                               p2 eps
+                               :when (and (not= p1 p2)
+                                          (< (math/ceil (math/dist p1 p2)) max-gap)
+                                          (not (connected? matrix-labels p1 p2)))]
+                         #{p1 p2}))]
+         (cv2/line image (first ps) (second ps) 255 1)))))))
+
+   (def tmp-image (np/copy best))
+
+ (repair-skeleton! tmp-image)
+
+ (show/show-image tmp-image)
+  #+end_src

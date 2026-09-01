@@ -541,7 +541,7 @@
    Reads EDN corpus files directly to avoid a circular dependency on
    steno.corpus (which depends on this namespace)."
   [corpus-dir]
-  (->> (.rglob (pathlib/Path. corpus-dir) "*")
+  (->> (.rglob (pathlib/Path corpus-dir) "*")
        iterator-seq
        (filter #(.is_file %))
        (filter #(str/ends-with? (.-name %) ".edn"))
@@ -559,7 +559,7 @@
     match score of each extractor against the curated wsign."
   [glyph-dir corpus-dir]
   (let [curated (corpus-by-fileimage corpus-dir)
-        files (->> (.rglob (pathlib/Path. glyph-dir) "*.png")
+        files (->> (.rglob (pathlib/Path glyph-dir) "*.png")
                    iterator-seq
                    (filter #(.is_file %))
                    (map str)

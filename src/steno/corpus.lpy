@@ -58,7 +58,7 @@
        (str/ends-with? (.-name fisier) ".edn")))
 
 (defn read-corpus [corpus-dir]
-  (let [root (pathlib/Path. corpus-dir)]
+  (let [root (pathlib/Path corpus-dir)]
     (->> (iterator-seq (.rglob root "*")) ; rglob returns the generator that iterator-seq consumes correctly
          (filter edn-file?)
          (mapv (fn [f]
@@ -73,7 +73,7 @@
    The function is side-effect free and accepts the directory as an argument.
   Returns a lazy collection."
   [corpus-dir filter-fn process-fn]
-  (let [root (pathlib/Path. corpus-dir)]
+  (let [root (pathlib/Path corpus-dir)]
     (->> (iterator-seq (.rglob root "*")) ; rglob returnează un generator pe care iterator-seq îl consumă corect
          (filter dir?)
          (filter filter-fn)
@@ -83,7 +83,7 @@
   "Traverse the directories in CORPUS-DIR and apply the PROCESS-FN function to FILTERed ones.
    The function has side-effect and accepts the directory as an argument."
   [corpus-dir filter-fn process-fn!]
-  (let [root (pathlib/Path. corpus-dir)
+  (let [root (pathlib/Path corpus-dir)
         dirs (->> (iterator-seq (.rglob root "*")) ; rglob returnează un generator pe care iterator-seq îl consumă corect
                   (filter dir?)
                   (filter filter-fn))]
