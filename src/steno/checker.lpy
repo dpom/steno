@@ -8,8 +8,8 @@
 
     Screen layout follows the mockup (specs/translator-checker/
     GUI-screen.png): top panel with the large 'gliph image' display frame,
-    middle 'lsigns' table with 6 columns (Lsign image, freq, diff, knn,
-    select, save) and a menu bar with a File menu (open image / open
+    middle 'lsigns' table with 7 columns (Lsign image, start, freq, diff,
+    knn, select, save) and a menu bar with a File menu (open image / open
     directory / quit) plus direct Save, Previous, Next and Delete buttons."
   (:require
    [basilisp.core :refer [format]]
@@ -33,7 +33,7 @@
 
 (def thumbnail-height 40)
 (def image-suffixes #{"png" "jpg" "jpeg" "tif" "tiff"})
-(def table-headers ["Lsign" "freq" "diff" "knn" "select" "save"])
+(def table-headers ["Lsign" "start" "freq" "diff" "knn" "select" "save"])
 
 ;; ---------------------------------------------------------------------------
 ;; Pure checker core
@@ -51,15 +51,17 @@
 (defn build-rows
   "Translate every lsign of WSIGN and build one review row per lsign.
 
-   Each row holds the lsign position, its rendered matrix, the per
-   translator candidate pairs, the combined best match proposal, the
-   selectable letter (pre-filled with the best match) and the save flag."
+   Each row holds the lsign position, its rendered matrix, the first
+   lineseq cell, the per translator candidate pairs, the combined best
+   match proposal, the selectable letter (pre-filled with the best match)
+   and the save flag."
   [ctx translators wsign]
   (map-indexed (fn [pos lsign]
                  (let [{:keys [letters text]} (tra/translate-lsign ctx translators lsign)]
                    {:pos pos
                     :lsign lsign
                     :matrix (utl/lineseq-to-matrix (:lineseq lsign))
+                    :start (subvec (first (:lineseq lsign)) 0 2)
                     :results (zipmap translators letters)
                     :best text
                     :select text
@@ -105,10 +107,12 @@
 
 (defn save-row!
   "Persist ROW as a corpus entry under CORPUS-DIR/<letter>/, creating parents
-   on demand. Saving twice the same position replaces the previous entry.
-   Returns the destination path."
+   on demand. The lsign lineseq is normalized to the axe origin before saving
+   (cnv/normalize2-lsign). Saving twice the same position replaces the previous
+   entry. Returns the destination path."
   [logger corpus-dir imagefile {:keys [pos select lsign]}]
-  (let [outfile (entry-path corpus-dir select imagefile pos)]
+  (let [outfile (entry-path corpus-dir select imagefile pos)
+        lsign (cnv/normalize2-lsign lsign)]
     (.mkdir (.-parent outfile) ** :parents true :exist_ok true)
     (utl/save-edn outfile (lsign-entry imagefile pos lsign))
     (.info logger "Saved in %s" outfile)
@@ -205,20 +209,26 @@
     (nth files idx nil)))
 
 (defn- refresh-table!
-  "Rebuild the 'lsigns' table for the current ROWS: one 6-column row per
-   lsign (thumbnail, freq, diff, knn chains, select combobox, save box)."
+  "Rebuild the 'lsigns' table for the current ROWS: one 7-column row per
+   lsign (thumbnail, start, freq, diff, knn chains, select combobox, save
+   box), the content columns separated by vertical rules."
   [ui rows]
   (let [{:keys [table photos* widgets*]} ui
         letters (letters-list (:corpus-dir ui))
-        widgets (volatile! [])]
+        widgets (volatile! [])
+        n-sections (count table-headers)]
     (clear-frame! table)
     (doseq [[col header] (map-indexed vector table-headers)]
       (doto (tk/Label table ** :text header  :padx 5  :pady 5)
-        (.grid ** :row 0  :column col  :sticky "ew")))
+        (.grid ** :row 0  :column (* col 2)  :sticky "ew")))
+    (doseq [col (range (dec n-sections))]
+      (doto (ttk/Separator table ** :orient "vertical")
+        (.grid ** :row 0  :column (inc (* col 2))  :rowspan (inc (count rows))  :sticky "ns")))
     (doseq [row rows]
       (let [r (inc (:pos row))
             key (keyword (str "row-" (:pos row)))
             thumb (tk/Label table ** :image (matrix-photo photos* key (:matrix row) thumbnail-height))
+            start-label (tk/Label table ** :text (str (:start row))  :anchor "w"  :padx 5)
             results (format-results (:results row))
             freq-label (tk/Label table ** :text (get results "freq")  :anchor "w"  :padx 5)
             diff-label (tk/Label table ** :text (get results "diff")  :anchor "w"  :padx 5)
@@ -229,13 +239,14 @@
                                 :values (python/tuple letters)  :width 8)
             check (tk/Checkbutton table ** :variable save-var)]
         (.grid thumb ** :row r  :column 0)
-        (.grid freq-label ** :row r  :column 1  :sticky "ew")
-        (.grid diff-label ** :row r  :column 2  :sticky "ew")
-        (.grid knn-label ** :row r  :column 3  :sticky "ew")
-        (.grid combo ** :row r  :column 4  :padx 5)
-        (.grid check ** :row r  :column 5  :padx 5)
+        (.grid start-label ** :row r  :column 2  :sticky "ew")
+        (.grid freq-label ** :row r  :column 4  :sticky "ew")
+        (.grid diff-label ** :row r  :column 6  :sticky "ew")
+        (.grid knn-label ** :row r  :column 8  :sticky "ew")
+        (.grid combo ** :row r  :column 10  :padx 5)
+        (.grid check ** :row r  :column 12  :padx 5)
         (vswap! widgets conj {:sel-var sel-var :save-var save-var :row row})))
-    (doseq [col [1 2 3]]
+    (doseq [col [4 6 8]]
       (.columnconfigure table col ** :weight 1))
     (reset! widgets* @widgets)))
 
@@ -505,6 +516,10 @@
   ;; => true, each translator contributes a vector of [letter match] pairs
   (= (:select row) (:best row))
   ;; => true, selector pre-filled with the best match
+  (:start row)
+  ;; => [X Y] first lineseq cell cut to row/column only, e.g. [0 0]
+  (count (:start row))
+  ;; => 2
   (:save? row)
   ;; => true
 
@@ -547,7 +562,8 @@
              tmp-corpus "yoga1_12-01-11.png"
              {:pos 2 :select "ţ" :lsign {:ltype 0 :lineseq [[5 5 128]]}})
   (utl/load-edn (str (entry-path tmp-corpus "ţ" "yoga1_12-01-11.png" 2)))
-  ;; => replaced entry: {:ltype 0, ..., :pos 2} — same single file, not duplicated
+  ;; => replaced entry: {:ltype 0, :lineseq [[0 0 128]], :pos 2} —
+  ;;    lineseq renormalized to the axe origin, same single file, not duplicated
 
   ;; 1.6 letters list against the project corpus
   (letters-list corpus-dir)

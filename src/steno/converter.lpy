@@ -270,8 +270,7 @@
        image-to-lineseq
        lineseqs-to-wsign
        (map normalize1-lsign)
-       (sort-by #(first (:lineseq %)) compare-cell)
-       (mapv normalize2-lsign)))
+       (sort-by #(first (:lineseq %)) compare-cell)))
 
 (comment
 
