@@ -4,6 +4,7 @@
    [basilisp.edn :as edn]
    [basilisp.io :as bio])
   (:import
+   cv2
    [multiprocessing :refer [Process]]
    [numpy :as np]
    [os.path :as path]))
@@ -16,7 +17,7 @@
     p))
 
 (defmacro mget
-  "Get a cell of a matrix"
+  "Get a slice of a matrix"
   [m r1 r2 c1 c2]
   `(aget ~m (python/tuple [(python/slice ~r1 ~r2) (python/slice ~c1 ~c2)])))
 
@@ -24,6 +25,40 @@
   "Print function for tap>, useful in REPL."
   [map]
   (p/print-table (keys map) [map]))
+
+(defn bin-u8
+  "Convert 0/255 skeleton as uint8 0/1."
+  [img]
+  (.astype (np/greater img 0) np/uint8))
+
+(defn neighbor-counts
+  "8-connected foreground neighbour count for every pixel. Outside the image is
+   treated as background (zero-padded) so stroke endpoints on the image border
+   are still detected as degree-1."
+  [bin-img]
+  (let [kernel (np/ones [3 3] np/uint8)
+        padded (cv2/copyMakeBorder bin-img 1 1 1 1 cv2/BORDER_CONSTANT 0)
+        summed (cv2/filter2D padded -1 kernel)
+        cropped (aget summed (python/tuple [(python/slice 1 -1) (python/slice 1 -1)]))]
+    (np/subtract cropped bin-img)))
+
+(defn endpoint-coords
+  "Coordinates of degree-1 foreground pixels (dangling ends)."
+  [bin-img]
+  (let [nbr (neighbor-counts bin-img)
+        cond (np/logical_and (np/equal bin-img 1) (np/equal nbr 1))
+        [rs cs] (np/where cond)]
+    (map (fn [r c] [(int r) (int c)]) rs cs)))
+
+(defn nested-levels
+  "Return the depth level of a nested Vector."
+  [v]
+  (if (vector? v)
+    (if (empty? v)
+      1
+      (let [max-nested (apply max (map nested-levels v))]
+        (inc max-nested)))
+    0))
 
 (defn cells-to-matrix
   "Transform a sequence of CELLS ([x y]) into a matrix of dimensions SIZE ([x y])"
@@ -80,6 +115,12 @@
   (add-tap (bound-fn* print4tap))
 
   (tap> {:a 2 :b 5})
+
+  (nested-levels [1 2 3])               ; => 1
+  (nested-levels [[1 2] 3])             ; => 2
+  (nested-levels [[1 2] [3 [4 5]]])     ; => 3
+  (nested-levels [[[1]] [[2]]])         ; => 3
+  (nested-levels "not a vector")        ; => 0
 
   ;;
   )

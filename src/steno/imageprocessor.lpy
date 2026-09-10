@@ -1,7 +1,8 @@
 (ns steno.imageprocessor
   "Prepare the page image"
   (:require
-   [steno.spec :as spec])
+   [steno.spec :as spec]
+   [steno.utils :as utl])
   (:import
    cv2
    math
@@ -34,70 +35,6 @@
       (skim/skeletonize)
       (skiu/img_as_ubyte)))
 
-(defn- bin-u8
-  "Foreground mask of a 0/255 skeleton as uint8 0/1."
-  [img]
-  (.astype (np/greater img 0) np/uint8))
-
-(defn neighbor-counts
-  "8-connected foreground neighbour count for every pixel. Outside the image is
-   treated as background (zero-padded) so stroke endpoints on the image border
-   are still detected as degree-1."
-  [bin-img]
-  (let [kernel (np/ones [3 3] np/uint8)
-        padded (cv2/copyMakeBorder bin-img 1 1 1 1 cv2/BORDER_CONSTANT 0)
-        summed (cv2/filter2D padded -1 kernel)
-        cropped (aget summed (python/tuple [(python/slice 1 -1) (python/slice 1 -1)]))]
-    (np/subtract cropped bin-img)))
-
-(defn endpoint-coords
-  "Coordinates of degree-1 foreground pixels (dangling ends)."
-  [img]
-  (let [bin-img (bin-u8 img)
-        nbr (neighbor-counts bin-img)
-        cond (np/logical_and (np/equal bin-img 1) (np/equal nbr 1))
-        [rs cs] (np/where cond)]
-    (map (fn [r c] [(int c) (int r)]) rs cs)))
-
-(defn continuation-neighbor
-  "The single foreground neighbour of an endpoint (the along-stroke direction)."
-  [img [r c]]
-  (->> spec/all-directions
-       (some (fn [[dr dc]]
-               (let [nr (+ r dr) nc (+ c dc)
-                     h (first (.- img shape)) w (second (.- img shape))]
-                 (when (and (>= nr 0) (< nr h) (>= nc 0) (< nc w)
-                            (> (int (aget img nr nc)) 0))
-                   [nr nc]))))))
-
-(defn nearest-foreground
-  "Nearest other foreground pixel to [r c] within `gap-radius`, excluding EXCLUDE.
-   Returns [y x] or nil."
-  [img [r c] exclude]
-  (let [R gap-distance
-        h (first (.- img shape)) w (second (.- img shape))
-        y0 (max 0 (- r R)) y1 (min h (+ r R 1))
-        x0 (max 0 (- c R)) x1 (min w (+ c R 1))]
-    (loop [y y0 best nil best-d (inc (* 2 R R))]
-      (if (>= y y1)
-        best
-        (let [[b bd] (loop [x x0 b best bd best-d]
-                       (if (>= x x1)
-                         [b bd]
-                         (let [same? (and (= y r) (= x c))
-                               excl? (contains? exclude [y x])
-                               fg? (> (int (aget img y x)) 0)
-                               d (+ (* (- y r) (- y r)) (* (- x c) (- x c)))]
-                           (if (and (not same?) (not excl?) fg? (< d bd))
-                             (recur (inc x) [y x] d)
-                             (recur (inc x) b bd)))))]
-          (recur (inc y) b bd))))))
-
-(defn component-count
-  "Number of 8-connected components in a 0/255 image."
-  [img]
-  (first (cv2/connectedComponents img nil 8)))
-
 (defn skeleton-score
   "Lower means a cleaner skeleton. Penalise thick (merged) strokes, which
    survive a 3x3 erosion, and an excessive number of disconnected fragments."
@@ -113,65 +50,82 @@
    skeleton-quality score (fewer thick/merged strokes and fewer fragments
    wins). Returns the chosen 1-pixel skeleton."
   [image]
-  (let [p1 (process-image1 image)
-        p2 (process-image2 image)]
-    (if (<= (skeleton-score p1) (skeleton-score p2))
-      p1
-      p2)))
+  (let [p1 (utl/bin-u8 (process-image1 image))
+        p2 (utl/bin-u8 (process-image2 image))
+        sc1 (skeleton-score p1)
+        sc2 (skeleton-score p2)]
+    (cond
+      (< sc1 sc2) p1
+      (< sc1 sc2) p2
+      :else (if (<= (count (utl/endpoint-coords p1)) (count (utl/endpoint-coords p2)))
+              p1
+              p2))))
 
-(defn repair-skeleton!
-  "Bridge small gaps in a 1px skeleton IMAGE by connecting nearby dangling endpoints. The function modify the original image."
-  ([image] (repair-skeleton! image gap-distance))
+(defn repair-skeleton
+  "Bridge small gaps in a 1px skeleton IMAGE by connecting nearby dangling endpoints."
+  ([image] (repair-skeleton image gap-distance))
   ([image max-gap]
-   (let [eps (endpoint-coords image)]
+   (let [eps (utl/endpoint-coords image)
+         result (np/copy image)]
      (when (> (count eps) 2)
        (doseq [p1 eps
                p2 eps]
-         (when (and (not= p1 p2) (< (math/ceil (math/dist p1 p2)) max-gap))
-           (cv2/line image p1 p2 255 1)))))
-   image))
+         (when (and (not= p1 p2) (< (math/dist p1 p2) max-gap))
+           (let [[y1 x1] p1
+                 [y2 x2] p2]
+             (cv2/line result [x1 y1] [x2 y2] 255 1)))))
+     result)))
 
 (defn process-image
   "Process the IMAGE into a clear 1 pixel thick stenogram by auto-selecting
    the better of the two skeletonization strategies (ADR-0001), then repairing
    over-thinning gaps so a single stroke stays continuous."
   [image]
-  (let [best (process-image-best image)]
-    (repair-skeleton! best)
-    best))
+  (repair-skeleton (process-image-best image)))
 
 (comment
 
   (require
-   '[steno.extractor :as extr]
-   '[steno.converter :as cnv]
-   '[steno.show :as show]
-   '[steno.utils :as utl])
+   '[steno.show :as show])
 
-  (def fileimage "test/resources/template.png")
+  (def fileimage "test/resources/rol.png")
 
-  (def mtx (extr/extract-glyphs fileimage))
+  (def image (cv2/imread fileimage cv2/IMREAD_GRAYSCALE))
 
-  (defn pimage
-    [row col glyph]
-    {:row row
-     :col col
-     :roi (process-image (:roi glyph))})
+  (show/show-image image)
 
-  (def mtx2 (utl/map-glyph-matrix mtx pimage))
+  (def img1 (process-image1 image))
 
-  (show/show-glyph-matrix mtx2)
+  (def img2 (process-image2 image))
 
-  (defn show-repair
-    [row col glyph]
-    (let [skel (process-image (:roi glyph))]
-      {:row row :col col :wsign (cnv/image-to-wsign skel)}))
+  (show/show-two-images [img1 img2])
 
-  (def mtx-r (utl/map-glyph-matrix mtx show-repair))
+  (skeleton-score img1)
+  ;; => 4
 
-  ;; Inspect a previously fragmented glyph: it should now yield one
-  ;; continuous lsign instead of several short ones.
-  (show/show-glyph-matrix mtx-r)
+  (utl/endpoint-coords img1)
+  ;; => ([1 129] [15 140] [15 191] [23 142] [92 22] [95 9] [95 16] [99 6] [102 3])
 
-;;
+  (def img1b (repair-skeleton img1))
+
+  (show/show-two-images [img1 img1b])
+
+  (skeleton-score img2)
+  ;; => 4
+
+  (utl/endpoint-coords img2)
+  ;; => ([7 196] [87 182] [88 174] [89 180] [90 173] [101 4])
+
+  (def img2b (repair-skeleton img2))
+
+  (show/show-two-images [img2 img2b])
+
+  (utl/endpoint-coords img2b)
+  ;; => ([7 196] [101 4])
+
+  (def best (process-image-best image))
+
+  (show/show-two-images [image best])
+
+  ;;
   )

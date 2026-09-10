@@ -8678,3 +8678,925 @@ bb app make-references
 
  (show/show-image tmp-image)
   #+end_src
+
+* 2026-09-02
+
+- code review code imageprocessor:
+  #+begin_src clojure
+(reverse [1 2])
+;; => (2 1)
+
+ (require
+   '[steno.show :as show]
+   '[steno.imageprocessor :as imgproc]
+   '[steno.spec :as spec]
+   '[steno.converter :as conv])
+
+ (import
+   cv2
+   [numpy :as np]
+   [skimage.morphology :as skmorph]
+   [skimage.util :as skiu])
+
+ (def cale-imagine "tmp/yoga_001_1/yoga_001_1-01-02.png")
+ (def image (cv2/imread cale-imagine cv2/IMREAD_GRAYSCALE))
+
+ (show/show-image image)
+
+(def best (imgproc/process-image image))
+
+(show/show-image best)
+
+(.- best shape)
+;; => #py (107 199)
+
+(def eps (imgproc/endpoint-coords best))
+eps
+;; => ([1 129] [15 191])
+
+(aget best 1 129)
+;; => np.uint8(255)
+
+(aget best 1 130)
+;; => np.uint8(0)
+
+(aget best 2 128)
+;; => np.uint8(255)
+
+(aget best 2 130)
+;; => np.uint8(0)
+
+(defn nearest-foreground
+  "Nearest other foreground pixel to [r c] within `gap-radius`, excluding EXCLUDE.
+   Returns [y x] or nil."
+  [img [r c] exclude]
+  (let [R spec/gap-distance
+        h (first (.- img shape)) w (second (.- img shape))
+        y0 (max 0 (- r R)) y1 (min h (+ r R 1))
+        x0 (max 0 (- c R)) x1 (min w (+ c R 1))]
+    (loop [y y0 best nil best-d (inc (* 2 R R))]
+      (if (>= y y1)
+        best
+        (let [[b bd] (loop [x x0 b best bd best-d]
+                       (if (>= x x1)
+                         [b bd]
+                         (let [same? (and (= y r) (= x c))
+                               excl? (contains? exclude [y x])
+                               fg? (> (int (aget img y x)) 0)
+                               d (+ (* (- y r) (- y r)) (* (- x c) (- x c)))]
+                           (if (and (not same?) (not excl?) fg? (< d bd))
+                             (recur (inc x) [y x] d)
+                             (recur (inc x) b bd)))))]
+          (recur (inc y) b bd))))))
+
+(defn component-count
+  "Number of 8-connected components in a 0/255 image."
+  [img]
+  (first (cv2/connectedComponents img nil 8)))
+
+(component-count best)
+;; => 2
+
+(cv2/line best [0 0] [40 50] 255 1)
+;; => array([[255,   0,   0, ...,   0,   0,   0],
+;;           [  0, 255,   0, ...,   0,   0,   0],
+;;           [  0,   0, 255, ...,   0,   0,   0],
+;;           ...,
+;;           [  0,   0,   0, ...,   0,   0,   0],
+;;           [  0,   0,   0, ...,   0,   0,   0],
+;;           [  0,   0,   0, ...,   0,   0,   0]], shape=(107, 199), dtype=uint8)
+
+(aget best  100 5)
+;; => np.uint8(255)
+
+(show/show-image best)
+
+(.- best shape)
+;; => #py (107 199)
+
+
+(def kernel (np/ones [3 3] np/uint8))
+(def padded (cv2/copyMakeBorder best 1 1 1 1 cv2/BORDER_CONSTANT 0))
+
+(.- padded shape)
+;; => #py (109 201)
+
+(def summed (cv2/filter2D padded -1 kernel))
+
+(show/show-two-images [best summed])
+
+(def cropped (aget summed (python/tuple [(python/slice 1 -1) (python/slice 1 -1)])))
+
+(show/show-two-images [summed cropped])
+
+(def subtract
+  (np/subtract cropped best))
+
+(show/show-two-images [cropped subtract])
+
+(def nbr (imgproc/neighbor-counts best))
+
+(show/show-two-images [best (imgproc/bin-u8 best)])
+
+
+(defn image-to-cnumx [img]
+  (let [[h w] (.- img shape)
+        cnumx (np/zeros [h w] ** :dtype np/uint8)]
+    (doseq [row (python/range h)
+            column (python/range w)]
+      (when (pos? (conv/get-cell-value img row column))
+        (let [[_ cnum] (conv/get-cell-number-and-neighbors img [row column]) ]
+          (aset cnumx row column cnum))))
+    cnumx))
+
+(def result (image-to-cnumx (imgproc/bin-u8 best)))
+
+
+(show/show-image result)
+
+(defn get-cells-with-func
+  [mx bool-func]
+  (let [[h w] (.- mx shape)
+        cells (python/list)]
+    (doseq [row (python/range h)
+            column (python/range w)]
+      (when (bool-func (conv/get-cell-value mx row column))
+        (.append cells [row column])))
+    cells))
+
+(defn endpoint? [num]
+  (and (pos? num) (= (.bit_count num) 1)))
+
+
+(def endpoints
+  (get-cells-with-func result endpoint?))
+endpoints
+;; => #py [[1 128] [5 126] [6 125] [9 135] [11 99] [11 133] [14 94] [16 91] [16 179] [17 90] [18 89] [21 170] [22 87] [23 86] [24 85] [28 83] [30 142] [34 135] [35 134] [36 133] [39 127] [45 114] [49 107] [57 86] [68 60] [73 54] [78 41] [79 40] [83 32] [84 31] [85 30] [88 28] [89 27] [95 8] [96 7] [102 2]]
+
+(bin (aget result 5 126))
+;; => "0b1000000"
+
+(conv/get-cell-number-and-neighbors best [5 126])
+;; => [#{} np.uint8(64)]
+
+(conv/get-cell-number-and-neighbors best [1 128])
+;; => [#{} np.uint8(64)]
+
+(conv/get-cell-number-and-neighbors best [102 2])
+;; => [#{} np.uint8(128)]
+
+(bin 128)
+;; => "0b10000000"
+
+
+(conv/get-cell-number-and-neighbors best [101 3])
+;; => [#{} np.uint8(56)]
+
+(bin 56)
+;; => "0b111000"
+
+(conv/get-cell-number-and-neighbors best [102 3])
+;; => [#{} np.uint8(127)]
+
+(bin 127)
+;; => "0b1111111"
+
+(aget best 102 3)
+;; => np.uint8(255)
+
+
+
+
+(count endpoints)
+;; => 36
+
+(show/show-image best)
+
+
+(def test (python/list))
+
+(.append test [1 2])
+
+(defn get-cell-value
+  "Get cell value. If row or column index is wrong return 0."
+  [mat row column]
+  (try
+    (aget mat row column)
+    (catch Exception _e
+      0)))
+
+(import numpy)
+
+(defn analyze-binary-image [img]
+  (let [[h w] (.shape img)
+        result-img (numpy/zeros [h w] :dtype numpy/uint8)
+        endpoints (python/list)
+        directions [[0 1]   ;; E
+                    [1 1]   ;; SE
+                    [1 0]   ;; S
+                    [1 -1]  ;; SV
+                    [0 -1]  ;; V
+                    [-1 -1] ;; NV
+                    [-1 0]  ;; N
+                    [-1 1]]] ;; NE
+
+    (doseq [y (python/range h)
+            x (python/range w)]
+      (if (pos? (aget img y x))
+        ;; Calculăm codul de vecini pentru pixelii cu valoarea 1
+        (let [code (let [c (loop [dirs directions
+                                 idx 0
+                                 acc 0]
+                            (if (empty? dirs)
+                              acc
+                              (let [[dy dx] (first dirs)
+                                    ny (+ y dy)
+                                    nx (+ x dx)]
+                                (recur (rest dirs)
+                                       (inc idx)
+                                       (if (and (>= ny 0) (< ny h) (>= nx 0) (< nx w) (pos? (aget img ny nx)))
+                                         (bit-or acc (bit-shift-left 1 idx))
+                                         acc)))))]
+                     (numpy/uint8 c))]
+
+          (aset result-img y x code)
+
+          ;; Verificăm dacă are exact un singur vecin (bit_count == 1)
+          (when (= (.bit_count (int code)) 1)
+            (.append endpoints [y x])))
+
+        ;; Pixelii cu valoarea 0 rămân 0
+        (aset result-img y x (numpy/uint8 0))))
+
+    ;; Returnează un vector conținând noul numpy array și lista de poziții
+    [result-img endpoints]))
+
+(defn get-neighbor
+  "Get the neighbor cell (address and value)."
+  [mat [r c] [dr dc]]
+  (let [nr (+ r dr)
+        nc (+ c dc)]
+    [[nr nc] (if (or (neg? nr) (neg? nc))
+               0
+               (get-cell-value mat nr nc))]))
+
+(defn get-cnum
+  [matx row column]
+  (np/uint8
+   (reduce (fn [acc [drow dcol]]
+             (let [v (get-cell-value matx (+ row drow) (+ column dcol))]
+               (+ (* acc 2) v)))
+           0
+           spec/all-directions)))
+
+(defn binary-image-to-cnumx [img]
+  (let [[h w] (.- img shape)
+        cnumx (np/zeros [h w] ** :dtype np/uint8)]
+    (doseq [row (python/range h)
+            column (python/range w)]
+      (when (pos? (conv/get-cell-value img row column))
+          (aset cnumx row column (get-cnum img row column))))
+    cnumx))
+
+(def cnumx
+  (binary-image-to-cnumx (imgproc/bin-u8 best)))
+
+(show/show-image cnumx)
+
+(def endpoints
+  (get-cells-with-func cnumx endpoint?))
+(count endpoints)
+;; => 271
+
+endpoints
+;; => #py [[0 128] [0 129] [0 130] [1 127] [1 129] [1 130] [2 130] [4 126] [5 125] [5 129] [6 111] [6 128] [7 109] [7 127] [8 105] [8 127] [8 135] [8 136] [8 137] [9 101] [9 112] [9 123] [9 128] [9 134] [9 138] [10 99] [10 110] [10 125] [10 138] [11 98] [11 106] [11 126] [11 138] [12 96] [12 102] [12 127] [12 137] [13 94] [13 100] [13 132] [13 185] [13 189] [14 93] [14 99] [14 136] [14 137] [14 141] [14 181] [14 192] [15 91] [15 97] [15 133] [15 179] [15 191] [15 192] [16 90] [16 95] [16 134] [16 178] [16 186] [16 188] [16 192] [17 89] [17 94] [17 135] [17 138] [17 142] [17 176] [17 182] [18 88] [18 92] [18 139] [18 174] [18 180] [19 91] [19 172] [19 179] [20 170] [20 177] [21 87] [21 143] [21 169] [21 175] [22 86] [22 90] [22 140] [22 167] [22 173] [23 85] [23 89] [23 164] [23 171] [24 84] [24 88] [24 144] [24 161] [24 170] [25 87] [25 141] [25 158] [25 168] [26 145] [26 153] [26 165] [27 83] [27 142] [27 162] [28 82] [28 86] [28 159] [29 85] [29 142] [29 154] [30 141] [30 146] [31 139] [31 144] [32 81] [32 137] [32 143] [33 84] [33 135] [33 142] [34 134] [34 140] [35 133] [35 138] [36 84] [36 132] [36 136] [37 81] [37 129] [37 135] [38 127] [38 134] [39 85] [39 126] [39 133] [40 82] [40 123] [40 130] [41 121] [41 128] [42 119] [42 127] [43 86] [43 117] [43 124] [44 83] [44 87] [44 114] [44 122] [45 84] [45 113] [45 120] [46 88] [46 111] [46 118] [47 85] [47 89] [47 109] [47 115] [48 86] [48 90] [48 107] [48 114] [49 87] [49 91] [49 106] [49 112] [50 88] [50 92] [50 103] [50 110] [51 89] [51 99] [51 108] [52 107] [53 104] [54 100] [55 89] [56 86] [56 92] [57 85] [57 91] [58 90] [59 84] [60 81] [60 87] [61 79] [61 86] [62 77] [62 85] [63 75] [63 82] [64 71] [64 80] [65 69] [65 78] [66 66] [66 76] [67 60] [67 61] [67 62] [67 64] [67 72] [68 59] [68 70] [69 67] [70 65] [71 56] [71 62] [72 54] [72 61] [73 53] [73 60] [74 49] [74 57] [75 47] [75 55] [76 44] [76 54] [77 41] [77 50] [78 40] [78 48] [79 39] [79 45] [80 36] [80 42] [81 34] [81 41] [82 32] [82 40] [83 31] [83 37] [84 30] [84 35] [85 29] [85 33] [86 32] [87 28] [88 27] [88 31] [89 26] [89 30] [90 24] [90 29] [91 21] [91 28] [92 19] [92 27] [93 17] [93 25] [94 8] [94 22] [95 7] [95 20] [96 6] [96 18] [97 5] [97 15] [99 4] [99 8] [100 3] [101 2] [101 7] [102 2] [102 6] [103 2] [103 5]]
+
+(aget cnumx 0 128)
+;; => np.uint8(8)
+
+(aget best 0 128)
+;; => np.uint8(0)
+
+(show/show-two-images [best (imgproc/bin-u8 best)])
+
+(aget best 60 25)
+;; => np.uint8(0)
+
+(def padded
+  (cv2/copyMakeBorder best 1 1 1 1 cv2/BORDER_CONSTANT 0))
+
+(show/show-two-images [best padded])
+
+(imgproc/endpoint-coords padded)
+;; => ([2 130] [16 192])
+
+(.- padded shape)
+;; => #py (109 201)
+
+(def test-img
+  (-> best
+      (cv2/copyMakeBorder 1 1 1 1 cv2/BORDER_CONSTANT 0)
+      imgproc/bin-u8))
+
+(.- test-img shape)
+;; => #py (109 201)
+
+
+(show/show-image test-img)
+
+(aget test-img 0 0)
+;; => np.uint8(0)
+
+(defn get-cnum
+  [binary-img row column]
+  (np/uint8
+   (reduce (fn [acc [drow dcol]]
+             (let [v (aget binary-img (+ row drow) (+ column dcol))]
+               (+ (* acc 2) v)))
+           0
+           spec/all-directions)))
+  #+end_src
+* 2026-09-08
+
+- rezultate neconcludente, refac functiile de determinare a capetelor si de calcul cnum:
+  #+begin_src clojure
+ (require
+   '[steno.show :as show]
+   '[steno.imageprocessor :as imgproc]
+   '[steno.spec :as spec]
+   '[steno.converter :as conv]
+   '[steno.utils :as utl])
+
+ (import
+   cv2
+   [numpy :as np]
+   [skimage.morphology :as skmorph]
+   [skimage.util :as skiu])
+
+ (def cale-imagine "tmp/yoga_001_1/yoga_001_1-01-02.png")
+ (def image (cv2/imread cale-imagine cv2/IMREAD_GRAYSCALE))
+
+ (show/show-image image)
+
+(def best (imgproc/process-image image))
+
+(show/show-image best)
+
+;; adaug un border de un pixel background ca sa simplific calculele si convertesc 255 la 1
+(def img
+  (-> best
+      (cv2/copyMakeBorder 1 1 1 1 cv2/BORDER_CONSTANT 0)
+      imgproc/bin-u8))
+
+ (.- img shape)
+ ;; => #py (109 201)
+
+ (show/show-image img)
+ ;; => CompletedProcess(args=["emacsclient" "-e" "(local/display-image-from-file \"/tmp/tmppzdqv6e9.png\")"], returncode=0)
+
+
+
+ (defn get-cnum
+  [binary-img row column]
+  (np/uint8
+   (reduce (fn [acc [drow dcol]]
+             (let [v (aget binary-img (+ row drow) (+ column dcol))]
+               (+ (* acc 2) v)))
+           0
+           spec/all-directions)))
+
+ (utl/mget img 90 109 0 20)
+
+
+;; 1. Extragerea liniilor folosind Probabilistic Hough Transform
+(defn extract-lines
+  [binary-img]
+  (let [lines (cv2/HoughLinesP  binary-img
+                                1               ; rezoluție rho (pixeli)
+                                (/ np/pi 180) ; rezoluție theta (radiani)
+                                50              ; prag (threshold)
+                                ,**
+                                :minLineLength 30
+                                :maxLineGap 5)]
+    (if (some? lines)
+      (mapv (fn [line]
+              (let [[x1 y1 x2 y2] (first line)]
+                {:type :line :start [x1 y1] :end [x2 y2]}))
+            lines)
+      [])))
+
+ (def lines (cv2/HoughLinesP  best
+                                1               ; rezoluție rho (pixeli)
+                                (/ np/pi 180) ; rezoluție theta (radiani)
+                                50              ; prag (threshold)
+                                ,**
+                                :minLineLength 30
+                                :maxLineGap 5))
+;; => array([[[33, 83, 86, 59]]], dtype=int32)
+
+(cv2/HoughLinesP  img
+                  1               ; rezoluție rho (pixeli)
+                  (/ np/pi 180) ; rezoluție theta (radiani)
+                  50              ; prag (threshold)
+                  ,**
+                  :minLineLength 30
+                  :maxLineGap 5)
+ ;; => array([[[33, 85, 74, 66]]], dtype=int32)
+
+
+ ;; 2. Extragerea contururilor și filtrarea pentru ovale și semicercuri
+(defn extract-shapes
+  [binary-img]
+  (let [contours-data (cv2/findContours binary-img cv2/RETR_LIST cv2/CHAIN_APPROX_NONE)
+        ;; compatibility cu versiuni OpenCV (retușează tuple-ul de contururi)
+        contours (if (= (count contours-data) 2)
+                   (first contours-data)
+                   (nth contours-data 1))]
+    (reduce
+     (fn [acc contour]
+       (let [pts-count (count contour)]
+         ;; Avem nevoie de cel puțin 5 puncte pentru a potrivi o elipsă
+         (if (>= pts-count 5)
+           (let [ellipse (cv2/fitEllipse contour)
+                 [[center-x center-y] [d1 d2] angle] ellipse
+                 perimeter (cv2/arcLength  contour true)
+                 area (cv2/contourArea  contour)
+                 ;; Verificăm cât de mult din contur acoperă elipsa teoretică
+                 ellipse-perimeter (* np/pi (+ d1 d2) 0.5)
+                 coverage-ratio (/ perimeter ellipse-perimeter)]
+
+             (cond
+               ;; Dacă conturul este închis și se potrivește cu o elipsă/oval
+               (and (cv2/isContourConvex contour) (> coverage-ratio 0.85))
+               (conj acc {:type :oval
+                          :center [center-x center-y]
+                          :axes [d1 d2]
+                          :angle angle})
+
+               ;; Dacă acoperirea este în jur de ~50% (0.4 - 0.65), este probabil un semicerc/arc
+               (and (>= coverage-ratio 0.4) (<= coverage-ratio 0.65))
+               (conj acc {:type :semicircle
+                          :center [center-x center-y]
+                          :approx-radius (/ (+ d1 d2) 4.0)
+                          :angle angle})
+
+               :else acc))
+           acc)))
+     []
+     contours)))
+
+ (extract-shapes best)
+ ;; => []
+
+
+
+
+;; 3. Pipeline-ul principal de analiză
+(defn analyze-binary-image
+  [image-path]
+  (let [img (.imread cv2 image-path (.IMREAD_GRAYSCALE)
+        ;; Asigurăm că imaginea este într-adevăr binară (0 și 255)
+        [_ binary-img] (.threshold cv2 img 127 255 (.THRESH_BINARY cv2))
+        lines (extract-lines binary-img)
+        shapes (extract-shapes binary-img)]
+    {:lines lines
+     :ovals (filterv #(= (:type %) :oval) shapes)
+     :semicircles (filterv #(= (:type %) :semicircle) shapes)}))
+
+ (utl/mget img 50 60 85 95)
+
+  #+end_src
+- functiile din cv2 nu dau rezultate grozave
+- incerc o noua metoda pentru extragere lseq (continuare repl)):
+  #+begin_src clojure
+  (defn get-cnum
+  [binary-img row column]
+  (np/uint8
+   (reduce (fn [acc [drow dcol]]
+             (let [v (aget binary-img (+ row drow) (+ column dcol))]
+               (+ (* acc 2) v)))
+           0
+           spec/all-directions)))
+  ;; => #'user/get-cnum
+
+  (defn binary-image-to-cnumx [img]
+    (let [[h w] (.- img shape)
+        cnumx (np/zeros [h w] ** :dtype np/uint8)]
+    (doseq [row (python/range 1 (- h 1))
+            column (python/range 1 (- w 1))]
+      (when (pos? (conv/get-cell-value img row column))
+          (aset cnumx row column (get-cnum img row column))))
+    cnumx))
+
+(def cnumx
+  (binary-image-to-cnumx img))
+
+  (utl/mget cnumx 50 60 85 95)
+  ;; => array([[  0,   0,   0,   1, 144,  10,  96,   4,   0,   0],
+  ;;           [  0,   0,   0,   0,   1, 144,  10,  96,   4,   0],
+  ;;           [  0,   0,   0,   0,   0,   1, 152,  66,  36,   0],
+  ;;           [  0,   0,   0,   0,   0,   0, 129,  24, 106,  76],
+  ;;           [  0,   0,   0,   0,   0,   0,   9, 208, 134, 160],
+  ;;           [  0,   0,   0,   0,   0,   0, 136,  65,  53,  19],
+  ;;           [  0,   0,   0,   0,   0,   8, 193,  20,  34,   0],
+  ;;           [  0,   0,   8,  72,  76, 196,   5,  48,   2,   0],
+  ;;           [  0,   8, 192, 132, 160,  33,  48,   2,   0,   0],
+  ;;           [  0, 136,  65,  53,  19,  18,   2,   0,   0,   0]], dtype=uint8)
+
+  (utl/mget img 50 60 85 95)
+  ;; => array([[0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+  ;;           [0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+  ;;           [0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
+  ;;           [0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
+  ;;           [0, 0, 0, 0, 0, 0, 0, 0, 1, 1],
+  ;;           [0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
+  ;;           [0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
+  ;;           [0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+  ;;           [0, 0, 0, 1, 1, 1, 0, 0, 0, 0],
+  ;;           [0, 0, 1, 0, 0, 0, 0, 0, 0, 0]], dtype=uint8)
+
+  (aget img 60 86)
+  ;; => np.uint8(0)
+
+  (get-cnum img 60 86)
+  ;; => np.uint8(193)
+
+
+
+  (aget img 60 87)
+  ;; => np.uint8(1)
+
+  (conv/get-cell-value img 60 87)
+  ;; => np.uint8(1)
+
+  (conv/get-cell-value img 60 86)
+  ;; => np.uint8(0)
+
+  (aget cnumx 60 86)
+  ;; => np.uint8(193)
+
+
+  (aget cnumx 60 87)
+  ;; => np.uint8(20)
+
+  (.- cnumx shape)
+  ;; => #py (109 201)
+
+  (.- img shape)
+  ;; => #py (109 201)
+
+  (pos? 0)
+  ;; => false
+
+  (pos? 1)
+  ;; => true
+
+
+      (def  cnumx (np/zeros [10 20] ** :dtype np/uint8))
+ cnumx
+  ;; => array([[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  ;;           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  ;;           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  ;;           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  ;;           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  ;;           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  ;;           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  ;;           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  ;;           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  ;;           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]],
+  ;;          dtype=uint8)
+
+
+
+  (show/show-image img)
+  #+end_src
+* 2026-09-09
+
+- incerc sa depanez functia ~binary-image-to-cnumx~ (continu nrepl):
+  #+begin_src clojure
+    (def simg (-> img
+      (utl/mget  50 60 90 100)
+      (cv2/copyMakeBorder 1 1 1 1 cv2/BORDER_CONSTANT 0)))
+
+    (.- simg shape)
+    ;; => #py (12 12)
+
+simg
+    ;; => array([[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    ;;           [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    ;;           [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    ;;           [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+    ;;           [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+    ;;           [0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0],
+    ;;           [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+    ;;           [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+    ;;           [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    ;;           [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    ;;           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    ;;           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], dtype=uint8)
+
+
+    (show/show-image simg)
+
+    (def scnumx (binary-image-to-cnumx simg))
+    scnumx
+    ;; => array([[  8,  64,   4,   0,   0,   0,   0,   0,   0,   0,   0,   0],
+    ;;           [128,   8,  96,   4,   0,   0,   0,   0,   0,   0,   0,   0],
+    ;;           [  1, 144,  10,  96,   4,   0,   0,   0,   0,   0,   0,   0],
+    ;;           [  0,   1, 152,  66,  36,   0,   0,   0,   0,   0,   0,   0],
+    ;;           [  0,   0, 129,  24, 106,  76,  76,  76,  76,  76,  68,   0],
+    ;;           [  0,   0,   9, 208, 134, 160, 160, 160, 160, 160,  32,   0],
+    ;;           [  0,   0, 136,  65,  53,  19,  19,  19,  19,  19,  18,   0],
+    ;;           [  0,   8, 193,  20,  34,   0,   0,   0,   0,   0,   0,   0],
+    ;;           [  8, 192,   5,  48,   2,   0,   0,   0,   0,   0,   0,   0],
+    ;;           [128,   1,  48,   2,   0,   0,   0,   0,   0,   0,   0,   0],
+    ;;           [  1,  16,   2,   0,   0,   0,   0,   0,   0,   0,   0,   0],
+    ;;           [  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0]],
+    ;;          dtype=uint8)
+
+    (aget simg 0 0)
+    ;; => np.uint8(0)
+
+    (aget simg 1 1)
+    ;; => np.uint8(1)
+
+    (pos? (aget simg 0 0))
+    ;; => true
+
+    (zero? (aget simg 0 0))
+    ;; => np.True_
+
+    (zero? (aget simg 1 1))
+    ;; => np.False_
+
+    (pos? (conv/get-cell-value simg 0 0))
+    ;; => true
+
+    (defn binary-image-to-cnumx [img]
+      (let [[h w] (.- img shape)
+            cnumx (np/zeros [h w] ** :dtype np/uint8)]
+        (doseq [row (python/range 1 (- h 1))
+                column (python/range 1 (- w 1))]
+          (when-not (zero? (conv/get-cell-value img row column))
+          (aset cnumx row column (get-cnum img row column))))
+        cnumx))
+
+(if (zero? (conv/get-cell-value simg 0 0))
+  "true"
+  "false")
+    ;; => "true"
+
+
+    ;; => np.True_
+
+(if (zero? (conv/get-cell-value simg 1 1))
+"true"
+  "false")
+    ;; => "true"
+
+(if (= (conv/get-cell-value simg 0 0) 1)
+  "true"
+  "false")
+    (aget simg 0 0)
+    ;; => np.uint8(0)
+
+    (= (aget simg 0 0) 2r1)
+    ;; => np.False_
+
+   (false? np/False_)
+    ;; => false
+
+
+
+
+    (def scnumx (binary-image-to-cnumx simg))
+    scnumx
+    ;; => array([[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    ;;           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    ;;           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    ;;           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    ;;           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    ;;           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    ;;           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    ;;           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    ;;           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    ;;           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    ;;           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    ;;           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], dtype=uint8)
+
+    (if (.item (zero? (conv/get-cell-value simg 1 1)))
+    "true"
+      "false")
+    ;; => "false"
+
+    (defn binary-image-to-cnumx [img]
+      (let [[h w] (.- img shape)
+            cnumx (np/zeros [h w] ** :dtype np/uint8)]
+        (doseq [row (python/range 1 (- h 1))
+                column (python/range 1 (- w 1))]
+          (when-not (.item (zero? (conv/get-cell-value img row column)))
+            (aset cnumx row column (get-cnum img row column))))
+        cnumx))
+
+    (def scnumx (binary-image-to-cnumx simg))
+    scnumx
+    ;; => array([[  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0],
+    ;;           [  0,   8,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0],
+    ;;           [  0,   0,  10,   0,   0,   0,   0,   0,   0,   0,   0,   0],
+    ;;           [  0,   0,   0,  66,   0,   0,   0,   0,   0,   0,   0,   0],
+    ;;           [  0,   0,   0,  24,   0,   0,   0,   0,   0,   0,   0,   0],
+    ;;           [  0,   0,   0,   0, 134, 160, 160, 160, 160, 160,  32,   0],
+    ;;           [  0,   0,   0,  65,   0,   0,   0,   0,   0,   0,   0,   0],
+    ;;           [  0,   0,   0,  20,   0,   0,   0,   0,   0,   0,   0,   0],
+    ;;           [  0,   0,   5,   0,   0,   0,   0,   0,   0,   0,   0,   0],
+    ;;           [  0,   1,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0],
+    ;;           [  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0],
+    ;;           [  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0]],
+    ;;          dtype=uint8)
+
+    (bin 10)
+    ;; => "0b1010"
+
+    (show/show-image img)
+
+    (.- img shape)
+    ;; => #py (109 201)
+
+
+    (utl/mget img 100 109 0 10)
+    ;; => array([[0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
+    ;;           [0, 0, 0, 0, 0, 0, 1, 1, 0, 0],
+    ;;           [0, 0, 0, 0, 0, 1, 1, 0, 0, 0],
+    ;;           [0, 0, 0, 0, 1, 1, 0, 0, 0, 0],
+    ;;           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    ;;           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    ;;           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    ;;           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    ;;           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], dtype=uint8)
+  #+end_src
+  eroarea: in basilisp doar nil si bool false sunt false celelalte obiecte sun considerate true. Functiile gen ~zero?~ pentru ~np/uint8~ returneaza obiectele ~np/True_~ si ~np/False_~ care deci sunt ~true~ in basilisp. Solutia a fost sa folosesc metoda ~.item~ a acestor obiecte care returneaza un boolean.
+- refactorizare imageprocessor:
+  #+begin_src clojure
+(comment
+
+  (require
+   '[steno.show :as show])
+
+  (def fileimage "test/resources/rol.png")
+
+  (def image (cv2/imread fileimage cv2/IMREAD_GRAYSCALE))
+
+  (show/show-image image)
+
+  (def img1 (process-image1 image))
+
+  (def img2 (process-image2 image))
+
+  (show/show-two-images [img1 img2])
+
+  (skeleton-score img1)
+  ;; => 4
+
+  (utl/endpoint-coords img1)
+  ;; => ([1 129] [15 140] [15 191] [23 142] [92 22] [95 9] [95 16] [99 6] [102 3])
+
+  (def img1b (-> img1
+                 np/copy
+                 repair-skeleton!))
+
+  (show/show-two-images [img1 img1b])
+
+  (skeleton-score img2)
+  ;; => 4
+
+  (utl/endpoint-coords img2)
+  ;; => ([7 196] [87 182] [88 174] [89 180] [90 173] [101 4])
+
+  (def img2b
+    (-> img2
+        np/copy
+        repair-skeleton!))
+
+  (show/show-two-images [img2 img2b])
+
+  (utl/endpoint-coords img2b)
+  ;; => ([7 196] [101 4])
+
+  (def best (process-image-best image))
+
+  (show/show-two-images [image best])
+
+  (np/save "test/resources/rol.npy" best)
+
+  ;;
+  )
+  #+end_src
+
+* 2026-09-10
+
+- refactorizare converter:
+  #+begin_src clojure
+(comment
+
+  (require
+   '[steno.show :as show])
+
+  (def img (np/load "test/resources/rol.npy"))
+
+  (show/show-image img)
+
+  (def eps (utl/endpoint-coords img))
+  eps
+  ;; => ([7 196] [87 182] [88 174] [89 180] [90 173] [101 4])
+
+  (sort-by second eps)
+  ;; => ([101 4] [90 173] [88 174] [89 180] [87 182] [7 196])
+
+  (defn get-start-point [image]
+    (->> image
+         utl/endpoint-coords
+         (sort-by second)
+         first))
+
+  (def start (get-start-point img))
+
+  (utl/mget img 90 103 3 20)
+  ;; => array([[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  ;;           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1],
+  ;;           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
+  ;;           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0],
+  ;;           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0],
+  ;;           [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0],
+  ;;           [0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  ;;           [0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  ;;           [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  ;;           [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  ;;           [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  ;;           [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  ;;           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], dtype=uint8)
+
+  (get-start-cell img)
+  ;; => [0 0]
+
+  (defn image-to-lineseq
+    "Convert a gliph image in a vector of line sequences."
+    [mat]
+    (loop [state {:start-cells #{(get-start-point mat)}
+                  :prev-cells #{}
+                  :line []}
+           acc []]
+      (tap> state)
+      (let [new-state (if (= (count (:start-cells state)) 1)
+                        (get-liniar-sequence mat (assoc state :start-cell (first (:start-cells state))))
+                        (get-parallel-sequence mat state))
+            new-acc (conj acc (:line new-state))]
+        (if (empty? (:start-cells new-state))
+          (filterv seq new-acc)
+          (recur new-state new-acc)))))
+
+  (image-to-lineseq img)
+  ;; => [[[101 4 np.uint8(1)]]]
+
+  (get-liniar-sequence img {:start-cell [101 4] :prev-cells #{} :line []})
+  ;; => {:prev-cells #{[101 4]}, :line [[101 4 np.uint8(1)]], :start-cells #{}}
+
+  (.item
+   (zero?
+    (get-cell-value img [101 4])))
+  ;; => false
+
+  (get-cell-number-and-neighbors img [101 4])
+  ;; => [#{[100 5]} np.uint8(1)]
+
+  (get-liniar-sequence img {:start-cell [101 4] :prev-cells #{} :line []})
+  ;; => {:prev-cells #{[81 38] [80 41] [74 55] [68 66] [69 64] [63 78] [81 39] [76 47] [86 27] [70 62] [62 80] [69 65] [78 44] [67 67] [87 26] [74 54] [59 85] [84 32] [95 12] [55 88] [56 88] [85 29] [57 87] [66 68] [75 52] [94 13] [91 18] [89 23] [84 33] [85 30] [81 37] [99 6] [91 19] [66 69] [86 28] [54 89] [100 5] [96 9] [59 86] [73 56] [66 70] [87 25] [58 87] [77 46] [95 11] [90 20] [65 73] [84 31] [61 83] [70 61] [83 34] [88 24] [98 7] [92 17] [77 45] [66 71] [65 74] [53 90] [83 35] [61 82] [72 57] [90 21] [96 10] [75 53] [71 58] [79 42] [64 76] [90 22] [93 15] [75 51] [61 81] [70 63] [76 49] [71 59] [82 36] [64 75] [93 16] [60 84] [80 40] [75 50] [94 14] [64 77] [78 43] [62 79] [70 60] [97 8] [101 4] [65 72] [76 48]}, :line [[101 4 np.uint8(1)] [100 5 np.uint8(5)] [99 6 np.uint8(5)] [98 7 np.uint8(5)] [97 8 np.uint8(5)] [96 9 np.uint8(132)] [96 10 np.uint8(33)] [95 11 np.uint8(132)] [95 12 np.uint8(33)] [94 13 np.uint8(132)] [94 14 np.uint8(33)] [93 15 np.uint8(132)] [93 16 np.uint8(33)] [92 17 np.uint8(5)] [91 18 np.uint8(132)] [91 19 np.uint8(33)] [90 20 np.uint8(132)] [90 21 np.uint8(160)] [90 22 np.uint8(33)] [89 23 np.uint8(5)] [88 24 np.uint8(5)] [87 25 np.uint8(132)] [87 26 np.uint8(33)] [86 27 np.uint8(132)] [86 28 np.uint8(33)] [85 29 np.uint8(132)] [85 30 np.uint8(33)] [84 31 np.uint8(132)] [84 32 np.uint8(160)] [84 33 np.uint8(33)] [83 34 np.uint8(132)] [83 35 np.uint8(33)] [82 36 np.uint8(5)] [81 37 np.uint8(132)] [81 38 np.uint8(160)] [81 39 np.uint8(33)] [80 40 np.uint8(132)] [80 41 np.uint8(33)] [79 42 np.uint8(5)] [78 43 np.uint8(132)] [78 44 np.uint8(33)] [77 45 np.uint8(132)] [77 46 np.uint8(33)] [76 47 np.uint8(132)] [76 48 np.uint8(160)] [76 49 np.uint8(33)] [75 50 np.uint8(132)] [75 51 np.uint8(160)] [75 52 np.uint8(160)] [75 53 np.uint8(33)] [74 54 np.uint8(132)] [74 55 np.uint8(33)] [73 56 np.uint8(5)] [72 57 np.uint8(5)] [71 58 np.uint8(132)] [71 59 np.uint8(33)] [70 60 np.uint8(132)] [70 61 np.uint8(160)] [70 62 np.uint8(160)] [70 63 np.uint8(33)] [69 64 np.uint8(132)] [69 65 np.uint8(33)] [68 66 np.uint8(5)] [67 67 np.uint8(5)] [66 68 np.uint8(132)] [66 69 np.uint8(160)] [66 70 np.uint8(160)] [66 71 np.uint8(33)] [65 72 np.uint8(132)] [65 73 np.uint8(160)] [65 74 np.uint8(33)] [64 75 np.uint8(132)] [64 76 np.uint8(160)] [64 77 np.uint8(33)] [63 78 np.uint8(5)] [62 79 np.uint8(132)] [62 80 np.uint8(33)] [61 81 np.uint8(132)] [61 82 np.uint8(160)] [61 83 np.uint8(33)] [60 84 np.uint8(5)] [59 85 np.uint8(132)] [59 86 np.uint8(33)] [58 87 np.uint8(20)] [57 87 np.uint8(65)] [56 88 np.uint8(20)] [55 88 np.uint8(65)] [54 89 np.uint8(5)] [53 90 np.uint8(148)]], :start-cells #{[52 90] [53 91]}}
+
+  (def lines
+    (image-to-lineseq img))
+  ;; => [[[101 4 np.uint8(1)] [100 5 np.uint8(5)] [99 6 np.uint8(5)] [98 7 np.uint8(5)] [97 8 np.uint8(5)] [96 9 np.uint8(132)] [96 10 np.uint8(33)] [95 11 np.uint8(132)] [95 12 np.uint8(33)] [94 13 np.uint8(132)] [94 14 np.uint8(33)] [93 15 np.uint8(132)] [93 16 np.uint8(33)] [92 17 np.uint8(5)] [91 18 np.uint8(132)] [91 19 np.uint8(33)] [90 20 np.uint8(132)] [90 21 np.uint8(160)] [90 22 np.uint8(33)] [89 23 np.uint8(5)] [88 24 np.uint8(5)] [87 25 np.uint8(132)] [87 26 np.uint8(33)] [86 27 np.uint8(132)] [86 28 np.uint8(33)] [85 29 np.uint8(132)] [85 30 np.uint8(33)] [84 31 np.uint8(132)] [84 32 np.uint8(160)] [84 33 np.uint8(33)] [83 34 np.uint8(132)] [83 35 np.uint8(33)] [82 36 np.uint8(5)] [81 37 np.uint8(132)] [81 38 np.uint8(160)] [81 39 np.uint8(33)] [80 40 np.uint8(132)] [80 41 np.uint8(33)] [79 42 np.uint8(5)] [78 43 np.uint8(132)] [78 44 np.uint8(33)] [77 45 np.uint8(132)] [77 46 np.uint8(33)] [76 47 np.uint8(132)] [76 48 np.uint8(160)] [76 49 np.uint8(33)] [75 50 np.uint8(132)] [75 51 np.uint8(160)] [75 52 np.uint8(160)] [75 53 np.uint8(33)] [74 54 np.uint8(132)] [74 55 np.uint8(33)] [73 56 np.uint8(5)] [72 57 np.uint8(5)] [71 58 np.uint8(132)] [71 59 np.uint8(33)] [70 60 np.uint8(132)] [70 61 np.uint8(160)] [70 62 np.uint8(160)] [70 63 np.uint8(33)] [69 64 np.uint8(132)] [69 65 np.uint8(33)] [68 66 np.uint8(5)] [67 67 np.uint8(5)] [66 68 np.uint8(132)] [66 69 np.uint8(160)] [66 70 np.uint8(160)] [66 71 np.uint8(33)] [65 72 np.uint8(132)] [65 73 np.uint8(160)] [65 74 np.uint8(33)] [64 75 np.uint8(132)] [64 76 np.uint8(160)] [64 77 np.uint8(33)] [63 78 np.uint8(5)] [62 79 np.uint8(132)] [62 80 np.uint8(33)] [61 81 np.uint8(132)] [61 82 np.uint8(160)] [61 83 np.uint8(33)] [60 84 np.uint8(5)] [59 85 np.uint8(132)] [59 86 np.uint8(33)] [58 87 np.uint8(20)] [57 87 np.uint8(65)] [56 88 np.uint8(20)] [55 88 np.uint8(65)] [54 89 np.uint8(5)] [53 90 np.uint8(148)]] [[[52 90 np.uint8(74)]] [[53 91 np.uint8(162)] [53 92 np.uint8(33)] [52 93 np.uint8(132)] [52 94 np.uint8(160)] [52 95 np.uint8(160)] [52 96 np.uint8(160)] [52 97 np.uint8(160)] [52 98 np.uint8(160)] [52 99 np.uint8(33)] [51 100 np.uint8(132)] [51 101 np.uint8(160)] [51 102 np.uint8(160)] [51 103 np.uint8(160)] [51 104 np.uint8(160)] [51 105 np.uint8(160)] [51 106 np.uint8(33)] [50 107 np.uint8(132)] [50 108 np.uint8(33)] [49 109 np.uint8(132)] [49 110 np.uint8(33)] [48 111 np.uint8(132)] [48 112 np.uint8(33)] [47 113 np.uint8(5)] [46 114 np.uint8(5)] [45 115 np.uint8(132)] [45 116 np.uint8(33)] [44 117 np.uint8(132)] [44 118 np.uint8(160)] [44 119 np.uint8(33)] [43 120 np.uint8(5)] [42 121 np.uint8(132)] [42 122 np.uint8(33)] [41 123 np.uint8(132)] [41 124 np.uint8(160)] [41 125 np.uint8(33)] [40 126 np.uint8(132)] [40 127 np.uint8(160)] [40 128 np.uint8(33)] [39 129 np.uint8(5)] [38 130 np.uint8(132)] [38 131 np.uint8(160)] [38 132 np.uint8(160)] [38 133 np.uint8(33)] [37 134 np.uint8(20)] [36 134 np.uint8(65)] [35 135 np.uint8(5)] [34 136 np.uint8(132)] [34 137 np.uint8(33)] [33 138 np.uint8(132)] [33 139 np.uint8(33)] [32 140 np.uint8(5)] [31 141 np.uint8(132)] [31 142 np.uint8(33)] [30 143 np.uint8(5)] [29 144 np.uint8(21)]]] [[[51 89 np.uint8(10)] [50 88 np.uint8(24)] [49 88 np.uint8(66)] [48 87 np.uint8(24)] [47 87 np.uint8(66)] [46 86 np.uint8(24)] [45 86 np.uint8(66)] [44 85 np.uint8(24)] [43 85 np.uint8(66)] [42 84 np.uint8(24)] [41 84 np.uint8(80)] [40 84 np.uint8(66)] [39 83 np.uint8(24)] [38 83 np.uint8(80)] [37 83 np.uint8(80)] [36 83 np.uint8(80)] [35 83 np.uint8(80)] [34 83 np.uint8(80)] [33 83 np.uint8(80)] [32 83 np.uint8(80)] [31 83 np.uint8(80)] [30 83 np.uint8(80)] [29 83 np.uint8(65)] [28 84 np.uint8(20)] [27 84 np.uint8(65)] [26 85 np.uint8(5)] [25 86 np.uint8(20)] [24 86 np.uint8(65)] [23 87 np.uint8(5)] [22 88 np.uint8(20)] [21 88 np.uint8(65)] [20 89 np.uint8(20)] [19 89 np.uint8(65)] [18 90 np.uint8(5)] [17 91 np.uint8(5)] [16 92 np.uint8(132)] [16 93 np.uint8(33)] [15 94 np.uint8(5)] [14 95 np.uint8(5)] [13 96 np.uint8(132)] [13 97 np.uint8(160)] [13 98 np.uint8(33)] [12 99 np.uint8(5)] [11 100 np.uint8(132)] [11 101 np.uint8(160)] [11 102 np.uint8(160)] [11 103 np.uint8(160)] [11 104 np.uint8(33)] [10 105 np.uint8(132)] [10 106 np.uint8(160)] [10 107 np.uint8(160)] [10 108 np.uint8(33)] [9 109 np.uint8(132)] [9 110 np.uint8(160)] [9 111 np.uint8(33)] [8 112 np.uint8(132)] [8 113 np.uint8(160)] [8 114 np.uint8(160)] [8 115 np.uint8(160)] [8 116 np.uint8(160)] [8 117 np.uint8(160)] [8 118 np.uint8(160)] [8 119 np.uint8(160)] [8 120 np.uint8(160)] [8 121 np.uint8(160)] [8 122 np.uint8(160)] [8 123 np.uint8(160)] [8 124 np.uint8(40)] [9 125 np.uint8(130)] [9 126 np.uint8(40)] [10 127 np.uint8(130)] [10 128 np.uint8(160)] [10 129 np.uint8(40)] [11 130 np.uint8(130)] [11 131 np.uint8(160)] [11 132 np.uint8(160)] [11 133 np.uint8(40)] [12 134 np.uint8(130)] [12 135 np.uint8(40)] [13 136 np.uint8(10)] [14 137 np.uint8(10)] [15 138 np.uint8(10)] [16 139 np.uint8(10)] [17 140 np.uint8(10)] [18 141 np.uint8(10)] [19 142 np.uint8(66)] [20 142 np.uint8(80)] [21 142 np.uint8(24)] [22 143 np.uint8(66)] [23 143 np.uint8(80)] [24 143 np.uint8(80)] [25 143 np.uint8(24)] [26 144 np.uint8(66)] [27 144 np.uint8(88)]] [[28 145 np.uint8(39)]] [[28 144 np.uint8(208)]]] [[27 146 np.uint8(132)] [27 147 np.uint8(160)] [27 148 np.uint8(33)] [26 149 np.uint8(132)] [26 150 np.uint8(160)] [26 151 np.uint8(160)] [26 152 np.uint8(160)] [26 153 np.uint8(160)] [26 154 np.uint8(160)] [26 155 np.uint8(33)] [25 156 np.uint8(132)] [25 157 np.uint8(160)] [25 158 np.uint8(33)] [24 159 np.uint8(132)] [24 160 np.uint8(33)] [23 161 np.uint8(132)] [23 162 np.uint8(160)] [23 163 np.uint8(160)] [23 164 np.uint8(160)] [23 165 np.uint8(33)] [22 166 np.uint8(5)] [21 167 np.uint8(132)] [21 168 np.uint8(33)] [20 169 np.uint8(5)] [19 170 np.uint8(132)] [19 171 np.uint8(33)] [18 172 np.uint8(132)] [18 173 np.uint8(160)] [18 174 np.uint8(160)] [18 175 np.uint8(160)] [18 176 np.uint8(33)] [17 177 np.uint8(132)] [17 178 np.uint8(160)] [17 179 np.uint8(160)] [17 180 np.uint8(33)] [16 181 np.uint8(132)] [16 182 np.uint8(33)] [15 183 np.uint8(132)] [15 184 np.uint8(33)] [14 185 np.uint8(132)] [14 186 np.uint8(160)] [14 187 np.uint8(160)] [14 188 np.uint8(33)] [13 189 np.uint8(132)] [13 190 np.uint8(160)] [13 191 np.uint8(160)] [13 192 np.uint8(33)] [12 193 np.uint8(20)] [11 193 np.uint8(65)] [10 194 np.uint8(5)] [9 195 np.uint8(20)] [8 195 np.uint8(65)] [7 196 np.uint8(4)]]]
+
+  (count lines)
+  ;; => 4
+
+  (defn image-to-wsign
+    "Convert a gliph image in a wsign."
+    [image]
+    (->> image
+         image-to-lineseq
+         lineseqs-to-wsign
+         (map normalize1-lsign)
+         (sort-by #(first (:lineseq %)) compare-cell)
+         (mapv normalize2-lsign)))
+
+  (image-to-wsign img)
+  [{:ltype 1, :lineseq [[48 0 np.uint8 (1)] [47 1 np.uint8 (5)] [46 2 np.uint8 (5)] [45 3 np.uint8 (5)] [44 4 np.uint8 (5)] [43 5 np.uint8 (132)] [43 6 np.uint8 (33)] [42 7 np.uint8 (132)] [42 8 np.uint8 (33)] [41 9 np.uint8 (132)] [41 10 np.uint8 (33)] [40 11 np.uint8 (132)] [40 12 np.uint8 (33)] [39 13 np.uint8 (5)] [38 14 np.uint8 (132)] [38 15 np.uint8 (33)] [37 16 np.uint8 (132)] [37 17 np.uint8 (160)] [37 18 np.uint8 (33)] [36 19 np.uint8 (5)] [35 20 np.uint8 (5)] [34 21 np.uint8 (132)] [34 22 np.uint8 (33)] [33 23 np.uint8 (132)] [33 24 np.uint8 (33)] [32 25 np.uint8 (132)] [32 26 np.uint8 (33)] [31 27 np.uint8 (132)] [31 28 np.uint8 (160)] [31 29 np.uint8 (33)] [30 30 np.uint8 (132)] [30 31 np.uint8 (33)] [29 32 np.uint8 (5)] [28 33 np.uint8 (132)] [28 34 np.uint8 (160)] [28 35 np.uint8 (33)] [27 36 np.uint8 (132)] [27 37 np.uint8 (33)] [26 38 np.uint8 (5)] [25 39 np.uint8 (132)] [25 40 np.uint8 (33)] [24 41 np.uint8 (132)] [24 42 np.uint8 (33)] [23 43 np.uint8 (132)] [23 44 np.uint8 (160)] [23 45 np.uint8 (33)] [22 46 np.uint8 (132)] [22 47 np.uint8 (160)] [22 48 np.uint8 (160)] [22 49 np.uint8 (33)] [21 50 np.uint8 (132)] [21 51 np.uint8 (33)] [20 52 np.uint8 (5)] [19 53 np.uint8 (5)] [18 54 np.uint8 (132)] [18 55 np.uint8 (33)] [17 56 np.uint8 (132)] [17 57 np.uint8 (160)] [17 58 np.uint8 (160)] [17 59 np.uint8 (33)] [16 60 np.uint8 (132)] [16 61 np.uint8 (33)] [15 62 np.uint8 (5)] [14 63 np.uint8 (5)] [13 64 np.uint8 (132)] [13 65 np.uint8 (160)] [13 66 np.uint8 (160)] [13 67 np.uint8 (33)] [12 68 np.uint8 (132)] [12 69 np.uint8 (160)] [12 70 np.uint8 (33)] [11 71 np.uint8 (132)] [11 72 np.uint8 (160)] [11 73 np.uint8 (33)] [10 74 np.uint8 (5)] [9 75 np.uint8 (132)] [9 76 np.uint8 (33)] [8 77 np.uint8 (132)] [8 78 np.uint8 (160)] [8 79 np.uint8 (33)] [7 80 np.uint8 (5)] [6 81 np.uint8 (132)] [6 82 np.uint8 (33)] [5 83 np.uint8 (20)] [4 83 np.uint8 (65)] [3 84 np.uint8 (20)] [2 84 np.uint8 (65)] [1 85 np.uint8 (5)] [0 86 np.uint8 (148)]]}
+   {:ltype 0, :lineseq [[0 30 np.uint8 (160)] [0 29 np.uint8 (132)] [1 28 np.uint8 (33)] [1 27 np.uint8 (160)] [1 26 np.uint8 (132)] [2 25 np.uint8 (33)] [2 24 np.uint8 (160)] [2 23 np.uint8 (160)] [2 22 np.uint8 (132)] [3 21 np.uint8 (33)] [3 20 np.uint8 (160)] [3 19 np.uint8 (160)] [3 18 np.uint8 (160)] [3 17 np.uint8 (132)] [4 16 np.uint8 (5)] [5 15 np.uint8 (33)] [5 14 np.uint8 (160)] [5 13 np.uint8 (132)] [6 12 np.uint8 (5)] [7 11 np.uint8 (5)] [8 10 np.uint8 (33)] [8 9 np.uint8 (132)] [9 8 np.uint8 (5)] [10 7 np.uint8 (5)] [11 6 np.uint8 (65)] [12 6 np.uint8 (20)] [13 5 np.uint8 (65)] [14 5 np.uint8 (20)] [15 4 np.uint8 (5)] [16 3 np.uint8 (65)] [17 3 np.uint8 (20)] [18 2 np.uint8 (5)] [19 1 np.uint8 (65)] [20 1 np.uint8 (20)] [21 0 np.uint8 (65)] [22 0 np.uint8 (80)] [23 0 np.uint8 (80)] [24 0 np.uint8 (80)] [25 0 np.uint8 (80)] [26 0 np.uint8 (80)] [27 0 np.uint8 (80)] [28 0 np.uint8 (80)] [29 0 np.uint8 (80)] [30 0 np.uint8 (80)] [31 0 np.uint8 (24)] [32 1 np.uint8 (66)] [33 1 np.uint8 (80)] [34 1 np.uint8 (24)] [35 2 np.uint8 (66)] [36 2 np.uint8 (24)] [37 3 np.uint8 (66)] [38 3 np.uint8 (24)] [39 4 np.uint8 (66)] [40 4 np.uint8 (24)] [41 5 np.uint8 (66)] [42 5 np.uint8 (24)] [43 6 np.uint8 (10)] [44 7 np.uint8 (74)] [45 8 np.uint8 (162)] [45 9 np.uint8 (33)] [44 10 np.uint8 (132)] [44 11 np.uint8 (160)] [44 12 np.uint8 (160)] [44 13 np.uint8 (160)] [44 14 np.uint8 (160)] [44 15 np.uint8 (160)] [44 16 np.uint8 (33)] [43 17 np.uint8 (132)] [43 18 np.uint8 (160)] [43 19 np.uint8 (160)] [43 20 np.uint8 (160)] [43 21 np.uint8 (160)] [43 22 np.uint8 (160)] [43 23 np.uint8 (33)] [42 24 np.uint8 (132)] [42 25 np.uint8 (33)] [41 26 np.uint8 (132)] [41 27 np.uint8 (33)] [40 28 np.uint8 (132)] [40 29 np.uint8 (33)] [39 30 np.uint8 (5)] [38 31 np.uint8 (5)] [37 32 np.uint8 (132)] [37 33 np.uint8 (33)] [36 34 np.uint8 (132)] [36 35 np.uint8 (160)] [36 36 np.uint8 (33)] [35 37 np.uint8 (5)] [34 38 np.uint8 (132)] [34 39 np.uint8 (33)] [33 40 np.uint8 (132)] [33 41 np.uint8 (160)] [33 42 np.uint8 (33)] [32 43 np.uint8 (132)] [32 44 np.uint8 (160)] [32 45 np.uint8 (33)] [31 46 np.uint8 (5)] [30 47 np.uint8 (132)] [30 48 np.uint8 (160)] [30 49 np.uint8 (160)] [30 50 np.uint8 (33)] [29 51 np.uint8 (20)] [28 51 np.uint8 (65)] [27 52 np.uint8 (5)] [26 53 np.uint8 (132)] [26 54 np.uint8 (33)] [25 55 np.uint8 (132)] [25 56 np.uint8 (33)] [24 57 np.uint8 (5)] [23 58 np.uint8 (132)] [23 59 np.uint8 (33)] [22 60 np.uint8 (5)] [21 61 np.uint8 (21)] [19 61 np.uint8 (88)] [18 61 np.uint8 (66)] [17 60 np.uint8 (24)] [16 60 np.uint8 (80)] [15 60 np.uint8 (80)] [14 60 np.uint8 (66)] [13 59 np.uint8 (24)] [12 59 np.uint8 (80)] [11 59 np.uint8 (66)] [10 58 np.uint8 (10)] [9 57 np.uint8 (10)] [8 56 np.uint8 (10)] [7 55 np.uint8 (10)] [6 54 np.uint8 (10)] [5 53 np.uint8 (10)] [4 52 np.uint8 (40)] [4 51 np.uint8 (130)] [3 50 np.uint8 (40)] [3 49 np.uint8 (160)] [3 48 np.uint8 (160)] [3 47 np.uint8 (130)] [2 46 np.uint8 (40)] [2 45 np.uint8 (160)] [2 44 np.uint8 (130)] [1 43 np.uint8 (40)] [1 42 np.uint8 (130)] [0 41 np.uint8 (40)] [0 40 np.uint8 (160)] [0 39 np.uint8 (160)] [0 38 np.uint8 (160)] [0 37 np.uint8 (160)] [0 36 np.uint8 (160)] [0 35 np.uint8 (160)] [0 34 np.uint8 (160)] [0 33 np.uint8 (160)] [0 32 np.uint8 (160)] [0 31 np.uint8 (160)]]}
+   {:ltype 1, :lineseq [[21 0 np.uint8 (39)] [20 1 np.uint8 (132)] [20 2 np.uint8 (160)] [20 3 np.uint8 (33)] [19 4 np.uint8 (132)] [19 5 np.uint8 (160)] [19 6 np.uint8 (160)] [19 7 np.uint8 (160)] [19 8 np.uint8 (160)] [19 9 np.uint8 (160)] [19 10 np.uint8 (33)] [18 11 np.uint8 (132)] [18 12 np.uint8 (160)] [18 13 np.uint8 (33)] [17 14 np.uint8 (132)] [17 15 np.uint8 (33)] [16 16 np.uint8 (132)] [16 17 np.uint8 (160)] [16 18 np.uint8 (160)] [16 19 np.uint8 (160)] [16 20 np.uint8 (33)] [15 21 np.uint8 (5)] [14 22 np.uint8 (132)] [14 23 np.uint8 (33)] [13 24 np.uint8 (5)] [12 25 np.uint8 (132)] [12 26 np.uint8 (33)] [11 27 np.uint8 (132)] [11 28 np.uint8 (160)] [11 29 np.uint8 (160)] [11 30 np.uint8 (160)] [11 31 np.uint8 (33)] [10 32 np.uint8 (132)] [10 33 np.uint8 (160)] [10 34 np.uint8 (160)] [10 35 np.uint8 (33)] [9 36 np.uint8 (132)] [9 37 np.uint8 (33)] [8 38 np.uint8 (132)] [8 39 np.uint8 (33)] [7 40 np.uint8 (132)] [7 41 np.uint8 (160)] [7 42 np.uint8 (160)] [7 43 np.uint8 (33)] [6 44 np.uint8 (132)] [6 45 np.uint8 (160)] [6 46 np.uint8 (160)] [6 47 np.uint8 (33)] [5 48 np.uint8 (20)] [4 48 np.uint8 (65)] [3 49 np.uint8 (5)] [2 50 np.uint8 (20)] [1 50 np.uint8 (65)] [0 51 np.uint8 (4)]]}]
+
+  (compare-cell [46 8] [22 9])
+  ;; => 1
+
+  (utl/save-edn "test/resources/rol.edn" wsign)
+  ;;
+  )
+  #+end_src

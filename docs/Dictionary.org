@@ -1,5 +1,5 @@
 - binary matrix :: 2d matrix containing only 0 and 1
-- cell :: vector [x y]
+- cell :: vector [row column]
 - cnum :: cell number (byte) - neighborhood map - structure: E SE S SV V NV N NE
 - cnumseq :: sequence of adjacent cell cnums
 - gliph :: a stenografic symbol (usualy a word)

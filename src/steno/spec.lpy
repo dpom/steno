@@ -65,25 +65,24 @@
 (def all-directions
   "The eight 8-connected directions (orthogonals + diagonals). Real Duployer
     skeletons are 8-connected, so the graph must use all eight to keep true
-    junctions intact (a 4-connected graph shatters junctions into degree-2
-    fragments and over-segments)."
-  [[0  1]  ; E
-   [1  0]  ; S
-   [0 -1]  ; V
-   [-1  0] ; N
-   [1  1]  ; SE
-   [1 -1]  ; SV
-   [-1 -1] ; NV
-   [-1  1]])
+    junctions intact."
+  [[0  1]    ; E
+   [1  0]    ; S
+   [0 -1]    ; V
+   [-1  0]   ; N
+   [1  1]    ; SE
+   [1 -1]    ; SV
+   [-1 -1]   ; NV
+   [-1  1]]) ; NE
 
 (def pos
   "Direction position in the cell number"
   [2r10000000 ; E
-   2r01000000 ; SE
-   2r00100000 ; S
-   2r00010000 ; SV
-   2r00001000 ; V
-   2r00000100  ; NV
+   2r01000000 ; S
+   2r00100000 ; V
+   2r00010000 ; N
+   2r00001000 ; SE
+   2r00000100  ; SV
    2r00000010  ; N
    2r00000001] ; NE
   )

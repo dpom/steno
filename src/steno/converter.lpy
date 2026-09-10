@@ -1,262 +1,45 @@
 (ns steno.converter
   "Convert images in numeric sequences"
   (:require
-   [basilisp.edn :as edn]
    [basilisp.set :as set]
-   [basilisp.string :as str]
-   [steno.imageprocessor :as img]
-   [steno.spec :as spec])
+   [steno.spec :as spec]
+   [steno.utils :as utl])
   (:import
-   cv2
-   pathlib))
+   [numpy :as np]))
 
 (def neighbor-factor
   "Factor that determines how close two cells must be to be neighbors (sum of dx and dy)"
   10)
 
-(def lineseq-min-size 10)
+(defn get-start-point
+  "Get the start point of the gliph."
+  [image]
+  (->> image
+       utl/endpoint-coords
+       (sort-by second)
+       first))
 
-(def tap-topic "converter")
-
-(defn- image-to-matrix
-  "Convert an image to binary matrix."
-  [img]
-  (let [[rows cols _] (.- img shape)]
-    (mapv (fn [i]
-            (mapv (fn [j]
-                    (if (python/bool (zero? (+ (aget img i j)))) 0 1))
-                  (range 0 cols)))
-          (range 0 rows))))
-
-(defn- get-cell-value
+(defn get-cell-value
   "Get cell value. If row or column index is wrong return 0."
-  [mat row column]
-  (try
-    (aget mat row column)
-    (catch Exception _e
-      0)))
+  ([mat [row column]]
+   (try
+     (int (aget mat row column))
+     (catch Exception _e
+       0)))
+  ([mat [row column] [dr dc]]
+   (get-cell-value mat [(+ row dr) (+ column dc)])))
 
-(defn- get-neighbor
-  "Get the neighbor cell (address and value)."
-  [mat [r c] [dr dc]]
-  (let [nr (+ r dr)
-        nc (+ c dc)]
-    [[nr nc] (if (or (neg? nr) (neg? nc))
-               0
-               (get-cell-value mat nr nc))]))
-
-(defn- get-cell-number-and-neighbors
-  "Get all neighbors with 1 and the cell number"
-  [mat cell]
-  (reduce (fn [[neighbors num] dir]
-            (let [[np v] (get-neighbor mat cell dir)]
-              [(if (zero? v) neighbors (conj neighbors np)) (+ (* num 2) v)]))
+(defn get-cnum-and-neighbors
+  "Get all neighbors with 1 and the cell cnum."
+  [mat [row column :as cell]]
+  (reduce (fn [[neighbors num] [dr dc :as dir]]
+            (let [v (get-cell-value mat cell dir)]
+              [(if (zero? v)
+                 neighbors
+                 (conj neighbors [(+ row dr) (+ column dc)]))
+               (+ (* num 2) v)]))
           [#{} 0]
           spec/all-directions))
-
- ; NE
-
-(defn- diagonal-shortcut?
-  "True when the diagonal step from CELL in direction [dr dc] is a spurious
-    shortcut rather than a genuine isolated diagonal step. A diagonal edge is
-    spurious when either of the two orthogonal 'filler' pixels that would close
-    the 2x2 corner is foreground: then the two endpoints are already connected
-    orthogonally around the corner, and keeping the diagonal would create a
-    short chord that over-segments strokes."
-  [mat [r c] [dr dc]]
-  (let [filler-a (get-neighbor mat [r c] [dr 0])
-        filler-b (get-neighbor mat [r c] [0 dc])]
-    (or (not (zero? (second filler-a)))
-        (not (zero? (second filler-b))))))
-
-(defn- fg-neighbors
-  "8-connected foreground neighbor coordinates of CELL in the binary MAT.
-    Diagonal edges that are spurious corner shortcuts (either orthogonal filler
-    pixel is foreground) are dropped so the graph behaves like 4-connectivity
-    for drawn shapes while preserving genuine isolated diagonal steps in real
-    8-connected skeletons."
-  [mat cell]
-  (->> spec/all-directions
-       (map #(get-neighbor mat cell %))
-       (filter (fn [[n v]]
-                 (when (not (zero? v))
-                   (let [[dr dc] (map - n cell)]
-                     (if (and (not= dr 0) (not= dc 0))
-                       (not (diagonal-shortcut? mat cell [dr dc]))
-                       true)))))
-       (map first)
-       (vec)))
-
-(defn- skeleton-graph
-  "Build the skeleton graph: cell -> vector of 8-connected foreground neighbors."
-  [mat]
-  (let [rows (count mat)
-        cols (count (first mat))]
-    (reduce (fn [g idx]
-              (let [i (quot idx cols)
-                    j (rem idx cols)]
-                (if (= 1 (get-in mat [i j]))
-                  (assoc g [i j] (fg-neighbors mat [i j]))
-                  g)))
-            {}
-            (range (* rows cols)))))
-
-(defn- g-neighbors
-  [graph cell]
-  (get graph cell []))
-
-(defn- node-degree
-  [graph cell]
-  (count (g-neighbors graph cell)))
-
-(defn- break-node?
-  "True for a stroke endpoint (degree 1) or a junction (degree >= 3) in the
-   8-connected GRAPH. Bends and straight pixels (degree 2) are interior."
-  [graph cell]
-  (let [d (node-degree graph cell)]
-    (or (= d 1) (>= d 3))))
-
-(defn- walk-segment
-  "Walk a path from START (first interior pixel) away from PREV until hitting a
-   break node, an already-visited pixel, a re-entered pixel, or a dead end.
-   Returns the pixel list (excluding PREV) and the terminal cell."
-  [graph visited start prev]
-  (let [seen (volatile! #{})]
-    (loop [cur start
-           prv prev
-           acc []]
-      (vswap! seen conj cur)
-      (if (break-node? graph cur)
-        {:pixels (conj acc cur) :end cur}
-        (let [nxt (first (->> (g-neighbors graph cur)
-                              (remove #(= % prv))
-                              (remove #(contains? @visited %))
-                              (remove #(contains? @seen %))))]
-          (if nxt
-            (recur nxt cur (conj acc cur))
-            {:pixels (conj acc cur) :end cur}))))))
-
-(defn- walk-loop
-  "Walk a closed loop (component with no break nodes) from START. A local SEEN
-   set guarantees termination even when the component contains sub-cycles."
-  [graph visited start]
-  (let [seen (volatile! #{})]
-    (loop [cur start
-           prv nil
-           acc []]
-      (vswap! seen conj cur)
-      (let [nxt (first (->> (g-neighbors graph cur)
-                            (remove #(= % prv))
-                            (remove #(contains? @visited %))
-                            (remove #(contains? @seen %))))]
-        (if (and nxt (not= nxt start))
-          (recur nxt cur (conj acc cur))
-          (conj acc cur))))))
-
-(defn- pixels->lineseq
-  "Turn a pixel path into a lineseq of [x y n] cells (n = direction number)."
-  [mat pixels]
-  (mapv (fn [c]
-          (let [[_ n] (get-cell-number-and-neighbors mat c)]
-            (conj c n)))
-        pixels))
-
-(defn- group-into-lsigns
-  "Convert collected segments to lineseqs. Two chords sharing the same two
-   junctions form one loop lsign; everything else is a linear lsign. Drop
-   empty segments."
-  [mat segments]
-  (let [by-pair (group-by (fn [s] (set (:ends s))) segments)]
-    (mapcat (fn [segs]
-              (if (= (count segs) 2)
-                (let [[a b] segs
-                      pixels (vec (concat (:pixels a)
-                                          (drop-last (rest (reverse (:pixels b))))))]
-                  [(pixels->lineseq mat pixels)])
-                (->> segs
-                     (filter #(pos? (count (:pixels %))))
-                     (map #(pixels->lineseq mat (:pixels %))))))
-            (vals by-pair))))
-
-(defn- decompose-lsigns
-  "Decompose a binary matrix (1/0) into a vector of lineseqs, one per lsign,
-   bounded by skeleton junctions/endpoints; loops are cycles between two
-   junctions."
-  [mat]
-  (let [graph (skeleton-graph mat)
-        visited (volatile! #{})
-        segments (volatile! [])]
-    (doseq [c (keys graph)]
-      (when (break-node? graph c)
-        (doseq [n (->> (g-neighbors graph c)
-                       (remove #(contains? @visited %)))]
-          (let [{:keys [pixels end]} (walk-segment graph visited n c)]
-            (vswap! visited into pixels)
-            (vswap! segments conj {:pixels (conj pixels c) :ends [c end]})))
-        (vswap! visited conj c)))
-    (doseq [c (keys graph)]
-      (when (not (contains? @visited c))
-        (let [pixels (walk-loop graph visited c)]
-          (vswap! visited into pixels)
-          (vswap! segments conj {:pixels pixels
-                                 :ends [(first pixels) (first pixels)]}))))
-    (vec (group-into-lsigns mat @segments))))
-
-(defn- get-start-cells
-  "Find the cells where the word could start."
-  [mat]
-  (let [max-row (count mat)
-        max-col (count (first mat))]
-    (loop [acc []
-           row 0
-           col 0]
-      (let [[neighbors _] (get-cell-number-and-neighbors mat [row col])
-            new-acc (if (and (= (get-cell-value mat row col) 1)
-                             (= (count neighbors) 1))
-                      (conj acc [row col])
-                      acc)
-            new-col (inc col)
-            new-row (if (= new-col max-col) (inc row) row)
-            new-col (if (= new-row row) new-col 0)]
-        (if (= new-row max-row)
-          new-acc
-          (recur new-acc new-row new-col))))))
-
-(defn- get-min-start-cell
-  "Return the cell that has the highest probability of being the beginning of the word."
-  [start-cells]
-  (first
-   (reduce (fn [[min-cell sum] cell]
-             (let [new-sum (apply + cell)]
-               (if (< new-sum sum)
-                 [cell new-sum]
-                 [min-cell sum])))
-           [spec/dummy-cell (float "inf")]
-           start-cells)))
-
-(defn- get-first-one
-  "Return the first cell with the value one."
-  [mat]
-  (let [max-row (count mat)
-        max-col (count (first mat))]
-    (loop [row 0
-           col 0]
-      (if (= (get-cell-value mat row col) 1)
-        [row col]
-        (let [new-col (inc col)
-              new-row (if (= new-col max-col) (inc row) row)
-              new-col (if (= new-row row) new-col 0)]
-          (if (= new-row max-row)
-            spec/dummy-cell
-            (recur new-row new-col)))))))
-
-(defn- get-start-cell
-  [mat]
-  (let [cells (get-start-cells mat)]
-    (case (count cells)
-      0 (get-first-one mat)
-      1 (first cells)
-      (get-min-start-cell cells))))
 
 (defn- get-liniar-sequence
   "Return a liniar numeric sequence.
@@ -272,31 +55,21 @@
   (loop [start start-cell
          prev prev-cells
          line []]
-    (let [[neighbors val] (get-cell-number-and-neighbors mat start)
+    (let [[neighbors val] (get-cnum-and-neighbors mat start)
           new-neighbors (set/difference neighbors prev)
           new-line (conj line (conj start val))
           new-prev (conj prev start)]
-      ;; (tap> tap-topic {:cell start :val val :neighbors new-neighbors})
+      (tap> {:cell start :val val :neighbors new-neighbors})
       (if-not (= (count new-neighbors) 1)
         {:start-cells new-neighbors
          :prev-cells new-prev
          :line new-line}
         (recur (first new-neighbors) new-prev new-line)))))
 
-(defn nested-levels
-  "Return the depth level of a nested Vector."
-  [v]
-  (if (vector? v)
-    (if (empty? v)
-      1
-      (let [max-nested (apply max (map nested-levels v))]
-        (inc max-nested)))
-    0))
-
 (defn- parallel-lineseq?
   "True if line sequence is a loop"
   [lseq]
-  (= (nested-levels lseq) 3))
+  (= (utl/nested-levels lseq) 3))
 
 (defn- parallel-to-liniar
   "Transform a one line parallel sequence into a liniar sequence"
@@ -435,14 +208,14 @@
     (reverse line)
     line))
 
-(defn- matrix-to-lineseq
-  "Convert a word matrix in a vector of line sequences."
+(defn image-to-lineseq
+  "Convert a gliph image in a vector of line sequences."
   [mat]
-  (loop [state {:start-cells #{(get-start-cell mat)}
+  (loop [state {:start-cells #{(get-start-point mat)}
                 :prev-cells #{}
                 :line []}
          acc []]
-    ;; (tap> tap-topic state)
+    (tap> state)
     (let [new-state (if (= (count (:start-cells state)) 1)
                       (get-liniar-sequence mat (assoc state :start-cell (first (:start-cells state))))
                       (get-parallel-sequence mat state))
@@ -450,7 +223,6 @@
       (if (empty? (:start-cells new-state))
         (filterv seq new-acc)
         (recur new-state new-acc)))))
-
 (defn- lineseq-to-lsign
   "Convert a LINESEQ in a lsign (a map with lineseq and ltype keys)."
   [lineseq]
@@ -491,133 +263,49 @@
 
 ;; module entry points
 
-(defn image-to-wsign-legacy
-  "Legacy tracer-based conversion. Kept for A/B comparison against the graph
-   decomposition method."
+(defn image-to-wsign
+  "Convert a gliph image in a wsign."
   [image]
   (->> image
-       image-to-matrix
-       matrix-to-lineseq
+       image-to-lineseq
        lineseqs-to-wsign
        (map normalize1-lsign)
        (sort-by #(first (:lineseq %)) compare-cell)
        (mapv normalize2-lsign)))
 
-(defn image-to-wsign
-  "DEFAULT wsign converter: legacy tracer-based decomposition. The graph
-   decomposition method (image-to-wsign-graph) currently over-segments
-   8-connected real skeletons and is kept experimental for further work."
-  [image]
-  (image-to-wsign-legacy image))
-
-(defn image-to-wsign-graph
-  "Experimental skeleton-graph decomposition bounded by junctions/endpoints.
-   NOTE: real Duployer skeletons are 8-connected, so a 4-connected graph
-   shatters junctions into degree-2 fragments and over-segments badly
-   (e.g. a 4-stroke glyph splits into 82 lsigns). Kept for future work
-   using 8-connectivity with branch-count junction detection."
-  [image]
-  (->> image
-       image-to-matrix
-       decompose-lsigns
-       (map lineseq-to-lsign)
-       (map normalize1-lsign)
-       (sort-by #(first (:lineseq %)) compare-cell)
-       (mapv normalize2-lsign)))
-
-(defn- wsign-score
-  "Compare two wsigns: 1.0 when lsign counts and ltype multisets match,
-   otherwise a value scaled down by the count difference."
-  [a b]
-  (let [ca (count a) cb (count b)]
-    (if (and (= ca cb)
-             (= (frequencies (map :ltype a))
-                (frequencies (map :ltype b))))
-      1.0
-      (/ 1.0 (+ 1 (abs (- ca cb)))))))
-
-(defn- corpus-by-fileimage
-  "Read CORPUS-DIR and group curated entries into wsigns keyed by :fileimage.
-   Reads EDN corpus files directly to avoid a circular dependency on
-   steno.corpus (which depends on this namespace)."
-  [corpus-dir]
-  (->> (.rglob (pathlib/Path corpus-dir) "*")
-       iterator-seq
-       (filter #(.is_file %))
-       (filter #(str/ends-with? (.-name %) ".edn"))
-       (map #(edn/read-string (slurp (str %))))
-       (group-by :fileimage)
-       (map (fn [[k es]]
-              [k (->> es
-                      (sort-by :pos)
-                      (mapv #(select-keys % [:ltype :lineseq])))]))
-       (into {})))
-
-(defn compare-glyph-batch
-  "For every glyph PNG under GLYPH-DIR, print legacy and graph lsign counts and,
-    when a curated corpus entry (under CORPUS-DIR) matches the glyph path, the
-    match score of each extractor against the curated wsign."
-  [glyph-dir corpus-dir]
-  (let [curated (corpus-by-fileimage corpus-dir)
-        files (->> (.rglob (pathlib/Path glyph-dir) "*.png")
-                   iterator-seq
-                   (filter #(.is_file %))
-                   (map str)
-                   sort)]
-    (doseq [f files]
-      (let [img (cv2/imread f cv2/IMREAD_GRAYSCALE)
-            skel (img/process-image img)
-            legacy (image-to-wsign-legacy skel)
-            graph (image-to-wsign-graph skel)
-            entry (get curated f)]
-        (println (format "%s  legacy=%d graph=%d curated=%s"
-                         f (count legacy) (count graph)
-                         (if entry (count entry) "NA")))
-        (when entry
-          (println (format "   score graph=%.2f legacy=%.2f"
-                           (wsign-score graph entry)
-                           (wsign-score legacy entry))))))))
-
 (comment
 
-  (nested-levels [1 2 3])               ; => 1
-  (nested-levels [[1 2] 3])             ; => 2
-  (nested-levels [[1 2] [3 [4 5]]])     ; => 3
-  (nested-levels [[[1]] [[2]]])         ; => 3
-  (nested-levels "not a vector")        ; => 0
+  (require
+   '[steno.show :as show])
 
-  (compare-cell [46 8] [22 9])
+  (def img (np/load "test/resources/rol.npy"))
+
+  (show/show-image img)
+
+  (def start
+    (get-start-point img))
+  ;; => [101 4]
+
+  (get-cell-value img start)
   ;; => 1
 
-  (require
-   '[steno.extractor :as extr]
-   '[steno.show :as show]
-   '[steno.utils :as utl])
+  (get-cnum-and-neighbors img start)
+  ;; => [#{[100 5]} 1]
 
-  (add-tap (bound-fn* utl/print4tap))
+  (get-liniar-sequence img {:start-cell [101 4] :prev-cells #{} :line []})
+  ;; => {:prev-cells #{[81 38] [80 41] [74 55] [68 66] [69 64] [63 78] [81 39] [76 47] [86 27] [70 62] [62 80] [69 65] [78 44] [67 67] [87 26] [74 54] [59 85] [84 32] [95 12] [55 88] [56 88] [85 29] [57 87] [66 68] [75 52] [94 13] [91 18] [89 23] [84 33] [85 30] [81 37] [99 6] [91 19] [66 69] [86 28] [54 89] [100 5] [96 9] [59 86] [73 56] [66 70] [87 25] [58 87] [77 46] [95 11] [90 20] [65 73] [84 31] [61 83] [70 61] [83 34] [88 24] [98 7] [92 17] [77 45] [66 71] [65 74] [53 90] [83 35] [61 82] [72 57] [90 21] [96 10] [75 53] [71 58] [79 42] [64 76] [90 22] [93 15] [75 51] [61 81] [70 63] [76 49] [71 59] [82 36] [64 75] [93 16] [60 84] [80 40] [75 50] [94 14] [64 77] [78 43] [62 79] [70 60] [97 8] [101 4] [65 72] [76 48]}, :line [[101 4 1] [100 5 5] [99 6 5] [98 7 5] [97 8 5] [96 9 132] [96 10 33] [95 11 132] [95 12 33] [94 13 132] [94 14 33] [93 15 132] [93 16 33] [92 17 5] [91 18 132] [91 19 33] [90 20 132] [90 21 160] [90 22 33] [89 23 5] [88 24 5] [87 25 132] [87 26 33] [86 27 132] [86 28 33] [85 29 132] [85 30 33] [84 31 132] [84 32 160] [84 33 33] [83 34 132] [83 35 33] [82 36 5] [81 37 132] [81 38 160] [81 39 33] [80 40 132] [80 41 33] [79 42 5] [78 43 132] [78 44 33] [77 45 132] [77 46 33] [76 47 132] [76 48 160] [76 49 33] [75 50 132] [75 51 160] [75 52 160] [75 53 33] [74 54 132] [74 55 33] [73 56 5] [72 57 5] [71 58 132] [71 59 33] [70 60 132] [70 61 160] [70 62 160] [70 63 33] [69 64 132] [69 65 33] [68 66 5] [67 67 5] [66 68 132] [66 69 160] [66 70 160] [66 71 33] [65 72 132] [65 73 160] [65 74 33] [64 75 132] [64 76 160] [64 77 33] [63 78 5] [62 79 132] [62 80 33] [61 81 132] [61 82 160] [61 83 33] [60 84 5] [59 85 132] [59 86 33] [58 87 20] [57 87 65] [56 88 20] [55 88 65] [54 89 5] [53 90 148]], :start-cells #{[52 90] [53 91]}}
 
-  (def imagefile "test/resources/template.png")
+  (def lines
+    (image-to-lineseq img))
 
-  (def mtx (extr/extract-glyphs imagefile))
+  (count lines)
+  ;; => 4
 
-  (defn convert-image
-    [row col glyph]
-    {:row row
-     :col col
-     :wsign (-> (:roi glyph)
-                img/process-image
-                image-to-wsign)})
+  (def wsign
+    (image-to-wsign img))
+  [{:ltype 1, :lineseq [[48 0 1] [47 1 5] [46 2 5] [45 3 5] [44 4 5] [43 5 132] [43 6 33] [42 7 132] [42 8 33] [41 9 132] [41 10 33] [40 11 132] [40 12 33] [39 13 5] [38 14 132] [38 15 33] [37 16 132] [37 17 160] [37 18 33] [36 19 5] [35 20 5] [34 21 132] [34 22 33] [33 23 132] [33 24 33] [32 25 132] [32 26 33] [31 27 132] [31 28 160] [31 29 33] [30 30 132] [30 31 33] [29 32 5] [28 33 132] [28 34 160] [28 35 33] [27 36 132] [27 37 33] [26 38 5] [25 39 132] [25 40 33] [24 41 132] [24 42 33] [23 43 132] [23 44 160] [23 45 33] [22 46 132] [22 47 160] [22 48 160] [22 49 33] [21 50 132] [21 51 33] [20 52 5] [19 53 5] [18 54 132] [18 55 33] [17 56 132] [17 57 160] [17 58 160] [17 59 33] [16 60 132] [16 61 33] [15 62 5] [14 63 5] [13 64 132] [13 65 160] [13 66 160] [13 67 33] [12 68 132] [12 69 160] [12 70 33] [11 71 132] [11 72 160] [11 73 33] [10 74 5] [9 75 132] [9 76 33] [8 77 132] [8 78 160] [8 79 33] [7 80 5] [6 81 132] [6 82 33] [5 83 20] [4 83 65] [3 84 20] [2 84 65] [1 85 5] [0 86 148]]}
+   {:ltype 0, :lineseq [[0 30 160] [0 29 132] [1 28 33] [1 27 160] [1 26 132] [2 25 33] [2 24 160] [2 23 160] [2 22 132] [3 21 33] [3 20 160] [3 19 160] [3 18 160] [3 17 132] [4 16 5] [5 15 33] [5 14 160] [5 13 132] [6 12 5] [7 11 5] [8 10 33] [8 9 132] [9 8 5] [10 7 5] [11 6 65] [12 6 20] [13 5 65] [14 5 20] [15 4 5] [16 3 65] [17 3 20] [18 2 5] [19 1 65] [20 1 20] [21 0 65] [22 0 80] [23 0 80] [24 0 80] [25 0 80] [26 0 80] [27 0 80] [28 0 80] [29 0 80] [30 0 80] [31 0 24] [32 1 66] [33 1 80] [34 1 24] [35 2 66] [36 2 24] [37 3 66] [38 3 24] [39 4 66] [40 4 24] [41 5 66] [42 5 24] [43 6 10] [44 7 74] [45 8 162] [45 9 33] [44 10 132] [44 11 160] [44 12 160] [44 13 160] [44 14 160] [44 15 160] [44 16 33] [43 17 132] [43 18 160] [43 19 160] [43 20 160] [43 21 160] [43 22 160] [43 23 33] [42 24 132] [42 25 33] [41 26 132] [41 27 33] [40 28 132] [40 29 33] [39 30 5] [38 31 5] [37 32 132] [37 33 33] [36 34 132] [36 35 160] [36 36 33] [35 37 5] [34 38 132] [34 39 33] [33 40 132] [33 41 160] [33 42 33] [32 43 132] [32 44 160] [32 45 33] [31 46 5] [30 47 132] [30 48 160] [30 49 160] [30 50 33] [29 51 20] [28 51 65] [27 52 5] [26 53 132] [26 54 33] [25 55 132] [25 56 33] [24 57 5] [23 58 132] [23 59 33] [22 60 5] [21 61 21] [19 61 88] [18 61 66] [17 60 24] [16 60 80] [15 60 80] [14 60 66] [13 59 24] [12 59 80] [11 59 66] [10 58 10] [9 57 10] [8 56 10] [7 55 10] [6 54 10] [5 53 10] [4 52 40] [4 51 130] [3 50 40] [3 49 160] [3 48 160] [3 47 130] [2 46 40] [2 45 160] [2 44 130] [1 43 40] [1 42 130] [0 41 40] [0 40 160] [0 39 160] [0 38 160] [0 37 160] [0 36 160] [0 35 160] [0 34 160] [0 33 160] [0 32 160] [0 31 160]]}
+   {:ltype 1, :lineseq [[21 0 39] [20 1 132] [20 2 160] [20 3 33] [19 4 132] [19 5 160] [19 6 160] [19 7 160] [19 8 160] [19 9 160] [19 10 33] [18 11 132] [18 12 160] [18 13 33] [17 14 132] [17 15 33] [16 16 132] [16 17 160] [16 18 160] [16 19 160] [16 20 33] [15 21 5] [14 22 132] [14 23 33] [13 24 5] [12 25 132] [12 26 33] [11 27 132] [11 28 160] [11 29 160] [11 30 160] [11 31 33] [10 32 132] [10 33 160] [10 34 160] [10 35 33] [9 36 132] [9 37 33] [8 38 132] [8 39 33] [7 40 132] [7 41 160] [7 42 160] [7 43 33] [6 44 132] [6 45 160] [6 46 160] [6 47 33] [5 48 20] [4 48 65] [3 49 5] [2 50 20] [1 50 65] [0 51 4]]}]
 
-  (def mtx3 (utl/map-glyph-matrix mtx convert-image))
-
-  (def wsign (nth (nth mtx3 3) 2))
-
-  (show/show-lsign (nth (:wsign wsign) 1))
-
-  ;; ---------------------------------------------------------------------------
-  ;; extraction-eval: legacy vs graph decomposition vs curated corpus
-  ;; Requires: (require '[steno.corpus :as corpus] '[pathlib :refer [Path]])
-  ;; (compare-glyph-batch "tmp/yoga_001_1" "resources/corpus")
-
-  ;;
+;;
   )
