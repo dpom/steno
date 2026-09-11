@@ -1,0 +1,21 @@
+* Build Corpus Methodology
+
+1. Scan a stenographic document -> =steno.png=
+2. Extract glyphs
+     #+begin_src shell
+bb app save-glyphs -i steno.png -o tmp/steno
+     #+end_src
+3. Iterate through glyphs using:
+     #+begin_src shell
+bb app check -i tmp/steno
+     #+end_src
+     for each glyph:
+     1. for each =lsign=:
+         1. verify translations and set the correct translation
+         2. if the =lsign= is relevant, perform a save
+         3. save all selected =lsigns= in the corpus
+     2. if the current glyph has been fully processed, delete it; otherwise, leave it for further processing
+4. Regenerate references with the new corpus:
+     #+begin_src shell
+bb app make-references
+     #+end_src

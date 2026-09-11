@@ -1,4 +1,5 @@
 (require '[steno.imageprocessor :as img])
+(require '[steno.utils :as utl])
 (import [cv2] [numpy :as np])
 
 (defn- check!
@@ -17,7 +18,9 @@
 ;; so a 2-fragment image yields 3 labels and a repaired single stroke yields 2.
 (check! (= 3 (first (cv2/connectedComponents broken nil 8)))
         "broken stroke must start as 2 components (+1 background label)")
-(def fixed (img/repair-skeleton broken))
+;; repair-skeleton works on 1px 0/1 skeletons (endpoint-coords compares == 1),
+;; so feed the binary form of the glyph.
+(def fixed (img/repair-skeleton (utl/bin-u8 broken)))
 (check! (= 2 (first (cv2/connectedComponents fixed nil 8)))
         "repair must reconnect to 1 component (+1 background label)")
 (check! (= 255 (int (aget fixed 2 2)))
@@ -30,8 +33,21 @@
              [0 0 255 0 0]
              [0 0 255 0 0]
              [0 0 255 0 0]] ** :dtype np/uint8))
-(def clean-fixed (img/repair-skeleton clean))
-(check! (np/array_equal clean clean-fixed)
-        "clean stroke must be unchanged by repair")
+(def clean-input (utl/bin-u8 clean))
+(def clean-fixed (img/repair-skeleton clean-input))
+(check! (np/array_equal clean-input clean-fixed)
+        "clean stroke must be unchanged by repair (bridge no-op on the border)")
+
+;; Regression: process-image pads the glyph by 1px, so neighbor-counts must
+;; accept padded skeletons. The old crop-then-subtract broke broadcast on them.
+(def padded (cv2/copyMakeBorder broken 1 1 1 1 cv2/BORDER_CONSTANT 0))
+(def padded-bin (utl/bin-u8 padded))
+(check! (= 4 (count (utl/endpoint-coords padded-bin)))
+        "padded skeleton: 2 fragments x 2 endpoints detected (no broadcast error)")
+(def processed (img/process-image broken))
+(check! (= [7 7]
+           [(int (aget (.-shape processed) 0))
+            (int (aget (.-shape processed) 1))])
+        "process-image completes on a glyph and returns the 1px-padded skeleton")
 
 (println "imageprocessor repair checks PASSED")

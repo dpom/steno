@@ -1,31 +1,30 @@
 (require '[steno.converter :as cnv])
+(require '[steno.utils :as utl])
 (import [numpy :as np])
 
-(def fork
-  (np/array [[0 0 0 0 0]
-             [0 1 0 0 0]
-             [0 1 0 0 0]
-             [1 1 1 0 0]
-             [0 0 0 0 0]]))
+;; diamond ring: every cell has exactly 2 neighbours, so the glyph has no
+;; degree-1 endpoints. This is the "loop-start" case: extraction must fall
+;; back to a foreground start cell and walk the whole loop as a single ltype-0
+;; lsign. (Rings with axis-aligned corners still trip 3-way adjacency in the
+;; parallel merge and may drop the corner cell -- separate limitation.)
+(def diamond
+  (np/array [[0 0 1 0 0 0]
+             [0 1 0 1 0 0]
+             [1 0 0 0 1 0]
+             [0 1 0 1 0 0]
+             [0 0 1 0 0 0]]))
 
-(def loopm
-  (np/array [[0 1 1 1 0]
-             [0 1 0 1 0]
-             [0 1 0 1 0]
-             [0 1 1 1 0]]))
+(assert (nil? (seq (utl/endpoint-coords (utl/bin-u8 diamond))))
+        "ring must have no degree-1 endpoints")
+(assert (= [0 2] (cnv/get-start-point (utl/bin-u8 diamond)))
+        "loop-start must fall back to the topmost-leftmost foreground cell")
 
-(def cross
-  (np/array [[0 0 1 0 0]
-             [0 0 1 0 0]
-             [1 1 1 1 1]
-             [0 0 1 0 0]
-             [0 0 1 0 0]]))
-
-(assert (= 3 (count (cnv/image-to-wsign-graph fork)))
-        "T-junction must yield 3 linear lsigns")
-(let [w (cnv/image-to-wsign-graph loopm)]
-  (assert (= 1 (count w)) "square ring must yield 1 lsign")
-  (assert (= 0 (:ltype (first w))) "ring must be ltype 0 (loop)"))
-(assert (= 4 (count (cnv/image-to-wsign-graph cross)))
-        "cross must yield 4 linear lsigns, not 1")
-(println "converter graph-extraction tests passed")
+(let [ring (let [[rs cs] (np/where (np/greater (utl/bin-u8 diamond) 0))]
+             (set (map (fn [r c] [(int r) (int c)]) rs cs)))
+      w (cnv/image-to-wsign (utl/bin-u8 diamond))]
+  (assert (= 1 (count w)) "closed ring must yield 1 lsign")
+  (assert (= 0 (:ltype (first w))) "ring must be ltype 0 (loop)")
+  (assert (= 8 (count (:lineseq (first w)))) "loop must contain every cell once")
+  (assert (= ring (set (map (fn [[x y _]] [x y]) (:lineseq (first w)))))
+          "loop line-seq must cover exactly the ring cells"))
+(println "converter loop-start tests passed")

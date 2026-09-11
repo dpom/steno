@@ -50,8 +50,9 @@
    skeleton-quality score (fewer thick/merged strokes and fewer fragments
    wins). Returns the chosen 1-pixel skeleton."
   [image]
-  (let [p1 (utl/bin-u8 (process-image1 image))
-        p2 (utl/bin-u8 (process-image2 image))
+  (let [padded (cv2/copyMakeBorder image 1 1 1 1 cv2/BORDER_CONSTANT 0) ; add a 1pixel background border to simplify coordonates computations
+        p1 (utl/bin-u8 (process-image1 padded))
+        p2 (utl/bin-u8 (process-image2 padded))
         sc1 (skeleton-score p1)
         sc2 (skeleton-score p2)]
     (cond

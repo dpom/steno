@@ -91,9 +91,9 @@
    :pos pos})
 
 (defn entry-filename
-  "Corpus filename of the sign at POS of IMAGEFILE: <image>-00-00-<pos>.edn."
+  "Corpus filename of the sign at POS of IMAGEFILE: <image>-<pos>.edn."
   [imagefile pos]
-  (format "%s-%02d-%02d-%01d.edn" (utl/get-filename imagefile) 0 0 pos))
+  (format "%s-%01d.edn" (utl/get-filename imagefile) pos))
 
 (defn entry-path
   "Destination corpus file for the LETTER chosen for the sign at POS of IMAGEFILE."
