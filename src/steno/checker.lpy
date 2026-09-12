@@ -24,6 +24,7 @@
    cv2
    pathlib
    [tempfile :as tf]
+   [threading :as th]
    [tkinter :as tk]
    [matplotlib.figure :as mfig]
    [matplotlib.backends.backend_tkagg :as tkagg]
@@ -152,6 +153,48 @@
                        sort
                        vec)
       :else [])))
+
+(defn loadable-file?
+  "True if the glyph image at PATH converts to at least one sign
+   (imread failure and empty wsign both count as unreadable)."
+  [path-str]
+  (boolean (seq (load-glyph path-str))))
+
+(defn next-available?
+  "True when the queue FILES has a glyph after index IDX."
+  [files idx]
+  (and (seq files) (< idx (dec (count files)))))
+
+(defn prev-available?
+  "True when the queue FILES has a glyph before index IDX."
+  [_files idx]
+  (pos? idx))
+
+(defn busy-guard?
+  "True when the UI state snapshot carries an active :busy? flag."
+  [state]
+  (boolean (:busy? state)))
+
+(defn load-position-data
+  "Compute the data shown for the glyph at IDX of FILES: convert the glyph
+   (or skip forward past unreadable entries, one per position) and build the
+   review rows. Returns {:imagefile :idx :rows :skipped} where ROWS is the
+   build-rows result for the chosen glyph, IDX its queue position, and
+   SKIPPED the file names passed over (empty when no skip). IMAGEFILE is nil
+   and ROWS empty when the tail is exhausted. Pure — no Tk types."
+  [ctx translators files idx]
+  (loop [i idx skipped []]
+    (if (< i (count files))
+      (let [file (nth files i)
+            wsign (try (load-glyph file)
+                       (catch Exception _ nil))]
+        (if (seq wsign)
+          {:imagefile file
+           :idx i
+           :rows (vec (build-rows ctx translators wsign))
+           :skipped skipped}
+          (recur (inc i) (conj skipped file))))
+      {:imagefile nil :idx idx :rows [] :skipped skipped})))
 
 ;; ---------------------------------------------------------------------------
 ;; Image helpers
@@ -288,26 +331,76 @@
     (.axis proc-ax "off")
     (.draw (:glyph-canvas ui))))
 
+(declare set-actions-enabled!
+         set-status!)
+
+(defn- worker-load!
+  "Worker body: compute the glyph data for IDX of FILES and post it into
+   RESULT* (atom), signalling DONE?. Pure — never touches Tk. A throw inside
+   the pipeline is treated as an unreadable glyph (empty result) so the main
+   loop always receives a commit."
+  [ctx translators files idx result* done?]
+  (reset! result* (try (load-position-data ctx translators files idx)
+                       (catch Exception _ {:imagefile nil :idx idx :rows [] :skipped []})))
+  (reset! done? true))
+
+(defn- commit-load!
+  "Main-thread apply of a finished worker RESULT: clear the busy state and
+   refresh the screen. Discards the result when the queue moved on since the
+   load started (stale-commit guard)."
+  [ui {:keys [token result]}]
+  (let [{:keys [files idx busy?]} @(:state* ui)
+        [start-files start-idx] token]
+    (when (and busy? (= start-files files) (= start-idx idx))
+      (set-actions-enabled! ui true)
+      (.stop (:progress ui))
+      (let [{:keys [imagefile rows skipped] :as loaded} result]
+        (set-status! ui (if (seq skipped)
+                          (format "Skipped unreadable glyph %s" (first skipped))
+                          "Ready"))
+        (swap! (:state* ui) assoc :busy? false)
+        (if imagefile
+          (do (swap! (:state* ui) assoc :idx (:idx loaded) :rows rows)
+              (refresh-table! ui rows)
+              (refresh-glyph! ui imagefile))
+          (do (swap! (:state* ui) assoc :rows [])
+              (clear-screen! ui)
+              (when (seq files)
+                (mb/showinfo ** :parent (:root ui)
+                             :title "End of queue"
+                             :message "No more glyphs to review"))))))))
+
 (defn- load-position!
-  "(Re)load the glyph at the current queue index: convert, translate and
-   refresh the screen."
+  "Asynchronously load the glyph at the current queue index: process it on a
+   worker thread, block input while busy and commit on the main loop."
   [ui]
-  (let [imagefile (current-file ui)
-        wsign (when imagefile (load-glyph imagefile))
-        rows (if (and imagefile wsign)
-               (vec (build-rows (:ctx ui) (:translators ui) wsign))
-               [])]
-    (swap! (:state* ui) assoc :rows rows)
-    (refresh-table! ui rows)
-    (if imagefile
-      (refresh-glyph! ui imagefile)
-      (clear-screen! ui))))
+  (let [{:keys [files idx]} @(:state* ui)]
+    (swap! (:state* ui) assoc :busy? true)
+    (set-actions-enabled! ui false)
+    (.start (:progress ui))
+    (set-status! ui (format "Processing %d/%d …" (inc idx) (count files)))
+    (let [ctx (:ctx ui)
+          translators (:translators ui)
+          result* (atom nil)
+          done? (atom false)
+          token [files idx]
+          thread (th/Thread ** :daemon true
+                            :target (fn [] (worker-load! ctx translators files idx result* done?)))]
+      (reset! (:worker* ui) thread)
+      (.start thread)
+      (letfn [(poll []
+                (if @done?
+                  (commit-load! ui {:token token :result @result*})
+                  (.after (:root ui) 40 poll)))]
+        (.after (:root ui) 40 poll)))))
 
 (defn- open-input!
-  "Replace the review queue with INPUT (image or directory) and load it."
+  "Replace the review queue with INPUT (image or directory) and load it
+   (ignored while another glyph is still processing)."
   [ui input]
-  (reset! (:state* ui) {:files (vec (expand-input input)) :idx 0 :rows []})
-  (load-position! ui))
+  (when-not (busy-guard? @(:state* ui))
+    (reset! (:state* ui) {:files (vec (expand-input input)) :idx 0 :rows [] :busy? false})
+    (load-position! ui)))
 
 (defn- open-image!
   "Ask for a glyph image file and open it."
@@ -327,35 +420,45 @@
       (open-input! ui d))))
 
 (defn- prev-glyph!
-  "Move back one glyph in the review queue."
+  "Move back one glyph in the review queue (boundary-notifying)."
   [ui]
-  (when (pos? (:idx @(:state* ui)))
-    (swap! (:state* ui) update :idx dec)
-    (load-position! ui)))
+  (let [{:keys [files idx busy?]} @(:state* ui)]
+    (cond
+      busy? nil
+      (prev-available? files idx) (do (swap! (:state* ui) update :idx dec)
+                                      (load-position! ui))
+      :else (mb/showinfo ** :parent (:root ui)
+                         :title "Previous glyph"
+                         :message "This is the first glyph"))))
 
 (defn- next-glyph!
-  "Move forward one glyph in the review queue."
+  "Move forward one glyph in the review queue (boundary-notifying)."
   [ui]
-  (let [{:keys [files idx]} @(:state* ui)]
-    (when (< idx (dec (count files)))
-      (swap! (:state* ui) update :idx inc)
-      (load-position! ui))))
+  (let [{:keys [files idx busy?]} @(:state* ui)]
+    (cond
+      busy? nil
+      (next-available? files idx) (do (swap! (:state* ui) update :idx inc)
+                                      (load-position! ui))
+      :else (mb/showinfo ** :parent (:root ui)
+                         :title "Next glyph"
+                         :message "No more glyphs to review"))))
 
 (defn- delete-glyph!
   "Delete the glyph image file at the current queue position, remove it
    from the review queue and reload the screen (confirmation first)."
   [ui]
-  (let [{:keys [files idx]} @(:state* ui)
-        file (nth files idx nil)]
-    (when (and file (.exists (pathlib/Path file)))
-      (when (mb/askyesno ** :parent (:root ui)
-                         :title "Delete glyph"
-                         :message (str "Delete " file "?"))
-        (.unlink (pathlib/Path file))
-        (let [new-files (vec (keep-indexed (fn [i f] (when (not= i idx) f)) files))
-              new-idx (if (empty? new-files) 0 (min idx (dec (count new-files))))]
-          (swap! (:state* ui) assoc :files new-files :idx new-idx :rows [])
-          (load-position! ui))))))
+  (when-not (busy-guard? @(:state* ui))
+    (let [{:keys [files idx]} @(:state* ui)
+          file (nth files idx nil)]
+      (when (and file (.exists (pathlib/Path file)))
+        (when (mb/askyesno ** :parent (:root ui)
+                           :title "Delete glyph"
+                           :message (str "Delete " file "?"))
+          (.unlink (pathlib/Path file))
+          (let [new-files (vec (keep-indexed (fn [i f] (when (not= i idx) f)) files))
+                new-idx (if (empty? new-files) 0 (min idx (dec (count new-files))))]
+            (swap! (:state* ui) assoc :files new-files :idx new-idx :rows [])
+            (load-position! ui)))))))
 
 (defn- collect-row!
   "Merge the live widget values into ROW."
@@ -365,25 +468,41 @@
 (defn- save-checked!
   "SAVE: persist every checked row with a non-empty letter selection."
   [ui]
-  (let [savable (filter savable-row? (map collect-row! @(:widgets* ui)))
-        saved-count (count savable)]
-    (doseq [row savable]
-      (save-row! (:logger ui) (:corpus-dir ui) (current-file ui) row))
-    (mb/showinfo ** :parent (:root ui)
-                 :title "Saved"
-                 :message (format "Saved %d signs" saved-count))
-    saved-count))
+  (when-not (busy-guard? @(:state* ui))
+    (let [savable (filter savable-row? (map collect-row! @(:widgets* ui)))
+          saved-count (count savable)]
+      (doseq [row savable]
+        (save-row! (:logger ui) (:corpus-dir ui) (current-file ui) row))
+      (mb/showinfo ** :parent (:root ui)
+                   :title "Saved"
+                   :message (format "Saved %d signs" saved-count))
+      saved-count)))
 
 (defn- quit-app!
   "QUIT: close the application."
   [ui]
-  (let [root (:root ui)]
+  (let [root (:root ui)
+        worker @(:worker* ui)]
+    (when worker
+      (try (.join worker 1.0)
+           (catch Exception _ nil)))
     (.quit root)
     (.destroy root)))
 
+(defn- set-actions-enabled!
+  "Enable (ENABLED? true) or disable the menu items that mutate the review
+   session while a glyph is processing."
+  [ui enabled?]
+  (let [state (if enabled? "normal" "disabled")]
+    (doseq [idx [1 2 3 4]]
+      (.entryconfigure @(:menubar* ui) idx ** :state state))
+    (doseq [idx [0 1]]
+      (.entryconfigure @(:file-menu* ui) idx ** :state state))))
+
 (defn- build-menu!
   "Menu bar: File menu (open image / open directory / quit) plus direct
-   Save, Previous and Next command buttons."
+   Save, Previous and Next command buttons. Records the menubar in UI for
+   busy-state disabling."
   [root ui]
   (let [menubar (tk/Menu root)
         file-menu (tk/Menu menubar ** :tearoff 0)]
@@ -410,7 +529,10 @@
     (.add_command menubar ** :label "Delete"
                   :accelerator "Ctrl-D"
                   :command (fn [] (delete-glyph! ui)))
-    (.config root ** :menu menubar)))
+    (.config root ** :menu menubar)
+    (reset! (:menubar* ui) menubar)
+    (reset! (:file-menu* ui) file-menu)
+    ui))
 
 (defn- build-top-panel!
   "Top panel: the large central image display frame labelled 'gliph image',
@@ -430,6 +552,24 @@
      :glyph-canvas canvas
      :photos* photos*}))
 
+(defn- build-status-bar!
+  "Bottom panel: an indeterminate progress bar (start/stop around glyph
+   processing) and a status label alongside it."
+  [root]
+  (let [panel (tk/LabelFrame root ** :text "status"  :padx 10  :pady 5)
+        progress (ttk/Progressbar panel ** :mode "indeterminate"  :length 200)
+        label (tk/Label panel ** :text "Ready"  :anchor "w")]
+    (.pack label ** :side "left"  :fill "x"  :expand true)
+    (.pack progress ** :side "right"  :padx 8)
+    {:status-panel panel
+     :progress progress
+     :status-label label}))
+
+(defn- set-status!
+  "Set the status label text."
+  [ui text]
+  (.configure (:status-label ui) ** :text text))
+
 (defn- build-table-panel!
   "Middle panel: the 'lsigns' table frame."
   [root]
@@ -441,9 +581,13 @@
   "Assemble the UI context map shared by all callbacks."
   [root ctx translators corpus-dir inputs]
   (merge (build-top-panel! root (atom {}))
+         (build-status-bar! root)
          {:root root
-          :state* (atom {:files (vec inputs) :idx 0 :rows []})
+          :state* (atom {:files (vec inputs) :idx 0 :rows [] :busy? false})
           :widgets* (atom {})
+          :worker* (atom nil)
+          :menubar* (atom nil)
+          :file-menu* (atom nil)
           :ctx ctx
           :translators translators
           :corpus-dir corpus-dir}))
@@ -457,7 +601,7 @@
    output directory."
   [{:keys [logger] :as ctx} translators inputs corpus-dir]
   (let [root (tk/Tk)
-        {:keys [panel] :as ui*} (make-ui root ctx translators corpus-dir inputs)
+        {:keys [panel status-panel] :as ui*} (make-ui root ctx translators corpus-dir inputs)
         table (build-table-panel! root)
         ui (assoc ui* :table table :logger logger)]
     (doto root
@@ -466,6 +610,7 @@
     (build-menu! root ui)
     (.pack panel ** :side "top"  :fill "x")
     (.pack table ** :side "top"  :fill "both"  :expand true)
+    (.pack status-panel ** :side "bottom"  :fill "x")
     (.bind root "<Control-o>" (fn [_] (open-image! ui)))
     (.bind root "<Control-s>" (fn [_] (save-checked! ui)))
     (.bind root "<Control-Left>" (fn [_] (prev-glyph! ui)))

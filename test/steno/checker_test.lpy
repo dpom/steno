@@ -1,0 +1,87 @@
+(require '[steno.checker :as chk])
+(import [cv2] [numpy :as np] [tempfile :as tf] [logging])
+
+(defn- check!
+  [cond msg]
+  (when-not cond
+    (throw (Exception. msg))))
+
+;; 1.1 queue horizon predicates
+(check! (not (chk/next-available? [] 0))
+        "empty queue has no next")
+(check! (chk/next-available? ["a" "b" "c"] 0)
+        "next available at queue start")
+(check! (not (chk/next-available? ["a" "b" "c"] 2))
+        "no next after the last glyph")
+(check! (not (chk/prev-available? [] 0))
+        "empty queue has no previous")
+(check! (not (chk/prev-available? ["a"] 0))
+        "no previous before the first glyph")
+(check! (chk/prev-available? ["a" "b"] 1)
+        "previous available when not on first glyph")
+
+;; 1.2 loadable-file?: nil image or empty wsign counts as unreadable
+(def ring
+  (np/array [[0 0 255 0 0 0]
+             [0 255 0 255 0 0]
+             [255 0 0 0 255 0]
+             [0 255 0 255 0 0]
+             [0 0 255 0 0 0]] ** :dtype np/uint8))
+(def tmp-goods (tf/NamedTemporaryFile ** :suffix ".png" :delete false))
+(.write tmp-goods (second (cv2/imencode ".png" ring)))
+(.close tmp-goods)
+
+(def tmp-bad (tf/NamedTemporaryFile ** :suffix ".png" :delete false))
+(.write tmp-bad (.encode "this is not an image"))
+(.close tmp-bad)
+(check! (chk/loadable-file? (.-name tmp-goods))
+        "a real glyph image is loadable")
+(check! (not (chk/loadable-file? (.-name tmp-bad)))
+        "corrupt image is not loadable")
+(check! (not (chk/loadable-file? "does/not/exist.png"))
+        "missing file is not loadable")
+
+;; 1.3 load-position-data: skip forward past unreadable files, one per position
+(def good (.-name tmp-goods))
+(def bad (.-name tmp-bad))
+(def dummy-ctx {:logger (logging/getLogger "checker-test")})
+(def dummy-translators [])
+
+;; unreadable at the current index: skip to the next loadable
+(def res-fast-forward
+  (chk/load-position-data dummy-ctx dummy-translators [bad good bad] 0))
+(check! (= good (:imagefile res-fast-forward))
+        "skips the leading unreadable glyph")
+(check! (= 1 (:idx res-fast-forward))
+        "skip consumes exactly one queue position")
+(check! (= [bad] (:skipped res-fast-forward))
+        "skipped list records only the leading unreadable file")
+
+;; current index already loadable: no skip, same index
+(def res-here
+  (chk/load-position-data dummy-ctx dummy-translators [bad good] 1))
+(check! (= good (:imagefile res-here))
+        "loadable current file is loaded as-is")
+(check! (= 1 (:idx res-here))
+        "loadable current index stays put")
+(check! (= [] (:skipped res-here))
+        "no skips when the current file is loadable")
+
+;; all-unreadable tail: no image, rows empty, all files recorded as skipped
+(def res-empty
+  (chk/load-position-data dummy-ctx dummy-translators [bad bad] 0))
+(check! (nil? (:imagefile res-empty))
+        "all-unreadable queue yields no image")
+(check! (= [] (:rows res-empty))
+        "all-unreadable queue yields no rows")
+
+(check! (= [bad bad] (:skipped res-empty))
+        "both unreadable files are recorded as skipped")
+
+;; 1.4 busy-guard predicate over a state snapshot
+(check! (chk/busy-guard? {:busy? true})
+        "busy state guards actions")
+(check! (not (chk/busy-guard? {:busy? false}))
+        "idle state lets actions through")
+
+(println "checker busy-feedback helper tests passed")
