@@ -9600,3 +9600,103 @@ simg
   ;;
   )
   #+end_src
+* 2026-09-11
+
+- functia
+  #+begin_src clojure
+ (require
+   '[steno.show :as show]
+   '[steno.imageprocessor :as ip]
+   '[steno.spec :as spec]
+   '[steno.converter :as conv]
+   '[steno.utils :as utl])
+
+ (import
+   cv2
+   [numpy :as np]
+   [skimage.morphology :as skmorph]
+   [skimage.util :as skiu])
+
+ (def cale-imagine "tmp/template/template-00-02.png")
+ (def image (cv2/imread cale-imagine cv2/IMREAD_GRAYSCALE))
+
+ (show/show-image image)
+
+(def best (ip/process-image image))
+
+(show/show-image best)  
+
+   (def img1 (ip/process-image1 image))
+
+  (def img2 (ip/process-image2 image))
+
+ (show/show-two-images [img1 img2])
+
+   (ip/skeleton-score img1)
+ ;; => 2
+
+
+  (utl/endpoint-coords img1)
+ ;; => ()
+
+  (def img1b (ip/repair-skeleton img1))
+
+  (show/show-two-images [img1 img1b])
+
+  (ip/skeleton-score img2)
+ ;; => 2
+
+   (utl/endpoint-coords img2)
+ ;; => ()
+
+
+  (def img2b (ip/repair-skeleton img2))
+
+  (show/show-two-images [img2 img2b])
+
+  (utl/endpoint-coords img2b)
+ ;; => ()
+
+
+  (utl/endpoint-coords img2)
+
+ (def best (ip/process-image-best image))
+
+ (show/show-image best)
+
+ (def padded (cv2/copyMakeBorder image 1 1 1 1 cv2/BORDER_CONSTANT 0))
+
+ (show/show-image padded)
+
+
+ (show/show-two-images [image (utl/bin-u8 image)])
+
+ (utl/mget image 0 10 10 20)
+ ;; => array([[255, 255, 255, 255, 255, 255, 255, 255, 255, 172],
+ ;;           [255, 255, 255, 255, 255, 255, 255, 255, 104,   0],
+ ;;           [255, 255, 255, 255, 255, 255, 255, 255,   0,   0],
+ ;;           [255, 255, 255, 255, 255, 255, 255, 118,   0,   0],
+ ;;           [255, 255, 255, 255, 255, 255, 255,   0,   0,   0],
+ ;;           [255, 255, 255, 255, 255, 255, 115,   0,   0,   0],
+ ;;           [255, 255, 255, 255, 255, 255,   0,   0,   0,   0],
+ ;;           [255, 255, 255, 255, 255, 123,   0,   0,   0,   0],
+ ;;           [255, 255, 255, 255, 246,   0,   0,   0,   0,  59],
+ ;;           [255, 255, 255, 255,  64,   0,   0,   0,   0, 208]], dtype=uint8)
+
+ (utl/mget image 0 10 0 10)
+ ;; => array([[255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
+ ;;           [255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
+ ;;           [255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
+ ;;           [255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
+ ;;           [255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
+ ;;           [255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
+ ;;           [255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
+ ;;           [255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
+ ;;           [255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
+ ;;           [255, 255, 255, 255, 255, 255, 255, 255, 255, 255]], dtype=uint8)
+
+ (conv/get-start-point best)
+ ;; => [32 2]
+
+ 
+  #+end_src
