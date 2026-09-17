@@ -58,7 +58,7 @@
 (comment
 
   (require
-   '[steno.show :as show])
+   '[dev.show :as show])
 
   (def imagefile "test/resources/template.png")
 

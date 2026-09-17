@@ -16,7 +16,8 @@
                       "l" "r"
                       "m" "n"
                       "j" "s"
-                      "ţ" "ge"})
+                      "ţ" "ge"
+                      "in" "în"})
 
 (defn type-0?
   [path]

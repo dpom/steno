@@ -1,4 +1,4 @@
-(ns steno.show
+(ns dev.show
   "Implement functions to display graphicaly misc entities, used only in REPL"
   (:require
    [steno.utils :as utl])

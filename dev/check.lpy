@@ -1,0 +1,42 @@
+(ns dev.check
+  (:require
+   [basilisp.io :as bio]
+   [dev.show :as show]
+   [steno.corpus :as corpus]
+   [steno.utils :as utl])
+  (:import
+   os
+   pathlib))
+
+(def corpus-dir "/home/dan/pers/projects/steno/resources/corpus")
+
+(defn check
+  [dir pos]
+  (let [p (bio/path corpus-dir dir)
+        f     (-> p
+                  os/listdir
+                  (nth pos))]
+    (->> f
+         (bio/path p)
+         utl/load-edn
+         show/show-lsign)))
+
+(defn- get-leter-dimensions
+  [corpus]
+  (let [width (map :width corpus)
+        height (map :height corpus)]
+    {:min-width (apply min width)
+     :max-width (apply max width)
+     :min-height (apply min height)
+     :max-height (apply max height)}))
+
+(defn- get-dimensions-ref
+  [letter-path]
+  (-> letter-path
+      corpus/read-corpus
+      get-leter-dimensions
+      (assoc :letter (utl/get-filename letter-path))))
+
+(defn get-letter-dim
+  []
+  (into [] (sort-by :letter (corpus/walk-corpus corpus-dir identity get-dimensions-ref))))

@@ -9624,7 +9624,7 @@ simg
 
 (def best (ip/process-image image))
 
-(show/show-image best)  
+(show/show-image best)
 
    (def img1 (ip/process-image1 image))
 
@@ -9698,5 +9698,158 @@ simg
  (conv/get-start-point best)
  ;; => [32 2]
 
- 
+
+  #+end_src
+* 2026-09-15
+
+- lucru la corpus:
+  #+begin_src clojure
+  (require
+   '[basilisp.io :as bio]
+   '[steno.show :as show]
+   '[steno.utils :as utl])
+
+  (import
+   os
+   pathlib)
+
+
+  (def corpus-dir "/home/dan/pers/projects/steno/resources/corpus")
+
+  (def lsign-fle
+    (bio/path corpus-dir "de" "yoga_001_1-02-01-0.edn"))
+
+  (def lsign (utl/load-edn lsign-fle))
+
+  (show/show-lsign lsign)
+
+(os/listdir (bio/path corpus-dir "e"))
+
+  (defn check [dir pos]
+    (let [p (bio/path corpus-dir dir)
+          f     (-> p
+                    os/listdir
+                    (nth pos))]
+      (->> f
+       (bio/path p)
+         utl/load-edn
+         show/show-lsign)))
+
+
+  (check "dint" 0)
+
+  #+end_src
+
+* 2026-09-16
+
+- implementez un helper care sa-mi dea dimensiunile (width, height) lsign (continuare repl):
+  #+begin_src clojure
+(require
+ '[steno.corpus :as corpus]
+ '[steno.translator :as tra])
+
+(def a (corpus/read-corpus (bio/path corpus-dir "a")))
+(count a)
+;; => 26
+
+(def a0 (first a))
+
+(def lseq0 (:lineseq a0))
+
+(defn get-item-dim
+  [{:keys [lineseq]}]
+  {:width (apply max (map second lineseq))
+   :height (apply max (map first lineseq))})
+
+(get-item-dim a0)
+;; => {:width 23, :height 15}
+
+(defn get-leter-dimensions
+  [corpus]
+  (let [res (map get-item-dim corpus)
+        width (map :width res)
+        height (map :height res)]
+    {:min-width (apply min width)
+     :max-width (apply max width)
+     :min-height (apply min height)
+     :max-height (apply max height)}))
+
+(get-leter-dimensions a)
+;; => {:max-height 37, :min-width 12, :min-height 11, :max-width 53}
+
+  (defn get-dimensions-ref
+    [letter-path]
+    (-> letter-path
+      corpus/read-corpus
+      get-leter-dimensions
+      (assoc :letter (utl/get-filename letter-path))))
+
+(get-dimensions-ref (bio/path corpus-dir "a"))
+;; => {:max-height 37, :min-width 12, :min-height 11, :max-width 53, :letter "a"}
+
+(def dims (into [] (sort-by :letter (corpus/walk-corpus corpus-dir identity get-dimensions-ref))))
+dims
+[{:max-height 37, :min-width 12, :min-height 11, :max-width 53, :letter "a"}
+ {:max-height 45, :min-width 23, :min-height 22, :max-width 61, :letter "o"}
+ {:max-height 55, :min-width 0, :min-height 20, :max-width 7, :letter "p"}
+ {:max-height 53, :min-width 5, :min-height 53, :max-width 5, :letter "b"}
+ {:max-height 31, :min-width 28, :min-height 1, :max-width 72, :letter "t"}
+ {:max-height 19, :min-width 87, :min-height 5, :max-width 110, :letter "d"}
+ {:max-height 44, :min-width 19, :min-height 30, :max-width 26, :letter "c"}
+ {:max-height 102, :min-width 57, :min-height 102, :max-width 57, :letter "g"}
+ {:max-height 34, :min-width 15, :min-height 17, :max-width 31, :letter "f"}
+ {:max-height 27, :min-width 43, :min-height 19, :max-width 79, :letter "l"}
+ {:max-height 48, :min-width 28, :min-height 8, :max-width 151, :letter "r"}
+ {:max-height 100, :min-width 25, :min-height 43, :max-width 50, :letter "m"}
+ {:max-height 98, :min-width 29, :min-height 43, :max-width 50, :letter "n"}
+ {:max-height 47, :min-width 54, :min-height 29, :max-width 70, :letter "j"}
+ {:max-height 50, :min-width 47, :min-height 26, :max-width 93, :letter "s"}
+ {:max-height 17, :min-width 8, :min-height 10, :max-width 41, :letter "e"}
+ {:max-height 13, :min-width 22, :min-height 13, :max-width 22, :letter "i"}
+ {:max-height 67, :min-width 54, :min-height 67, :max-width 54, :letter "on"}
+ {:max-height 22, :min-width 73, :min-height 21, :max-width 78, :letter "ţ"}]
+
+(defn p!
+  [letter-path]
+  (doseq [f (os/listdir letter-path)]
+    (let [fpath (bio/path letter-path f)
+          {:keys [lineseq] :as lsign} (utl/load-edn fpath)]
+      (utl/save-edn fpath (assoc lsign
+                                 :width (apply max (map second lineseq))
+                                 :height (apply max (map first lineseq)))))))
+
+  (corpus/walk-corpus! corpus-dir identity p!)
+  #+end_src
+
+* 2026-09-17
+
+- continui refacerea corpus
+  #+begin_src clojure
+  (require '[dev.check :as chk])
+
+  (chk/get-letter-dim)
+  [{:max-height 37, :min-width 12, :min-height 11, :max-width 53, :letter "a"}
+   {:max-height 45, :min-width 23, :min-height 22, :max-width 61, :letter "o"}
+   {:max-height 55, :min-width 0, :min-height 20, :max-width 7, :letter "p"}
+   {:max-height 53, :min-width 5, :min-height 53, :max-width 5, :letter "b"}
+   {:max-height 31, :min-width 28, :min-height 1, :max-width 72, :letter "t"}
+   {:max-height 19, :min-width 87, :min-height 5, :max-width 110, :letter "d"}
+   {:max-height 34, :min-width 15, :min-height 17, :max-width 31, :letter "f"}
+   {:max-height 44, :min-width 19, :min-height 30, :max-width 26, :letter "c"}
+   {:max-height 102, :min-width 57, :min-height 102, :max-width 57, :letter "g"}
+   {:max-height 27, :min-width 43, :min-height 19, :max-width 79, :letter "l"}
+   {:max-height 48, :min-width 28, :min-height 8, :max-width 151, :letter "r"}
+   {:max-height 100, :min-width 25, :min-height 43, :max-width 50, :letter "m"}
+   {:max-height 98, :min-width 29, :min-height 43, :max-width 50, :letter "n"}
+   {:max-height 47, :min-width 54, :min-height 29, :max-width 70, :letter "j"}
+   {:max-height 50, :min-width 47, :min-height 26, :max-width 93, :letter "s"}
+   {:max-height 17, :min-width 8, :min-height 10, :max-width 41, :letter "e"}
+   {:max-height 13, :min-width 22, :min-height 13, :max-width 22, :letter "i"}
+   {:max-height 22, :min-width 73, :min-height 21, :max-width 78, :letter "ţ"}]
+
+
+
+
+  (chk/check "a" 0)
+
   #+end_src

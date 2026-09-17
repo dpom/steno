@@ -21,7 +21,7 @@
 
 (def LETTER
   [:touple
-   [:string {:min 1 :max 1}]
+   [:string {:min 1 :max 2}]
    MATCH])
 
 (def LETTERS [:sequential LETTER])
@@ -61,6 +61,17 @@
    [:type-0 [:sequential REFERENCE]]
    [:type-1 [:sequential REFERENCE]]
    [:min-refseq nat-int?]])
+
+(def CORPUS-ITEM
+  [:map
+   [:fileimage string?]
+   [:row nat-int?]
+   [:column nat-int?]
+   [:pos nat-int?]
+   [:ltype LTYPE]
+   [:lineseq LSEQ]
+   [:width nat-int?]
+   [:height nat-int?]])
 
 (def all-directions
   "The eight 8-connected directions (orthogonals + diagonals). Real Duployer

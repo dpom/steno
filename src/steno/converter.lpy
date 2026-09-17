@@ -5,10 +5,11 @@
    [steno.spec :as spec]
    [steno.utils :as utl])
   (:import
+   math
    [numpy :as np]))
 
 (def neighbor-factor
-  "Factor that determines how close two cells must be to be neighbors (sum of dx and dy)"
+  "Factor that determines how close two cells must be to be neighbors."
   10)
 
 (defn get-start-point
@@ -120,7 +121,7 @@
 (defn- neighbors?
   "True if the cells are adiacent"
   [[x1 y1 _] [x2 y2 _]]
-  (<= (+ (abs (- x1 x2))  (abs (- y1 y2))) neighbor-factor))
+  (< (math/dist [x1 y1] [x2 y2]) neighbor-factor))
 
 (defn- small-lineseq?
   "True if lineseq size is small (5-)"
@@ -267,7 +268,10 @@
   (let [x-min (apply min (map first lineseq))
         y-min (apply min (map second lineseq))
         new-lineseq (mapv (fn [[x y n]] [(- x x-min) (- y y-min) n]) lineseq)]
-    (assoc lsign :lineseq new-lineseq)))
+    (assoc lsign
+           :lineseq new-lineseq
+           :width (apply max (map second new-lineseq))
+           :height (apply max (map first new-lineseq)))))
 
 ;; module entry points
 
@@ -283,7 +287,7 @@
 (comment
 
   (require
-   '[steno.show :as show])
+   '[dev.show :as show])
 
   (def img (np/load "test/resources/rol.npy"))
 
