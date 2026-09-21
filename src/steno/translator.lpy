@@ -6,26 +6,29 @@
 
 (def ^{:doc "The unknown letter indicator"} unknown-letter "*")
 
-(def type-0-letters #{"o" "a"})
+(def type-0-letters ["a" "o"])
 
-(def type-1-letters #{"e" "i"
-                      "p" "b"
-                      "t" "d"
-                      "c" "g"
-                      "f" "v"
-                      "l" "r"
-                      "m" "n"
-                      "j" "s"
-                      "ţ" "ge"
-                      "in" "în"})
+(def type-1-letters ["p" "b"
+                     "t" "d"
+                     "c" "g"
+                     "f" "v"
+                     "l" "r"
+                     "m" "n"
+                     "j" "s"
+                     "ţ" "ge"
+                     "e" "i"
+                     "e`" "i`"
+                     "in" "în"
+                     "un" "on"
+                     "an" "en"])
 
 (defn type-0?
   [path]
-  (type-0-letters (utl/get-filename path)))
+  ((set type-0-letters) (utl/get-filename path)))
 
 (defn type-1?
   [path]
-  (type-1-letters (utl/get-filename path)))
+  ((set type-1-letters) (utl/get-filename path)))
 
 ;; Create the necessary context for the translation using the application configuration
 (defmulti prepare-translation

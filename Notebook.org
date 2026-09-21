@@ -9850,6 +9850,76 @@ dims
 
 
 
-  (chk/check "a" 0)
+  (chk/check "fit" 0)
+
+
+
+
+  #+end_src
+
+* 2026-09-18
+
+- continui refacere corpus
+  #+begin_src clojure
+    (require '[dev.check :as chk])
+
+
+    (require
+     '[steno.translator :as tra]
+     '[basilisp.io :as bio]
+     '[steno.corpus :as corpus])
+
+
+    (import
+     os
+     pathlib)
+
+    tra/type-0-letters
+
+    (map (fn [letter]
+        (assoc (->> letter
+                (bio/path chk/corpus-dir)
+                corpus/read-corpus
+                chk/get-letter-dimensions)
+               :letter letter))
+    tra/type-0-letters)
+    ;; => ({:letter "a", :min-width 12, :max-height 37, :max-width 53, :min-height 11} {:letter "o", :min-width 23, :max-height 45, :max-width 61, :min-height 22})
+
+    (defn letter-dim
+      []
+      (mapv (fn [letter]
+              (let [corpus (->> letter
+                                (bio/path chk/corpus-dir)
+                                corpus/read-corpus)]
+                    (when (seq corpus)
+                      (assoc (chk/get-letter-dimensions corpus) :letter letter))))
+            (concat tra/type-0-letters tra/type-1-letters)))
+
+    (letter-dim)
+    [{:letter "o", :min-width 23, :max-height 45, :max-width 61, :min-height 22}
+     {:letter "a", :min-width 12, :max-height 37, :max-width 53, :min-height 11}
+     {:letter "e", :min-width 8, :max-height 17, :max-width 41, :min-height 8}
+     {:letter "i", :min-width 22, :max-height 13, :max-width 22, :min-height 13}
+     {:letter "p", :min-width 0, :max-height 34, :max-width 4, :min-height 20}
+     {:letter "b", :min-width 4, :max-height 55, :max-width 7, :min-height 46}
+     {:letter "t", :min-width 28, :max-height 31, :max-width 72, :min-height 1}
+     {:letter "d", :min-width 87, :max-height 19, :max-width 110, :min-height 3}
+     {:letter "c", :min-width 19, :max-height 44, :max-width 26, :min-height 30}
+     {:letter "g", :min-width 23, :max-height 102, :max-width 57, :min-height 70}
+     {:letter "f", :min-width 15, :max-height 34, :max-width 31, :min-height 17} nil
+     {:letter "l", :min-width 28, :max-height 27, :max-width 79, :min-height 8}
+     {:letter "r", :min-width 42, :max-height 48, :max-width 151, :min-height 19}
+     {:letter "m", :min-width 25, :max-height 100, :max-width 50, :min-height 43}
+     {:letter "n", :min-width 29, :max-height 98, :max-width 50, :min-height 43}
+     {:letter "j", :min-width 54, :max-height 47, :max-width 71, :min-height 29}
+     {:letter "s", :min-width 47, :max-height 50, :max-width 93, :min-height 26}
+     {:letter "ţ", :min-width 73, :max-height 22, :max-width 78, :min-height 21} nil
+     {:letter "in", :min-width 20, :max-height 10, :max-width 20, :min-height 10}
+     {:letter "în", :min-width 27, :max-height 19, :max-width 27, :min-height 19}]
+
+        (chk/check "*" 1)
+
+    (chk/check "e" 10)
+
 
   #+end_src

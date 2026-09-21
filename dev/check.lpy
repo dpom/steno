@@ -15,13 +15,14 @@
   (let [p (bio/path corpus-dir dir)
         f     (-> p
                   os/listdir
+                  sort
                   (nth pos))]
     (->> f
          (bio/path p)
          utl/load-edn
          show/show-lsign)))
 
-(defn- get-leter-dimensions
+(defn get-letter-dimensions
   [corpus]
   (let [width (map :width corpus)
         height (map :height corpus)]
@@ -30,13 +31,12 @@
      :min-height (apply min height)
      :max-height (apply max height)}))
 
-(defn- get-dimensions-ref
-  [letter-path]
-  (-> letter-path
-      corpus/read-corpus
-      get-leter-dimensions
-      (assoc :letter (utl/get-filename letter-path))))
-
-(defn get-letter-dim
+(defn letter-dim
   []
-  (into [] (sort-by :letter (corpus/walk-corpus corpus-dir identity get-dimensions-ref))))
+  (mapv (fn [letter]
+          (let [corpus (->> letter
+                            (bio/path corpus-dir)
+                            corpus/read-corpus)]
+            (when (seq corpus)
+              (assoc (get-letter-dimensions corpus) :letter letter))))
+        (concat tra/type-0-letters tra/type-1-letters)))
