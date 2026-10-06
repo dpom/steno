@@ -9847,14 +9847,7 @@ dims
    {:max-height 13, :min-width 22, :min-height 13, :max-width 22, :letter "i"}
    {:max-height 22, :min-width 73, :min-height 21, :max-width 78, :letter "ţ"}]
 
-
-
-
   (chk/check "fit" 0)
-
-
-
-
   #+end_src
 
 * 2026-09-18
@@ -9863,12 +9856,10 @@ dims
   #+begin_src clojure
     (require '[dev.check :as chk])
 
-
     (require
      '[steno.translator :as tra]
      '[basilisp.io :as bio]
      '[steno.corpus :as corpus])
-
 
     (import
      os
@@ -9921,5 +9912,548 @@ dims
 
     (chk/check "e" 10)
 
+
+  #+end_src
+* 2026-09-21
+
+- am terminat de refacut corpus. Am observat ca detectarea buclelor da rateuri si incerc sa o imbunatatesc.
+  #+begin_src clojure
+(require
+ '[basilisp.io :as bio]
+ '[steno.imageprocessor :as imgproc]
+ '[steno.spec :as spec]
+ '[steno.converter :as conv]
+ '[dev.show :as show]
+ '[steno.utils :as utl])
+
+(import
+ cv2
+ [numpy :as np]
+ os
+ pathlib)
+
+(def cale-imagine "tmp/template/template-04-02.png")
+(def image (cv2/imread cale-imagine cv2/IMREAD_GRAYSCALE))
+
+(show/show-image image)
+
+(def best (imgproc/process-image image))
+
+(show/show-image best)
+
+(utl/endpoint-coords best)
+;; => ([3 36] [45 85])
+
+(add-tap (bound-fn* utl/print4tap))
+
+(tap> {:a 2 :b 5})
+
+(conv/get-start-point best)
+;; => [3 36]
+
+(def state {:start-cells #{(conv/get-start-point best)}
+            :prev-cells #{}
+            :line []})
+
+(def state1
+  (conv/get-liniar-sequence best (assoc state :start-cell (first (:start-cells state)))))
+;; => {:start-cells #{[53 22] [54 22]}, :prev-cells #{[35 3] [19 4] [53 12] [16 8] [31 2] [3 35] [38 3] [49 7] [8 20] [5 26] [54 21] [29 2] [17 6] [3 29] [3 34] [33 3] [11 15] [8 19] [6 24] [55 18] [20 3] [3 33] [4 28] [21 3] [5 25] [54 14] [24 2] [12 14] [45 5] [3 32] [12 13] [6 23] [47 6] [54 16] [15 9] [30 2] [25 2] [52 11] [32 2] [3 36] [9 18] [18 5] [26 2] [4 27] [16 7] [3 30] [22 3] [51 9] [39 3] [40 3] [48 6] [14 10] [52 10] [55 19] [9 17] [54 15] [7 22] [28 2] [34 3] [13 11] [50 8] [23 2] [36 3] [7 21] [54 20] [10 16] [37 3] [44 4] [43 4] [13 12] [42 4] [54 13] [46 5] [27 2] [41 3] [3 31] [55 17]}, :line [[3 36 32] [3 35 160] [3 34 160] [3 33 160] [3 32 160] [3 31 160] [3 30 160] [3 29 132] [4 28 33] [4 27 132] [5 26 33] [5 25 132] [6 24 33] [6 23 132] [7 22 33] [7 21 132] [8 20 33] [8 19 132] [9 18 33] [9 17 132] [10 16 5] [11 15 5] [12 14 33] [12 13 132] [13 12 33] [13 11 132] [14 10 5] [15 9 5] [16 8 33] [16 7 132] [17 6 5] [18 5 5] [19 4 5] [20 3 65] [21 3 80] [22 3 20] [23 2 65] [24 2 80] [25 2 80] [26 2 80] [27 2 80] [28 2 80] [29 2 80] [30 2 80] [31 2 80] [32 2 24] [33 3 66] [34 3 80] [35 3 80] [36 3 80] [37 3 80] [38 3 80] [39 3 80] [40 3 80] [41 3 24] [42 4 66] [43 4 80] [44 4 24] [45 5 66] [46 5 24] [47 6 66] [48 6 24] [49 7 10] [50 8 10] [51 9 10] [52 10 130] [52 11 40] [53 12 10] [54 13 130] [54 14 160] [54 15 160] [54 16 40] [55 17 130] [55 18 160] [55 19 33] [54 20 132] [54 21 161]]}
+  #+end_src
+
+* 2026-09-30
+
+- cred ca am gasit o metoda de rezolva detectarea buclelor:
+  #+begin_src clojure
+  (require
+ '[basilisp.io :as bio]
+ '[steno.imageprocessor :as imgproc]
+ '[steno.spec :as spec]
+ '[steno.converter :as conv]
+ '[dev.show :as show]
+ '[steno.utils :as utl])
+
+(import
+ cv2
+ [numpy :as np]
+ os
+ pathlib)
+
+(def cale-imagine "tmp/template/template-02-02.png")
+(def image (cv2/imread cale-imagine cv2/IMREAD_GRAYSCALE))
+
+(show/show-image image)
+
+(def best (imgproc/process-image image))
+
+(show/show-image best)
+
+  (utl/endpoint-coords best)
+  ;; => ([16 2])
+
+  (add-tap (bound-fn* utl/print4tap))
+
+  (def res0 (conv/image-to-lineseq best))
+  res0
+  [[[16 2 1] [15 3 132] [15 4 160] [15 5 160] [15 6 160] [15 7 160] [15 8 40] [16 9 130] [16 10 160] [16 11 160] [16 12 160] [16 13 160] [16 14 160] [16 15 160] [16 16 160] [16 17 160] [16 18 160] [16 19 160] [16 20 160] [16 21 160] [16 22 160] [16 23 160] [16 24 40] [17 25 130] [17 26 160] [17 27 160] [17 28 160] [17 29 160] [17 30 161]]
+   [[[17 31 176]] [[16 31 92]]]
+   [[[17 32 162] [17 33 160] [17 34 160] [17 35 160] [17 36 160] [17 37 160] [17 38 33] [16 39 132] [16 40 161]]
+    [[15 31 80] [14 31 80] [13 31 80] [12 31 80] [11 31 80] [10 31 80] [9 31 80] [8 31 80] [7 31 65] [6 32 5] [5 33 5] [4 34 5] [3 35 132] [3 36 160] [3 37 160] [3 38 160] [3 39 40] [4 40 66] [5 40 24] [6 41 66] [7 41 80] [8 41 80] [9 41 80] [10 41 80] [11 41 80] [12 41 80] [13 41 80] [14 41 80] [15 41 84] [16 41 56] [17 42 130] [17 43 160] [17 44 160] [17 45 160] [17 46 33] [16 47 132] [16 48 160] [16 49 160] [16 50 160] [16 51 160] [16 52 160] [16 53 160] [16 54 160] [16 55 160] [16 56 160] [16 57 160] [16 58 33] [15 59 132] [15 60 160] [15 61 160] [15 62 160] [15 63 160] [15 64 160] [15 65 160] [15 66 161]]]
+   [[[14 67 92]] [[15 67 176] [15 68 162] [15 69 160] [15 70 160] [15 71 160] [15 72 160] [15 73 160] [15 74 160] [15 75 33] [14 76 132] [14 77 160] [14 78 33] [13 79 20] [12 79 80] [11 79 80] [10 79 80] [9 79 80] [8 79 80] [7 79 66] [6 78 10] [5 77 40] [5 76 130] [4 75 40] [4 74 160] [4 73 160] [4 72 160] [4 71 132] [5 70 5] [6 69 5] [7 68 65] [8 68 80] [9 68 20] [10 67 65] [11 67 80] [12 67 80] [13 67 80]]]]
+
+  ( res0)
+  ;; => 4
+
+  (reduce conv/process-lineseq
+          {:prev nil
+           :res []
+           :modifs-count 0}
+          res0)
+
+  (def lseq2 (nth res0 2))
+
+  (conv/parallel-lineseq? lseq2)
+  ;; => true
+
+  (conv/loop? (first lseq2) (second lseq2))
+  ;; => false
+
+(conv/get-ltype (first lseq2))
+;; => 1
+
+(conv/small-lineseq? (first lseq2))
+;; => false
+
+(conv/get-ltype (second lseq2))
+;; => 1
+
+(def type-0-min-len 13)
+(def type-1-min-len 5)
+
+(def status0
+    {:prev nil
+     :resolved? false
+     :res []
+     :modifs-count 0
+     :lseq1 (first lseq2)
+     :lseq2 (second lseq2)})
+
+  (defn loop-already [{:keys [resolved? res prev modifs-count lseq1 lseq2] :as status}]
+    (if (and (not resolved?) (or (= (conv/get-ltype lseq1) 0) (= (conv/get-ltype lseq2) 0)))
+      (assoc status :res (filterv identity  (conj res prev lseq1 lseq2))
+             :modifs-count (inc modifs-count)
+             :resolved? true)
+      status))
+
+  (loop-already status0)
+;; => {:lseq1 [[17 32 162] [17 33 160] [17 34 160] [17 35 160] [17 36 160] [17 37 160] [17 38 33] [16 39 132] [16 40 161]], :prev nil, :lseq2 [[15 31 80] [14 31 80] [13 31 80] [12 31 80] [11 31 80] [10 31 80] [9 31 80] [8 31 80] [7 31 65] [6 32 5] [5 33 5] [4 34 5] [3 35 132] [3 36 160] [3 37 160] [3 38 160] [3 39 40] [4 40 66] [5 40 24] [6 41 66] [7 41 80] [8 41 80] [9 41 80] [10 41 80] [11 41 80] [12 41 80] [13 41 80] [14 41 80] [15 41 84] [16 41 56] [17 42 130] [17 43 160] [17 44 160] [17 45 160] [17 46 33] [16 47 132] [16 48 160] [16 49 160] [16 50 160] [16 51 160] [16 52 160] [16 53 160] [16 54 160] [16 55 160] [16 56 160] [16 57 160] [16 58 33] [15 59 132] [15 60 160] [15 61 160] [15 62 160] [15 63 160] [15 64 160] [15 65 160] [15 66 161]], :resolved? false, :res [], :modifs-count 0}
+
+
+
+  (defn  [{:keys [resolved? res prev modifs-count lseq1 lseq2] :as status}]
+    (if (and (not resolved?) (or (= (conv/get-ltype lseq1) 0) (= (conv/get-ltype lseq2) 1))
+      (assoc status :res (filterv identity  (conj res prev lseq1 lseq2))
+             :modifs-count (inc modifs-count))
+      status))
+
+
+;; ============================================================================
+;; 1. Interceptor Execution Engine
+;; ============================================================================
+
+(declare run-leave handle-error handle-leave-error)
+
+(defn execute
+  "Executes a pipeline of interceptors given an initial context map.
+
+   - Interceptors are maps with optional :enter, :leave, and :error functions.
+   - :enter functions run forward (first to last).
+   - :leave functions run backward (last to first) for successfully entered interceptors.
+   - If an exception occurs, :error handlers are invoked."
+  [context interceptors]
+  (loop [ctx context
+         queue (seq interceptors)
+         stack []]
+    (if (nil? queue)
+      ;; Enter phase completed successfully; execute leave phase in reverse order
+      (run-leave ctx (reverse stack))
+      (let [interceptor (first queue)
+            enter-fn (:enter interceptor)]
+        (try
+          (let [new-ctx (if enter-fn (enter-fn ctx) ctx)]
+            ;; If a response is already set, we can short-circuit further :enter steps
+            (if (:response new-ctx)
+              (run-leave new-ctx (reverse (conj stack interceptor)))
+              (recur new-ctx (next queue) (conj stack interceptor))))
+          (catch Exception e
+            (handle-error ctx (next queue) (conj stack interceptor) e)))))))
+
+(defn- run-leave
+  [context stack]
+  (loop [ctx context
+         stk (seq stack)]
+    (if (nil? stk)
+      ctx
+      (let [interceptor (first stk)
+            leave-fn (:leave interceptor)]
+        (try
+          (let [new-ctx (if leave-fn (leave-fn ctx) ctx)]
+            (recur new-ctx (next stk)))
+          (catch Exception e
+            (handle-leave-error ctx (next stk) e)))))))
+
+(defn- handle-error
+  [context remaining stack ex]
+  (let [all-interceptors (concat stack remaining)]
+    (loop [stk (reverse all-interceptors)
+           current-ex ex]
+      (if (nil? stk)
+        (throw current-ex)
+        (let [interceptor (first stk)
+              error-fn (:error interceptor)]
+          (if error-fn
+            (try
+              (let [ctx-with-err (assoc context :exception current-ex)]
+                (error-fn ctx-with-err))
+              (catch Exception new-ex
+                (recur (next stk) new-ex)))
+            (recur (next stk) current-ex)))))))
+
+(defn- handle-leave-error
+  [context stack ex]
+  (loop [stk (seq stack)
+         current-ex ex]
+    (if (nil? stk)
+      (throw current-ex)
+      (let [interceptor (first stk)
+            error-fn (:error interceptor)]
+        (if error-fn
+          (try
+            (let [ctx-with-err (assoc context :exception current-ex)]
+              (error-fn ctx-with-err))
+            (catch Exception new-ex
+              (recur (next stk) new-ex)))
+          (recur (next stk) current-ex))))))
+
+;; ============================================================================
+;; 2. Example Usage (Web Request-Response Pipeline)
+;; ============================================================================
+
+;; Logging interceptor demonstrates both :enter and :leave phases
+(def logging-interceptor
+  {:enter (fn [ctx]
+            (println "--> Entering request path:" (get-in ctx [:request :uri]))
+            ctx)
+   :leave (fn [ctx]
+            (println "<-- Leaving with response status:" (get-in ctx [:response :status]))
+            ctx)})
+
+;; Authentication interceptor short-circuits with a 401 if token is invalid
+(def auth-interceptor
+  {:enter (fn [ctx]
+            (let [token (get-in ctx [:request :headers "authorization"])]
+              (if (= token "secret-token")
+                (assoc-in ctx [:request :user] "alice")
+                (assoc ctx :response {:status 401 :body "Unauthorized"}))))})
+
+;; Handler interceptor generates the final application response
+(def handler-interceptor
+  {:enter (fn [ctx]
+            (let [user (get-in ctx [:request :user] "guest")]
+              (assoc ctx :response {:status 200 :body (str "Hello, " user "!")}))))})
+
+(defn -main [& args]
+  (let [pipeline [logging-interceptor auth-interceptor handler-interceptor]]
+
+    (println "=== Test 1: Valid Authorization Token ===")
+    (let [initial-ctx {:request {:uri "/greet" :headers {"authorization" "secret-token"}}}
+          result (execute initial-ctx pipeline)]
+      (println "Result Context:" result))
+
+    (println "\n=== Test 2: Invalid Authorization Token (Short-circuit) ===")
+    (let [initial-ctx {:request {:uri "/greet" :headers {"authorization" "bad-token"}}}
+          result (execute initial-ctx pipeline)]
+      (println "Result Context:" result))))
+
+
+
+(ns interceptors.core
+  (:gen-class))
+
+;; ============================================================================
+;; 1. Interceptor Execution Engine (Basilisp-compatible)
+;; ============================================================================
+
+(declare dispatch-error run-leave)
+
+(defn- dispatch-error
+  "Traverses the interceptor stack in reverse to find and execute an :error handler."
+  [stk context ex]
+  (if (seq stk)
+    (let [interceptor (first stk)
+          error-fn (:error interceptor)]
+      (if error-fn
+        (try
+          (let [ctx-with-err (assoc context :exception ex)]
+            (error-fn ctx-with-err))
+          (catch Exception new-ex
+            (dispatch-error (rest stk) context new-ex)))
+        (dispatch-error (rest stk) context ex)))
+    (throw ex)))
+
+(defn- run-leave
+  "Runs the :leave phase backward through the stack."
+  [context stack]
+  (if (seq stack)
+    (let [interceptor (first stack)
+          leave-fn (:leave interceptor)]
+      (try
+        (let [new-ctx (if leave-fn (leave-fn context) context)]
+          (run-leave new-ctx (rest stack)))
+        (catch Exception e
+          (dispatch-error (reverse stack) context e))))
+    context))
+
+(defn execute
+  "Executes a pipeline of interceptors given an initial context map.
+
+   - Interceptors are maps with optional :enter, :leave, and :error functions.
+   - :enter functions run forward (first to last).
+   - :leave functions run backward (last to first) for successfully entered interceptors.
+   - If an exception occurs, :error handlers are invoked."
+  [context interceptors]
+  (letfn [(run-enter [ctx queue stack]
+            (if (seq queue)
+              (let [interceptor (first queue)
+                    enter-fn (:enter interceptor)]
+                (try
+                  (let [new-ctx (if enter-fn (enter-fn ctx) ctx)]
+                    ;; If a response is already set, short-circuit further :enter steps
+                    (if (:response new-ctx)
+                      (run-leave new-ctx (reverse (conj stack interceptor)))
+                      (run-enter new-ctx (rest queue) (conj stack interceptor))))
+                  (catch Exception e
+                    (dispatch-error (reverse (concat stack queue)) ctx e))))
+              (run-leave ctx (reverse stack))))]
+    (run-enter context interceptors [])))
+
+;; ============================================================================
+;; 2. Example Usage (Web Request-Response Pipeline)
+;; ============================================================================
+
+;; Logging interceptor demonstrates both :enter and :leave phases
+(def logging-interceptor
+  {:enter (fn [ctx]
+            (println "--> Entering request path:" (get-in ctx [:request :uri]))
+            ctx)
+   :leave (fn [ctx]
+            (println "<-- Leaving with response status:" (get-in ctx [:response :status]))
+            ctx)})
+
+;; Authentication interceptor short-circuits with a 401 if token is invalid
+(def auth-interceptor
+  {:enter (fn [ctx]
+            (let [token (get-in ctx [:request :headers "authorization"])]
+              (if (= token "secret-token")
+                (assoc-in ctx [:request :user] "alice")
+                (assoc ctx :response {:status 401 :body "Unauthorized"}))))})
+
+;; Handler interceptor generates the final application response
+(def handler-interceptor
+  {:enter (fn [ctx]
+            (let [user (get-in ctx [:request :user] "guest")]
+              (assoc ctx :response {:status 200 :body (str "Hello, " user "!")})))})
+
+(defn -main [& args]
+  (let [pipeline [logging-interceptor auth-interceptor handler-interceptor]]
+
+    (println "=== Test 1: Valid Authorization Token ===")
+    (let [initial-ctx {:request {:uri "/greet" :headers {"authorization" "secret-token"}}}
+          result (execute initial-ctx pipeline)]
+      (println "Result Context:" result))
+
+    (println "\n=== Test 2: Invalid Authorization Token (Short-circuit) ===")
+    (let [initial-ctx {:request {:uri "/greet" :headers {"authorization" "bad-token"}}}
+          result (execute initial-ctx pipeline)]
+      (println "Result Context:" result))))
+
+;; interceptor simplificat
+
+;; ============================================================================
+;; 1. Skip Helper & Engine
+;; ============================================================================
+
+(defn skip
+  "Skips the next interceptor in the pipeline queue."
+  [ctx]
+  (update ctx :queue rest))
+
+(declare dispatch-error)
+
+(defn- dispatch-error
+  "Traverses the stack in reverse to find and execute an :error handler."
+  [stack context ex]
+  (if (seq stack)
+    (let [interceptor (first stack)
+          error-fn (:error interceptor)]
+      (if error-fn
+        (try
+          (let [ctx-with-err (assoc context :exception ex)]
+            (error-fn ctx-with-err))
+          (catch Exception new-ex
+            (dispatch-error (rest stack) context new-ex)))
+        (dispatch-error (rest stack) context ex)))
+    (throw ex)))
+
+(defn execute
+  "Executes a pipeline of interceptors with :enter and :error phases,
+   supporting queue manipulation and skipping."
+  [initial-context interceptors]
+  (letfn [(step [ctx]
+            (let [queue (:queue ctx)]
+              (if (seq queue)
+                (let [interceptor (first queue)
+                      ;; Pop from queue, push to stack
+                      next-ctx (-> ctx
+                                   (update :queue rest)
+                                   (update :stack conj interceptor))
+                      enter-fn (:enter interceptor)]
+                  (if enter-fn
+                    (try
+                      (let [result-ctx (enter-fn next-ctx)]
+                        (step result-ctx))
+                      (catch Exception e
+                        (dispatch-error (:stack next-ctx) next-ctx e)))
+                    (step next-ctx)))
+                ctx)))]
+    ;; Initialize context with execution queue and history stack
+    (let [ctx (assoc initial-context :queue interceptors :stack [])
+          final-ctx (step ctx)]
+      ;; Clean up internal framework keys before returning the final context
+      (dissoc final-ctx :queue :stack))))
+
+;; ============================================================================
+;; 2. Example Usage & Test Cases
+;; ============================================================================
+
+;; 1. Normal Logging Interceptor
+(def logger
+  {:enter (fn [ctx]
+            (println "  -> Executing: Logger")
+            (update ctx :logs (fnil conj []) "logged"))})
+
+;; 2. Conditional Skipper Interceptor
+(def conditional-skipper
+  {:enter (fn [ctx]
+            (println "  -> Executing: Skipper (Skipping the next interceptor)")
+            ;; Call (skip ctx) to drop the next item from :queue
+            (skip ctx))})
+
+;; 3. Interceptor that should be skipped
+(def target-interceptor
+  {:enter (fn [ctx]
+            (println "  -> Executing: Target Interceptor (You shouldn't see this if skipped!)")
+            (assoc ctx :target-ran true))})
+
+;; 4. Interceptor that throws an error
+(def error-generator
+  {:enter (fn [ctx]
+            (println "  -> Executing: Error Generator")
+            (throw (Exception. "Something went wrong!")))
+  :error (fn [ctx]
+           (println "  -> Caught Error in Interceptor! Handling it...")
+           (assoc ctx :response {:status 500 :body (:exception ctx)}))})
+
+(defn -main [& args]
+  (let [pipeline [logger conditional-skipper target-interceptor error-generator]]
+
+    (println "=== Test Run: Pipeline Execution ===")
+    (let [result (execute {} pipeline)]
+      (println "Final Result Context:" result))))
+  #+end_src
+* 2026-10-02
+
+- am implementat un framework de interceptors si acum o sa-l folosesc pentru procesarea lseqs (continuare repl):
+  #+begin_src clojure
+  (require '[steno.interceptors :as ic])
+
+  (def start-ctx
+    {:prev nil
+     :res []
+     :log []
+     :modifs-count 0
+     :lseq1 (first lseq2)
+     :lseq2 (second lseq2)})
+
+  (def logger
+    {:enter (fn [ctx]
+              (update ctx :log conj (dissoc ctx :log :lseq1 :lseq2)))})
+
+
+  (def loop-already
+    {:enter (fn [{:keys [res prev lseq1 lseq2] :as ctx}]
+              (if (or (= (conv/get-ltype lseq1) 0) (= (conv/get-ltype lseq2) 0))
+                (-> ctx
+                    (assoc :res (filterv identity  (conj res prev lseq1 lseq2)))
+                    (update :modifs-count inc)
+                    ic/skip)
+                ctx))})
+
+  (def make-loop
+    {:enter (fn [{:keys [res prev lseq1 lseq2] :as ctx}]
+              (if (conv/loop? lseq1 lseq2)
+                (-> ctx
+                    (assoc :res (filterv identity  (conj res prev (into lseq1 (rseq lseq2)))))
+                    (update :modifs-count inc)
+                    ic/skip)
+                ctx))})
+
+  (def break-loop
+    {:enter (fn [{:keys [res prev lseq1 lseq2] :as ctx}]
+              (-> ctx
+                  (assoc :prev lseq2)
+                  (assoc :res (filterv identity  (conj res prev lseq1)))
+                  (update :modifs-count inc)
+                  ic/skip))})
+
+  (def pipeline [loop-already logger make-loop logger break-loop])
+
+  (ic/execute start-ctx pipeline)
+  ;; => {:lseq1 [[17 32 162] [17 33 160] [17 34 160] [17 35 160] [17 36 160] [17 37 160] [17 38 33] [16 39 132] [16 40 161]], :log [{:stack [{:enter <function __lisp_fn_1538 at 0x770d58b977e0>} {:enter <function __lisp_fn_1555 at 0x770d5d6a14e0>}], :queue ({:enter <function __lisp_fn_1575 at 0x770d58b516c0>} {:enter <function __lisp_fn_1555 at 0x770d5d6a14e0>} {:enter <function __lisp_fn_1591 at 0x770d57e7f060>}), :prev nil, :res [], :modifs-count 0} {:stack [{:enter <function __lisp_fn_1538 at 0x770d58b977e0>} {:enter <function __lisp_fn_1555 at 0x770d5d6a14e0>} {:enter <function __lisp_fn_1575 at 0x770d58b516c0>} {:enter <function __lisp_fn_1555 at 0x770d5d6a14e0>}], :queue ({:enter <function __lisp_fn_1591 at 0x770d57e7f060>}), :prev nil, :res [], :modifs-count 0}], :prev [[15 31 80] [14 31 80] [13 31 80] [12 31 80] [11 31 80] [10 31 80] [9 31 80] [8 31 80] [7 31 65] [6 32 5] [5 33 5] [4 34 5] [3 35 132] [3 36 160] [3 37 160] [3 38 160] [3 39 40] [4 40 66] [5 40 24] [6 41 66] [7 41 80] [8 41 80] [9 41 80] [10 41 80] [11 41 80] [12 41 80] [13 41 80] [14 41 80] [15 41 84] [16 41 56] [17 42 130] [17 43 160] [17 44 160] [17 45 160] [17 46 33] [16 47 132] [16 48 160] [16 49 160] [16 50 160] [16 51 160] [16 52 160] [16 53 160] [16 54 160] [16 55 160] [16 56 160] [16 57 160] [16 58 33] [15 59 132] [15 60 160] [15 61 160] [15 62 160] [15 63 160] [15 64 160] [15 65 160] [15 66 161]], :lseq2 [[15 31 80] [14 31 80] [13 31 80] [12 31 80] [11 31 80] [10 31 80] [9 31 80] [8 31 80] [7 31 65] [6 32 5] [5 33 5] [4 34 5] [3 35 132] [3 36 160] [3 37 160] [3 38 160] [3 39 40] [4 40 66] [5 40 24] [6 41 66] [7 41 80] [8 41 80] [9 41 80] [10 41 80] [11 41 80] [12 41 80] [13 41 80] [14 41 80] [15 41 84] [16 41 56] [17 42 130] [17 43 160] [17 44 160] [17 45 160] [17 46 33] [16 47 132] [16 48 160] [16 49 160] [16 50 160] [16 51 160] [16 52 160] [16 53 160] [16 54 160] [16 55 160] [16 56 160] [16 57 160] [16 58 33] [15 59 132] [15 60 160] [15 61 160] [15 62 160] [15 63 160] [15 64 160] [15 65 160] [15 66 161]], :res [[[17 32 162] [17 33 160] [17 34 160] [17 35 160] [17 36 160] [17 37 160] [17 38 33] [16 39 132] [16 40 161]]], :modifs-count 1}
+
+
+
+
+
+
+
+
+
+  #+end_src
+* 2026-10-04
+
+- continui implementarea detectorului de bucla (continui nrepl):
+  #+begin_src clojure
+  (def cale-imagine "tmp/template/template-02-02.png")
+(def image (cv2/imread cale-imagine cv2/IMREAD_GRAYSCALE))
+
+(show/show-image image)
+
+(def best (imgproc/process-image image))
+
+(show/show-image best)
+
+  (utl/endpoint-coords best)
+  ;; => ([16 2])
+
+  (add-tap (bound-fn* utl/print4tap))
+
+  (def res0 (conv/image-to-lineseq best))
+  res0
+  [[[16 2 1] [15 3 132] [15 4 160] [15 5 160] [15 6 160] [15 7 160] [15 8 40] [16 9 130] [16 10 160] [16 11 160] [16 12 160] [16 13 160] [16 14 160] [16 15 160] [16 16 160] [16 17 160] [16 18 160] [16 19 160] [16 20 160] [16 21 160] [16 22 160] [16 23 160] [16 24 40] [17 25 130] [17 26 160] [17 27 160] [17 28 160] [17 29 160] [17 30 161]]
+   [[[17 31 176]] [[16 31 92]]]
+   [[[17 32 162] [17 33 160] [17 34 160] [17 35 160] [17 36 160] [17 37 160] [17 38 33] [16 39 132] [16 40 161]]
+    [[15 31 80] [14 31 80] [13 31 80] [12 31 80] [11 31 80] [10 31 80] [9 31 80] [8 31 80] [7 31 65] [6 32 5] [5 33 5] [4 34 5] [3 35 132] [3 36 160] [3 37 160] [3 38 160] [3 39 40] [4 40 66] [5 40 24] [6 41 66] [7 41 80] [8 41 80] [9 41 80] [10 41 80] [11 41 80] [12 41 80] [13 41 80] [14 41 80] [15 41 84] [16 41 56] [17 42 130] [17 43 160] [17 44 160] [17 45 160] [17 46 33] [16 47 132] [16 48 160] [16 49 160] [16 50 160] [16 51 160] [16 52 160] [16 53 160] [16 54 160] [16 55 160] [16 56 160] [16 57 160] [16 58 33] [15 59 132] [15 60 160] [15 61 160] [15 62 160] [15 63 160] [15 64 160] [15 65 160] [15 66 161]]]
+   [[[14 67 92]]
+    [[15 67 176] [15 68 162] [15 69 160] [15 70 160] [15 71 160] [15 72 160] [15 73 160] [15 74 160] [15 75 33] [14 76 132] [14 77 160] [14 78 33] [13 79 20] [12 79 80] [11 79 80] [10 79 80] [9 79 80] [8 79 80] [7 79 66] [6 78 10] [5 77 40] [5 76 130] [4 75 40] [4 74 160] [4 73 160] [4 72 160] [4 71 132] [5 70 5] [6 69 5] [7 68 65] [8 68 80] [9 68 20] [10 67 65] [11 67 80] [12 67 80] [13 67 80]]]]
 
   #+end_src

@@ -2,11 +2,20 @@
   "Convert images in numeric sequences"
   (:require
    [basilisp.set :as set]
+   [steno.interceptors :as ic]
    [steno.spec :as spec]
    [steno.utils :as utl])
   (:import
    math
    [numpy :as np]))
+
+(def type-0-min-len
+  "Minimum len of a type 0 lseq."
+  13)
+
+(def type-1-min-len
+  "Minimum len of a type 1 lseq."
+  5)
 
 (def neighbor-factor
   "Factor that determines how close two cells must be to be neighbors."
@@ -50,7 +59,7 @@
           [#{} 0]
           spec/all-directions))
 
-(defn- get-liniar-sequence
+(defn get-liniar-sequence
   "Return a liniar numeric sequence.
 
    Params:
@@ -75,12 +84,12 @@
          :line new-line}
         (recur (first new-neighbors) new-prev new-line)))))
 
-(defn- parallel-lineseq?
+(defn parallel-lineseq?
   "True if line sequence is a loop"
   [lseq]
   (= (utl/nested-levels lseq) 3))
 
-(defn- parallel-to-liniar
+(defn parallel-to-liniar
   "Transform a one line parallel sequence into a liniar sequence"
   [line-seq]
   (let [lseq (filterv seq line-seq)]
@@ -88,7 +97,7 @@
       (first lseq)
       lseq)))
 
-(defn- get-parallel-sequence
+(defn get-parallel-sequence
   "Return a parallel numeric sequence. The parallel numeric sequence contains usual 2 liniar sequences forming a loop.
 
    Params:
@@ -118,55 +127,83 @@
                                          start-cells)]
     (assoc state :line (parallel-to-liniar line))))
 
-(defn- neighbors?
+(defn neighbors?
   "True if the cells are adiacent"
   [[x1 y1 _] [x2 y2 _]]
   (< (math/dist [x1 y1] [x2 y2]) neighbor-factor))
 
-(defn- small-lineseq?
+(defn small-type-1-lineseq?
   "True if lineseq size is small (5-)"
   [lseq]
   (let [size (count lseq)]
     (and (pos? size) (< size 5))))
 
-(defn- get-ltype
+(defn small-type-0-lineseq?
+  "True if lineseq size is smaller than min type 0."
+  [lseq]
+  (let [size (count lseq)]
+    (and (pos? size) (< size type-0-min-len))))
+
+(defn get-ltype
   "Returns the line sequence type: loop (0) or liniar (1)"
   [lseq]
-  (if (and (not (small-lineseq? lseq)) (neighbors? (first lseq) (last lseq))) 0 1))
+  (if (and (not (small-type-0-lineseq? lseq)) (neighbors? (first lseq) (last lseq))) 0 1))
 
-(defn- loop?
+(defn loop?
   "True if the 2 line sequences build a loop"
   [lseq1 lseq2]
   (and (neighbors? (first lseq1) (first lseq2))
        (neighbors? (last lseq1) (last lseq2))))
 
-(defn- reverse-loop?
+(defn reverse-loop?
   "True if the 2 line sequences build a loop, second lseq is reversed"
   [lseq1 lseq2]
   (and (neighbors? (first lseq1) (last lseq2))
        (neighbors? (last lseq1) (first lseq2))))
 
-(defn- process-lineseq
-  [{:keys [prev res modifs-count]} lseq]
-  ;; (tap> tap-topic {:lseq lseq})
-  ;; (tap> tap-topic {:modifs-count modifs-count})
-  ;; (tap> tap-topic {:prev prev})
-  ;; (tap> tap-topic {:res res})
+(def loop-already
+  {:name "loop-already"
+   :enter (fn [{:keys [res prev lseq1 lseq2] :as ctx}]
+            (if (or (= (get-ltype lseq1) 0) (= (get-ltype lseq2) 0))
+              (-> ctx
+                  (assoc :res (filterv identity  (conj res prev lseq1 lseq2)))
+                  (update :modifs-count inc)
+                  ic/skip)
+              ctx))})
+
+(def make-loop
+  {:name "make-loop"
+   :enter (fn [{:keys [res prev lseq1 lseq2] :as ctx}]
+            (if (loop? lseq1 lseq2)
+              (-> ctx
+                  (assoc :res (filterv identity  (conj res prev (into lseq1 (rseq lseq2)))))
+                  (update :modifs-count inc)
+                  ic/skip)
+              ctx))})
+
+(def break-loop
+  {:name "break-loop"
+   :enter (fn [{:keys [res prev lseq1 lseq2] :as ctx}]
+            (-> ctx
+                (assoc :prev lseq2)
+                (assoc :res (filterv identity  (conj res prev lseq1)))
+                (update :modifs-count inc)
+                ic/skip))})
+
+(def parallel-pipeline [loop-already make-loop break-loop])
+
+(defn process-lineseq
+  [{:keys [prev res modifs-count] :as ctx} lseq]
+  ;; (tap> {:lseq lseq})
+  ;; (tap> {:modifs-count modifs-count})
+  ;; (tap> {:prev prev})
+  ;; (tap> {:res res})
   (if (parallel-lineseq? lseq)
     (let [[lseq1 lseq2] lseq]
-      (cond
-        (= (or (get-ltype lseq1) 0) (= (get-ltype lseq2) 0))
-        {:prev nil
-         :res (filterv identity  (conj res prev lseq1 lseq2))
-         :modifs-count (inc modifs-count)}
-        (loop? lseq1 lseq2)
-        {:prev nil
-         :res (filterv identity  (conj res prev (into lseq1 (rseq lseq2))))
-         :modifs-count (inc modifs-count)}
-        :else
-        {:prev lseq2
-         :res (filterv identity  (conj res prev lseq1))
-         :modifs-count (inc modifs-count)}))
+      (-> ctx
+          (assoc :lseq1 lseq1 :lseq2 lseq2)
+          (ic/execute parallel-pipeline)
+          (dissoc :lseq1 :lseq2)))
     (cond
       (and prev (loop? prev lseq))
       {:prev nil
@@ -180,7 +217,7 @@
       {:prev nil
        :res (filterv identity  (conj res prev lseq))
        :modifs-count modifs-count}
-      (small-lineseq? prev) ; small  prev, add it to the lseq
+      (small-type-1-lineseq? prev) ; small  prev, add it to the lseq
       {:prev (into prev lseq)
        :res res
        :modifs-count (inc modifs-count)}
@@ -189,7 +226,7 @@
        :res (filterv identity (conj res prev))
        :modifs-count modifs-count})))
 
-(defn- get-loop-start
+(defn get-loop-start
   [line]
   (reduce (fn [{:keys [min-x min-y] :as res} [pos [x y _]]]
             (if (or (< x min-x) (and (= x min-x) (< y min-y)))
@@ -200,7 +237,7 @@
            :min-pos 0}
           (map-indexed list (rest line))))
 
-(defn- normalize-loop
+(defn normalize-loop
   [line]
   (let [pos (:min-pos (get-loop-start line))]
     (into (subvec line pos) (subvec line 0 pos))))
@@ -211,7 +248,7 @@
   (compare (+ (first cell1) (second cell1))
            (+ (first cell2) (second cell2))))
 
-(defn- normalize-liniar
+(defn normalize-liniar
   [line]
   (if (compare-cell (first line) (last line))
     (reverse line)
@@ -232,7 +269,8 @@
       (if (empty? (:start-cells new-state))
         (filterv seq new-acc)
         (recur new-state new-acc)))))
-(defn- lineseq-to-lsign
+
+(defn lineseq-to-lsign
   "Convert a LINESEQ in a lsign (a map with lineseq and ltype keys)."
   [lineseq]
   (let [ltype (get-ltype lineseq)
@@ -240,7 +278,7 @@
     {:ltype ltype
      :lineseq ls}))
 
-(defn- lineseqs-to-wsign
+(defn lineseqs-to-wsign
   "Convert a sequence of LINESEQ in a wsign (a sequence of lsign)."
   [lineseqs]
   (let [{:keys [prev res modifs-count]} (reduce process-lineseq
@@ -255,7 +293,7 @@
       (mapv lineseq-to-lsign new-lineseqs)
       (lineseqs-to-wsign new-lineseqs))))
 
-(defn- normalize1-lsign
+(defn normalize1-lsign
   "LSIGN lineseq should start with the cell closest to the origin."
   [{:keys [lineseq] :as lsign}]
   (if (= 1 (compare-cell (first lineseq)  (last lineseq)))
