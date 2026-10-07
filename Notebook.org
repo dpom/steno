@@ -10457,3 +10457,111 @@ dims
     [[15 67 176] [15 68 162] [15 69 160] [15 70 160] [15 71 160] [15 72 160] [15 73 160] [15 74 160] [15 75 33] [14 76 132] [14 77 160] [14 78 33] [13 79 20] [12 79 80] [11 79 80] [10 79 80] [9 79 80] [8 79 80] [7 79 66] [6 78 10] [5 77 40] [5 76 130] [4 75 40] [4 74 160] [4 73 160] [4 72 160] [4 71 132] [5 70 5] [6 69 5] [7 68 65] [8 68 80] [9 68 20] [10 67 65] [11 67 80] [12 67 80] [13 67 80]]]]
 
   #+end_src
+* 2026-10-06
+
+- am ajuns la concluzia ca interceptors introduce un nivel de  complexitate in plus asa ca renunt la el:
+  #+begin_src clojure
+  (require
+ '[steno.imageprocessor :as imgproc]
+ '[steno.converter :as conv]
+ '[dev.show :as show]
+ '[steno.utils :as utl])
+
+(import
+ cv2
+ math)
+
+  (def cale-imagine "tmp/template/template-02-02.png")
+  (def image (cv2/imread cale-imagine cv2/IMREAD_GRAYSCALE))
+
+(def best (imgproc/process-image image))
+
+  (show/show-image best)
+
+  (utl/endpoint-coords best)
+  ;; => ([16 2])
+
+  (def res0 (conv/image-to-lineseq best))
+  res0
+  [[[16 2 1] [15 3 132] [15 4 160] [15 5 160] [15 6 160] [15 7 160] [15 8 40] [16 9 130] [16 10 160] [16 11 160] [16 12 160] [16 13 160] [16 14 160] [16 15 160] [16 16 160] [16 17 160] [16 18 160] [16 19 160] [16 20 160] [16 21 160] [16 22 160] [16 23 160] [16 24 40] [17 25 130] [17 26 160] [17 27 160] [17 28 160] [17 29 160] [17 30 161]]
+   [[[17 31 176]] [[16 31 92]]]
+   [[[17 32 162] [17 33 160] [17 34 160] [17 35 160] [17 36 160] [17 37 160] [17 38 33] [16 39 132] [16 40 161]] [[15 31 80] [14 31 80] [13 31 80] [12 31 80] [11 31 80] [10 31 80] [9 31 80] [8 31 80] [7 31 65] [6 32 5] [5 33 5] [4 34 5] [3 35 132] [3 36 160] [3 37 160] [3 38 160] [3 39 40] [4 40 66] [5 40 24] [6 41 66] [7 41 80] [8 41 80] [9 41 80] [10 41 80] [11 41 80] [12 41 80] [13 41 80] [14 41 80] [15 41 84] [16 41 56] [17 42 130] [17 43 160] [17 44 160] [17 45 160] [17 46 33] [16 47 132] [16 48 160] [16 49 160] [16 50 160] [16 51 160] [16 52 160] [16 53 160] [16 54 160] [16 55 160] [16 56 160] [16 57 160] [16 58 33] [15 59 132] [15 60 160] [15 61 160] [15 62 160] [15 63 160] [15 64 160] [15 65 160] [15 66 161]]]
+   [[[14 67 92]] [[15 67 176] [15 68 162] [15 69 160] [15 70 160] [15 71 160] [15 72 160] [15 73 160] [15 74 160] [15 75 33] [14 76 132] [14 77 160] [14 78 33] [13 79 20] [12 79 80] [11 79 80] [10 79 80] [9 79 80] [8 79 80] [7 79 66] [6 78 10] [5 77 40] [5 76 130] [4 75 40] [4 74 160] [4 73 160] [4 72 160] [4 71 132] [5 70 5] [6 69 5] [7 68 65] [8 68 80] [9 68 20] [10 67 65] [11 67 80] [12 67 80] [13 67 80]]]]
+
+  (count res0)
+  ;; => 4
+
+  (def lseq (nth res0 2))
+  (def lseq1 (first lseq))
+  (def lseq2 (second lseq))
+
+  (conv/small-type-0-lineseq? lseq1)
+  ;; => true
+
+
+  (conv/small-type-0-lineseq? lseq2)
+  ;; => false
+
+  (def c (< (count lseq1) (count lseq2)))
+
+  (def ref-lseq (if c lseq1 lseq2))
+  ;; => [[17 32 162] [17 33 160] [17 34 160] [17 35 160] [17 36 160] [17 37 160] [17 38 33] [16 39 132] [16 40 161]]
+
+  (def mod-lseq (if c lseq2 lseq1))
+  mod-lseq
+  ;; => [[15 31 80] [14 31 80] [13 31 80] [12 31 80] [11 31 80] [10 31 80] [9 31 80] [8 31 80] [7 31 65] [6 32 5] [5 33 5] [4 34 5] [3 35 132] [3 36 160] [3 37 160] [3 38 160] [3 39 40] [4 40 66] [5 40 24] [6 41 66] [7 41 80] [8 41 80] [9 41 80] [10 41 80] [11 41 80] [12 41 80] [13 41 80] [14 41 80] [15 41 84] [16 41 56] [17 42 130] [17 43 160] [17 44 160] [17 45 160] [17 46 33] [16 47 132] [16 48 160] [16 49 160] [16 50 160] [16 51 160] [16 52 160] [16 53 160] [16 54 160] [16 55 160] [16 56 160] [16 57 160] [16 58 33] [15 59 132] [15 60 160] [15 61 160] [15 62 160] [15 63 160] [15 64 160] [15 65 160] [15 66 161]]
+
+
+  (def ref-cell (last ref-lseq))
+ref-cell
+  ;; => [16 40 161]
+
+
+  (show/show-two-lseq  ref-lseq mod-lseq)
+
+
+  (defn dist
+    [[x1 y1 _] [x2 y2 _]]
+    (math/dist [x1 y1] [x2 y2]))
+
+  (dist ref-cell (first mod-lseq))
+  ;; => 9.055385138137417
+
+  (dist ref-cell (second mod-lseq))
+  ;; => 9.219544457292887
+
+
+  (let [df (partial dist ref-cell)]
+    (->> mod-lseq
+         (map df)
+         (map-indexed vector)
+         (apply min-key second)
+         first))
+  ;; => 29
+
+ (def lseq3 (aslice mod-lseq 29))
+
+  (def lseq4 (drop 29 mod-lseq))
+
+  (show/show-two-lseq lseq3 lseq4)
+
+  (def lseq5 (into lseq3 (rseq ref-lseq)))
+
+  (show/show-two-lseqs [lseq5 lseq4])
+
+  (defn extract-loop
+    [lseq1 lseq2]
+    (let [c (< (count lseq1) (count lseq2))
+          ref-lseq (if c lseq1 lseq2)
+          mod-lseq (if c lseq2 lseq1)
+          df (partial dist (last ref-lseq))
+          min-point (->> mod-lseq
+                         (map df)
+                         (map-indexed vector)
+                         (apply min-key second)
+                         first)
+          res1 (into (aslice mod-lseq min-point) (rseq ref-lseq))]
+      [res1 (drop min-point mod-lseq)]))
+
+(show/show-two-lseqs (extract-loop lseq1 lseq2))
+  #+end_src

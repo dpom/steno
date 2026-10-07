@@ -83,6 +83,11 @@
   [{:keys [lineseq]}]
   (show-matrix (utl/lineseq-to-matrix lineseq)))
 
+(defn show-two-lseqs
+  [[lseq1 lseq2]]
+  (show-two-matrices [(utl/lineseq-to-matrix lseq1)
+                      (utl/lineseq-to-matrix lseq2)]))
+
 (defn show-glyph-matrix
   "Afișează GLYPHS într-o grilă, păstrând axele vizibile."
   [glyphs]
