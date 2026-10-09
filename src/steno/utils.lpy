@@ -1,8 +1,9 @@
 (ns steno.utils
   (:require
-   [basilisp.pprint :as p]
    [basilisp.edn :as edn]
-   [basilisp.io :as bio])
+   [basilisp.io :as bio]
+   [basilisp.pprint :as p]
+   [basilisp.string :as str])
   (:import
    cv2
    [multiprocessing :refer [Process]]
@@ -95,6 +96,55 @@
   [filename]
   (with-open [r (bio/reader filename)]
     (edn/read r)))
+
+(defn sort-map-keys
+  "Sortează recursiv cheile unei mape (și ale mapelor cuibărite) în ordine alfabetică."
+  [m]
+  (cond
+    (map? m)
+    (let [sorted-entries (sort-by (fn [[k _]] (str k))
+                                  (for [[k v] m]
+                                    [k (sort-map-keys v)]))]
+      (into {} sorted-entries))
+
+    (coll? m)
+    (into (empty m) (map sort-map-keys m))
+
+    :else m))
+
+(defn pretty-edn
+  "Formatează o structură de date EDN cu indentare pe mai multe linii."
+  ([data] (pretty-edn data 0))
+  ([data level]
+   (let [indent (str/join "" (repeat (* level 2) " "))]
+     (cond
+       (map? data)
+       (if (empty? data)
+         "{}"
+         (str "{\n"
+              (str/join ",\n"
+                        (for [[k v] data]
+                          (str indent "  " (pr-str k) " "
+                               (pretty-edn v (inc level)))))
+              "\n" indent "}"))
+
+       (vector? data)
+       (if (empty? data)
+         "[]"
+         (str "[\n"
+              (str/join "\n"
+                        (for [x data]
+                          (str indent "  " (pretty-edn x (inc level)))))
+              "\n" indent "]"))
+
+       :else (pr-str data)))))
+
+(defn save-sorted-edn
+  "Sortează cheile alfabetic și salvează mapa într-un fișier EDN formatat frumos."
+  [filepath data]
+  (let [sorted-data (sort-map-keys data)
+        pretty-str  (pretty-edn sorted-data)]
+    (spit filepath pretty-str)))
 
 (defn save-edn
   "Save an ENTITY in an edn file with FILENAME."

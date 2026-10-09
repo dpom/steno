@@ -10565,3 +10565,129 @@ ref-cell
 
 (show/show-two-lseqs (extract-loop lseq1 lseq2))
   #+end_src
+* 2026-10-08
+
+- vreau sa sortez map inainte de salvare:
+  #+begin_src clojure
+
+(require '[basilisp.edn :as edn]
+         '[basilisp.string :as str])
+
+(defn sort-map-keys
+  "Sortează recursiv cheile unei mape (și ale mapelor cuibărite) în ordine alfabetică."
+  [m]
+  (cond
+    (map? m) (into (sorted-map)
+                   (for [[k v] m]
+                     [k (sort-map-keys v)]))
+    (coll? m) (into (empty m) (map sort-map-keys m))
+    :else m))
+
+(defn save-sorted-edn
+  "Sortează cheile unei mape alfabetic și salvează structura într-un fișier EDN."
+  [data filepath]
+  (let [sorted-data (sort-map-keys data)
+        edn-string  (edn/render-str sorted-data)]
+    (spit filepath edn-string)))
+
+(ns my-app.core
+  (:require [basilisp.edn :as edn]))
+
+(defn sort-map-keys
+  "Sortează recursiv cheile unei mape (și ale mapelor cuibărite) în ordine alfabetică."
+  [m]
+  (cond
+    (map? m)
+    (into (array-map)
+          (sort-by (fn [[k _]] (str k))
+                   (for [[k v] m]
+                     [k (sort-map-keys v)])))
+
+    (coll? m)
+    (into (empty m) (map sort-map-keys m))
+
+    :else m))
+
+(defn sort-map-keys
+  "Sortează recursiv cheile unei mape (și ale mapelor cuibărite) în ordine alfabetică."
+  [m]
+  (cond
+    (map? m)
+    (let [sorted-entries (sort-by (fn [[k _]] (str k))
+                                  (for [[k v] m]
+                                    [k (sort-map-keys v)]))]
+      (into {} sorted-entries))
+
+    (coll? m)
+    (into (empty m) (map sort-map-keys m))
+
+    :else m))
+
+
+(defn save-sorted-edn
+  "Sortează cheile unei mape alfabetic și salvează structura într-un fișier EDN."
+  [data filepath]
+  (let [sorted-data (sort-map-keys data)
+        edn-string  (edn/render-str sorted-data)]
+    (spit filepath edn-string)))
+
+;;
+
+(defn sort-map-keys
+  "Sortează recursiv cheile unei mape (și ale mapelor cuibărite) în ordine alfabetică."
+  [m]
+  (cond
+    (map? m)
+    (let [sorted-entries (sort-by (fn [[k _]] (str k))
+                                  (for [[k v] m]
+                                    [k (sort-map-keys v)]))]
+      (into {} sorted-entries))
+
+    (coll? m)
+    (into (empty m) (map sort-map-keys m))
+
+    :else m))
+
+(defn pretty-edn
+  "Formatează o structură de date EDN cu indentare pe mai multe linii."
+  ([data] (pretty-edn data 0))
+  ([data level]
+   (let [indent (str/join "" (repeat (* level 2) " "))]
+     (cond
+       (map? data)
+       (if (empty? data)
+         "{}"
+         (str "{\n"
+              (str/join ",\n"
+                        (for [[k v] data]
+                          (str indent "  " (pr-str k) " "
+                               (pretty-edn v (inc level)))))
+              "\n" indent "}"))
+
+       (vector? data)
+       (if (empty? data)
+         "[]"
+         (str "[\n"
+              (str/join "\n"
+                        (for [x data]
+                          (str indent "  " (pretty-edn x (inc level)))))
+              "\n" indent "]"))
+
+       :else (pr-str data)))))
+
+(defn save-sorted-edn
+  "Sortează cheile alfabetic și salvează mapa într-un fișier EDN formatat frumos."
+  [data filepath]
+  (let [sorted-data (sort-map-keys data)
+        pretty-str  (pretty-edn sorted-data)]
+    (spit filepath pretty-str)))
+
+(def data-exemplu
+  {:z-key "ultimul"
+   :a-key "primul"
+   :m-key {:c-sub 3 :a-sub 1}
+   :b-key [1 2 {:y 10 :x 5}]})
+
+;; Salvare în fișier:
+(save-sorted-edn data-exemplu "output.edn")
+  #+end_src
