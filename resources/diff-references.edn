@@ -2,6 +2,10 @@
   :type-0 [
     {
       :letter "o",
+      :min-len 23,
+      :max-len 50,
+      :max-bits 184,
+      :min-match 0.7065217391304348,
       :reference [
         65
         65
@@ -26,14 +30,14 @@
         130
         160
         160
-      ],
-      :min-match 0.7065217391304348,
-      :max-bits 184,
-      :min-len 23,
-      :max-len 50
+      ]
     }
     {
       :letter "a",
+      :min-len 13,
+      :max-len 25,
+      :max-bits 104,
+      :min-match 0.6057692307692307,
       :reference [
         132
         65
@@ -48,16 +52,16 @@
         66
         80
         80
-      ],
-      :min-match 0.6057692307692307,
-      :max-bits 104,
-      :min-len 13,
-      :max-len 25
+      ]
     }
   ],
   :type-1 [
     {
       :letter "d",
+      :min-len 30,
+      :max-len 39,
+      :max-bits 240,
+      :min-match 0.925,
       :reference [
         160
         160
@@ -89,14 +93,14 @@
         160
         160
         132
-      ],
-      :min-match 0.925,
-      :max-bits 240,
-      :min-len 30,
-      :max-len 39
+      ]
     }
     {
-      :letter "\u0163",
+      :letter "t,",
+      :min-len 26,
+      :max-len 29,
+      :max-bits 208,
+      :min-match 0.875,
       :reference [
         128
         130
@@ -124,14 +128,14 @@
         20
         20
         64
-      ],
-      :min-match 0.875,
-      :max-bits 208,
-      :min-len 26,
-      :max-len 29
+      ]
     }
     {
       :letter "j",
+      :min-len 24,
+      :max-len 42,
+      :max-bits 192,
+      :min-match 0.71875,
       :reference [
         33
         65
@@ -157,14 +161,14 @@
         40
         80
         66
-      ],
-      :min-match 0.71875,
-      :max-bits 192,
-      :min-len 24,
-      :max-len 42
+      ]
     }
     {
       :letter "g",
+      :min-len 24,
+      :max-len 36,
+      :max-bits 192,
+      :min-match 0.8333333333333334,
       :reference [
         132
         80
@@ -190,14 +194,14 @@
         65
         65
         80
-      ],
-      :min-match 0.8333333333333334,
-      :max-bits 192,
-      :min-len 24,
-      :max-len 36
+      ]
     }
     {
       :letter "s",
+      :min-len 23,
+      :max-len 39,
+      :max-bits 184,
+      :min-match 0.7282608695652174,
       :reference [
         66
         66
@@ -222,14 +226,14 @@
         33
         33
         33
-      ],
-      :min-match 0.7282608695652174,
-      :max-bits 184,
-      :min-len 23,
-      :max-len 39
+      ]
     }
     {
       :letter "n",
+      :min-len 22,
+      :max-len 41,
+      :max-bits 176,
+      :min-match 0.7386363636363636,
       :reference [
         40
         130
@@ -253,14 +257,14 @@
         65
         33
         65
-      ],
-      :min-match 0.7386363636363636,
-      :max-bits 176,
-      :min-len 22,
-      :max-len 41
+      ]
     }
     {
       :letter "m",
+      :min-len 21,
+      :max-len 40,
+      :max-bits 168,
+      :min-match 0.7976190476190477,
       :reference [
         65
         33
@@ -283,14 +287,14 @@
         160
         132
         132
-      ],
-      :min-match 0.7976190476190477,
-      :max-bits 168,
-      :min-len 21,
-      :max-len 40
+      ]
     }
     {
       :letter "r",
+      :min-len 16,
+      :max-len 51,
+      :max-bits 128,
+      :min-match 0.7578125,
       :reference [
         132
         132
@@ -307,15 +311,15 @@
         132
         132
         132
-        33
-      ],
-      :min-match 0.7734375,
-      :max-bits 128,
-      :min-len 16,
-      :max-len 51
+        132
+      ]
     }
     {
       :letter "b",
+      :min-len 16,
+      :max-len 19,
+      :max-bits 128,
+      :min-match 0.8984375,
       :reference [
         80
         80
@@ -333,14 +337,14 @@
         80
         80
         194
-      ],
-      :min-match 0.8984375,
-      :max-bits 128,
-      :min-len 16,
-      :max-len 19
+      ]
     }
     {
       :letter "v",
+      :min-len 14,
+      :max-len 14,
+      :max-bits 112,
+      :min-match 1.0,
       :reference [
         24
         10
@@ -356,14 +360,14 @@
         80
         66
         80
-      ],
-      :min-match 1.0,
-      :max-bits 112,
-      :min-len 14,
-      :max-len 14
+      ]
     }
     {
-      :letter "\xeen",
+      :letter "i^n",
+      :min-len 12,
+      :max-len 12,
+      :max-bits 96,
+      :min-match 1.0,
       :reference [
         24
         80
@@ -377,14 +381,14 @@
         160
         130
         40
-      ],
-      :min-match 1.0,
-      :max-bits 96,
-      :min-len 12,
-      :max-len 12
+      ]
     }
     {
       :letter "c",
+      :min-len 11,
+      :max-len 24,
+      :max-bits 88,
+      :min-match 0.6477272727272727,
       :reference [
         65
         20
@@ -397,14 +401,14 @@
         65
         65
         80
-      ],
-      :min-match 0.6477272727272727,
-      :max-bits 88,
-      :min-len 11,
-      :max-len 24
+      ]
     }
     {
       :letter "e`",
+      :min-len 10,
+      :max-len 10,
+      :max-bits 80,
+      :min-match 1.0,
       :reference [
         33
         160
@@ -416,14 +420,14 @@
         132
         33
         128
-      ],
-      :min-match 1.0,
-      :max-bits 80,
-      :min-len 10,
-      :max-len 10
+      ]
     }
     {
       :letter "l",
+      :min-len 10,
+      :max-len 21,
+      :max-bits 80,
+      :min-match 0.825,
       :reference [
         132
         160
@@ -435,14 +439,14 @@
         33
         132
         33
-      ],
-      :min-match 0.825,
-      :max-bits 80,
-      :min-len 10,
-      :max-len 21
+      ]
     }
     {
       :letter "t",
+      :min-len 9,
+      :max-len 25,
+      :max-bits 72,
+      :min-match 0.7777777777777778,
       :reference [
         132
         160
@@ -453,14 +457,14 @@
         160
         160
         160
-      ],
-      :min-match 0.7777777777777778,
-      :max-bits 72,
-      :min-len 9,
-      :max-len 25
+      ]
     }
     {
       :letter "e",
+      :min-len 8,
+      :max-len 18,
+      :max-bits 64,
+      :min-match 0.625,
       :reference [
         132
         130
@@ -470,14 +474,14 @@
         66
         66
         10
-      ],
-      :min-match 0.625,
-      :max-bits 64,
-      :min-len 8,
-      :max-len 18
+      ]
     }
     {
       :letter "f",
+      :min-len 7,
+      :max-len 13,
+      :max-bits 56,
+      :min-match 0.7857142857142857,
       :reference [
         24
         24
@@ -486,14 +490,14 @@
         24
         24
         2
-      ],
-      :min-match 0.7857142857142857,
-      :max-bits 56,
-      :min-len 7,
-      :max-len 13
+      ]
     }
     {
       :letter "p",
+      :min-len 7,
+      :max-len 19,
+      :max-bits 56,
+      :min-match 0.9285714285714286,
       :reference [
         80
         80
@@ -502,14 +506,14 @@
         80
         80
         80
-      ],
-      :min-match 0.9285714285714286,
-      :max-bits 56,
-      :min-len 7,
-      :max-len 15
+      ]
     }
     {
       :letter "in",
+      :min-len 6,
+      :max-len 8,
+      :max-bits 48,
+      :min-match 0.625,
       :reference [
         132
         40
@@ -517,39 +521,35 @@
         65
         40
         66
-      ],
-      :min-match 0.625,
-      :max-bits 48,
-      :min-len 6,
-      :max-len 8
+      ]
     }
     {
       :letter "un",
+      :min-len 5,
+      :max-len 11,
+      :max-bits 40,
+      :min-match 0.8,
       :reference [
         40
         24
         24
         10
         32
-      ],
-      :min-match 0.8,
-      :max-bits 40,
-      :min-len 5,
-      :max-len 11
+      ]
     }
     {
       :letter "i",
+      :min-len 5,
+      :max-len 18,
+      :max-bits 40,
+      :min-match 0.7,
       :reference [
         24
         40
         80
         132
         132
-      ],
-      :min-match 0.7,
-      :max-bits 40,
-      :min-len 5,
-      :max-len 18
+      ]
     }
   ],
   :min-refseq 5

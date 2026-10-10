@@ -102,7 +102,7 @@
                          outname (format "%s-%02d-%02d-%01d.edn" fname row column i)
                          outfile (bio/path lsign-dir outname)]
                      (.mkdir lsign-dir ** :parents true :exist_ok true)
-                     (utl/save-sorted-edn outfile lsign)
+                     (corpus/save-corpus-item outfile lsign)
                      (.debug logger "Saved in %s" outfile)))))]
       (corpus/walk-matrix! wsigns f!))))
 
@@ -118,7 +118,7 @@
       (.info logger "Make references for %s" tr)
       (let [references (tra/build-references tr config corpus-dir)
             outfile (bio/path outdir (str tr "-references.edn"))]
-        (utl/save-sorted-edn outfile references)
+        (tra/save-references outfile references)
         (.info logger "saved in %s" outfile)))))
 
 (defn action-save-glyphs
@@ -138,7 +138,7 @@
       (->> lf
            utl/load-edn
            cnv/normalize2-lsign
-           (utl/save-sorted-edn lf)))))
+           (corpus/save-corpus-item lf)))))
 
 (defn action-renormalize-corpus
   "Renormalize the corpus lsigns."

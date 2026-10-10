@@ -94,57 +94,79 @@
 (defn load-edn
   "Load an entity from an edn file with FILENAME."
   [filename]
-  (with-open [r (bio/reader filename)]
-    (edn/read r)))
+  (let [content (slurp filename :encoding "utf-8")]
+    (edn/read-string content)))
 
-(defn sort-map-keys
-  "Sortează recursiv cheile unei mape (și ale mapelor cuibărite) în ordine alfabetică."
-  [m]
-  (cond
-    (map? m)
-    (let [sorted-entries (sort-by (fn [[k _]] (str k))
-                                  (for [[k v] m]
-                                    [k (sort-map-keys v)]))]
-      (into {} sorted-entries))
+(defn- make-key-comparator
+  "Creează un comparator pentru ordonarea cheilor (cu suport pentru priorități)."
+  [priority-keys]
+  (let [priority-map (zipmap priority-keys (range))]
+    (fn [k]
+      [(get priority-map k 9999) (str k)])))
 
-    (coll? m)
-    (into (empty m) (map sort-map-keys m))
+(defn- indent-str
+  "Generează un string cu spații pentru nivelul curent de indentare."
+  [level indent-size]
+  (str/join "" (repeat (* level indent-size) " ")))
 
-    :else m))
+(defn data->pprint-edn-str
+  "Transformă o structură într-un string EDN formatat frumos (pretty-printed).
 
-(defn pretty-edn
-  "Formatează o structură de date EDN cu indentare pe mai multe linii."
-  ([data] (pretty-edn data 0))
-  ([data level]
-   (let [indent (str/join "" (repeat (* level 2) " "))]
-     (cond
-       (map? data)
-       (if (empty? data)
-         "{}"
-         (str "{\n"
-              (str/join ",\n"
-                        (for [[k v] data]
-                          (str indent "  " (pr-str k) " "
-                               (pretty-edn v (inc level)))))
-              "\n" indent "}"))
+   Opțiuni (opts):
+   - :indent-size   numărul de spații per nivel de indentare (default: 2)
+   - :priority-keys vector de chei care să apară primele în hărți"
+  ([data]
+   (data->pprint-edn-str data {}))
+  ([data {:keys [indent-size priority-keys]
+          :or {indent-size 2 priority-keys []}}]
+   (let [key-rank (make-key-comparator priority-keys)]
+     (letfn [(format-node [x level]
+               (let [pad (indent-str level indent-size)
+                     next-pad (indent-str (inc level) indent-size)]
+                 (cond
+                   ;; --- MAPS ---
+                   (map? x)
+                   (if (empty? x)
+                     "{}"
+                     (let [sorted-ks (sort-by key-rank (keys x))
+                           entries (for [k sorted-ks]
+                                     (str next-pad
+                                          (pr-str k) " "
+                                          (format-node (get x k) (inc level))))]
+                       (str "{\n"
+                            (str/join ",\n" entries) "\n"
+                            pad "}")))
 
-       (vector? data)
-       (if (empty? data)
-         "[]"
-         (str "[\n"
-              (str/join "\n"
-                        (for [x data]
-                          (str indent "  " (pretty-edn x (inc level)))))
-              "\n" indent "]"))
+                   ;; --- VECTORS ---
+                   (vector? x)
+                   (if (empty? x)
+                     "[]"
+                     (let [items (for [item x]
+                                   (str next-pad (format-node item (inc level))))]
+                       (str "[\n"
+                            (str/join "\n" items) "\n"
+                            pad "]")))
 
-       :else (pr-str data)))))
+                   ;; --- SETS ---
+                   (set? x)
+                   (if (empty? x)
+                     "#{}"
+                     (let [sorted-items (sort-by str x)
+                           items (for [item sorted-items]
+                                   (str next-pad (format-node item (inc level))))]
+                       (str "#{\n"
+                            (str/join "\n" items) "\n"
+                            pad "}")))
 
-(defn save-sorted-edn
-  "Sortează cheile alfabetic și salvează mapa într-un fișier EDN formatat frumos."
-  [filepath data]
-  (let [sorted-data (sort-map-keys data)
-        pretty-str  (pretty-edn sorted-data)]
-    (spit filepath pretty-str)))
+                   ;; --- SCALARS / PRIMITIVES ---
+                   :else
+                   (pr-str x))))]
+       (format-node data 0)))))
+
+(defn save-pprint-edn
+  "Salvează datele în EDN formatat frumos într-un fișier."
+  [filename data & {:as opts}]
+  (spit filename (data->pprint-edn-str data opts)))
 
 (defn save-edn
   "Save an ENTITY in an edn file with FILENAME."
@@ -172,6 +194,12 @@
   (nested-levels [[1 2] [3 [4 5]]])     ; => 3
   (nested-levels [[[1]] [[2]]])         ; => 3
   (nested-levels "not a vector")        ; => 0
+
+  (def test (load-edn "resources/diff-references.edn"))
+
+  (save-pprint-edn "test_pretty.edn" test
+                   :indent-size 2
+                   :priority-keys [:type-0 :type-1 :letter :min-len :max-len])
 
   ;;
   )

@@ -1,5 +1,6 @@
 (ns steno.translator
   (:require
+   [steno.spec :as spec]
    [steno.utils :as utl])
   (:import
    [statistics :as st]))
@@ -15,10 +16,10 @@
                      "l" "r"
                      "m" "n"
                      "j" "s"
-                     "ţ" "ge"
+                     "t," "ge"
                      "e" "i"
                      "e`" "i`"
-                     "in" "în"
+                     "in" "i^n"
                      "un" "on"
                      "an" "en"])
 
@@ -65,6 +66,12 @@
   (python/float (* (/ match max-match))))
 
 ;; entry points
+
+(defn save-references
+  [outfile references]
+  (utl/save-pprint-edn outfile references
+                       :indent-size 2
+                       :priority-keys spec/references-priority-keys))
 
 (defn prepare-translations
   "Create the context for all translators."

@@ -10691,3 +10691,434 @@ ref-cell
 ;; Salvare în fișier:
 (save-sorted-edn data-exemplu "output.edn")
   #+end_src
+* 2026-10-09
+
+- am probleme cu literele romanesti:
+  #+begin_src clojure
+
+  (require '[steno.translator :as tra])
+
+  tra/type-1-letters
+  ;; => ["p" "b" "t" "d" "c" "g" "f" "v" "l" "r" "m" "n" "j" "s" "\u0163" "ge" "e" "i" "e`" "i`" "in" "\xeen" "un" "on" "an" "en"]
+
+  "ţ" → "ț"
+  "ş" → "ș"
+
+  tra/type-1-letters
+  ;; => ["p" "b" "t" "d" "c" "g" "f" "v" "l" "r" "m" "n" "j" "s" "\u021b" "ge" "e" "i" "e`" "i`" "in" "\xeen" "un" "on" "an" "en"]
+
+;; Importăm modulul unicode_escape/codecs din Python dacă e nevoie de unfix
+  (import  builtins)
+
+
+(defn unescape-unicode
+  "Convertește secvențele de escape de tip \\uXXXX sau \\xXX înapoi în caractere UTF-8."
+  [s]
+  (if (string? s)
+    (-> s
+        ;; Înlocuiește secvențele Python greșite precum \xeen cu caracterele reale
+        (str/replace #"\\x([0-9a-fA-F]{2})" (fn [[_ hex-code]]
+                                              (str (char (py/int hex-code 16)))))
+        ;; Asigură-te că \uXXXX este parsat corect
+        (str/replace #"\\u([0-9a-fA-F]{4})" (fn [[_ hex-code]]
+                                              (str (char (py/int hex-code 16))))))
+    s))
+
+(defn clean-diacritics
+  "Parcurge recursiv datele și curăță string-urile escapate."
+  [data]
+  (cond
+    (string? data) (unescape-unicode data)
+    (map? data) (into {} (for [[k v] data] [(clean-diacritics k) (clean-diacritics v)]))
+    (vector? data) (mapv clean-diacritics data)
+    (coll? data) (map clean-diacritics data)
+    :else data))
+
+
+  (ns my-app.core
+  (:require [basilisp.edn :as edn]
+            [basilisp.string :as str]))
+
+(defn sort-map-keys
+  "Sortează recursiv cheile unei mape (și ale mapelor cuibărite) în ordine alfabetică."
+  [m]
+  (cond
+    (map? m)
+    (let [sorted-entries (sort-by (fn [[k _]] (str k))
+                                  (for [[k v] m]
+                                    [k (sort-map-keys v)]))]
+      (into {} sorted-entries))
+
+    (coll? m)
+    (into (empty m) (map sort-map-keys m))
+
+    :else m))
+
+(defn pretty-edn
+  "Formatează structura EDN păstrând caracterele UTF-8 (diacriticele) intacte."
+  ([data] (pretty-edn data 0))
+  ([data level]
+   (let [indent (str/join "" (repeat (* level 2) " "))]
+     (cond
+       (map? data)
+       (if (empty? data)
+         "{}"
+         (str "{\n"
+              (str/join ",\n"
+                        (for [[k v] data]
+                          (str indent "  " (pretty-edn k 0) " "
+                               (pretty-edn v (inc level)))))
+              "\n" indent "}"))
+
+       (vector? data)
+       (if (empty? data)
+         "[]"
+         (str "[\n"
+              (str/join "\n"
+                        (for [x data]
+                          (str indent "  " (pretty-edn x (inc level)))))
+              "\n" indent "]"))
+
+       ;; Folosim pr-str direct pentru tot
+       :else (pr-str data)))))
+
+(defn save-sorted-edn
+  "Sortează cheile alfabetic și salvează mapa în EDN cu codare UTF-8."
+  [data filepath]
+  (let [sorted-data (sort-map-keys data)
+        pretty-str  (pretty-edn sorted-data)]
+    (spit filepath pretty-str :encoding "utf-8")))
+
+(defn load-edn
+  "Citește un fișier EDN specficând codarea UTF-8."
+  [filepath]
+  (let [content (slurp filepath :encoding "utf-8")]
+    (edn/read-string content)))
+
+  (require '[basilisp.edn :as edn])
+
+;; Importăm modulul codecs din Python
+(import codecs)
+
+(defn unescape-string
+  "Convertește secvențe de escape de tip \\uXXXX sau \\xXX într-un string UTF-8 real."
+  [s]
+  (if (string? s)
+    ;; Folosim 'unicode_escape' din Python pentru a transforma \u0163 / \xeen în caractere reale
+    (.decode codecs (.encode s "utf-8") "unicode_escape")
+    s))
+
+(defn decode-diacritics
+  "Parcurge recursiv o structură de date și decodează toate string-urile."
+  [data]
+  (cond
+    (string? data) (unescape-string data)
+    (map? data)    (into {} (for [[k v] data] [(decode-diacritics k) (decode-diacritics v)]))
+    (vector? data) (mapv decode-diacritics data)
+    (coll? data)   (map decode-diacritics data)
+    :else          data))
+
+(defn load-edn
+  "Citește un fișier EDN și decodează automat diacriticele românești din secvențe \\u / \\x."
+  [filepath]
+  (let [raw-content (slurp filepath :encoding "utf-8")
+        parsed-data (edn/read-string raw-content)]
+    (decode-diacritics parsed-data)))
+
+  (load-edn "resources/diff-references.edn")
+  ;; => Traceback (most recent call last):
+  ;;      File "/home/dan/pers/projects/steno/.venv/lib/python3.11/site-packages/basilisp/contrib/nrepl_server.lpy", line 141, in do_handle_eval
+  ;;        (let [result (last
+  ;;                     ^^^^^
+  ;;      File "/home/dan/pers/projects/steno/.venv/lib/python3.11/site-packages/basilisp/lang/runtime.py", line 2112, in trampoline
+  ;;        ret = f(*args, **kwargs)
+  ;;              ^^^^^^^^^^^^^^^^^^
+  ;;      File "/home/dan/pers/projects/steno/.venv/lib/python3.11/site-packages/basilisp/core.lpy", line 488, in last
+  ;;        (if (seq (rest s))
+  ;;                 ^^^^^^^^
+  ;;      File "/home/dan/.local/share/uv/python/cpython-3.11.15-linux-x86_64-gnu/lib/python3.11/functools.py", line 909, in wrapper
+  ;;        return dispatch(args[0].__class__)(*args, **kw)
+  ;;               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  ;;      File "/home/dan/pers/projects/steno/.venv/lib/python3.11/site-packages/basilisp/lang/runtime.py", line 1242, in _rest_iseq
+  ;;        return o.rest
+  ;;               ^^^^^^
+  ;;      File "/home/dan/pers/projects/steno/.venv/lib/python3.11/site-packages/basilisp/lang/seq.py", line 202, in rest
+  ;;        if self.is_empty:
+  ;;           ^^^^^^^^^^^^^
+  ;;      File "/home/dan/pers/projects/steno/.venv/lib/python3.11/site-packages/basilisp/lang/seq.py", line 192, in is_empty
+  ;;        return self.seq() is None
+  ;;               ^^^^^^^^^^
+  ;;      File "/home/dan/pers/projects/steno/.venv/lib/python3.11/site-packages/basilisp/lang/seq.py", line 173, in seq
+  ;;        self._compute_seq()
+  ;;      File "/home/dan/pers/projects/steno/.venv/lib/python3.11/site-packages/basilisp/lang/seq.py", line 168, in _compute_seq
+  ;;        self._obj = gen()
+  ;;                    ^^^^^
+  ;;      File "/home/dan/pers/projects/steno/.venv/lib/python3.11/site-packages/basilisp/contrib/nrepl_server.lpy", line 146, in ____do_handle_eval__for_5767_5803__lisp_fn_5804
+  ;;        (basilisp.lang.compiler/compile-and-exec-form form
+  ;;                                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  ;;      File "/home/dan/pers/projects/steno/.venv/lib/python3.11/site-packages/basilisp/lang/compiler/__init__.py", line 194, in compile_and_exec_form
+  ;;        last = getattr(ns.module, final_wrapped_name)()
+  ;;               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  ;;      File "*Org Src Notebook.org[ clojure ]*", line 131, in __lisp_expr___7331
+  ;;      File "*Org Src Notebook.org[ clojure ]*", line 128, in load_edn
+  ;;      File "/home/dan/pers/projects/steno/.venv/lib/python3.11/site-packages/basilisp/edn.lpy", line 681, in read_string
+  ;;        (defn read-string
+  ;;      File "/home/dan/pers/projects/steno/.venv/lib/python3.11/site-packages/basilisp/edn.lpy", line 681, in read_string__arity1
+  ;;        (defn read-string
+  ;;      File "/home/dan/pers/projects/steno/.venv/lib/python3.11/site-packages/basilisp/edn.lpy", line 681, in read_string
+  ;;        (defn read-string
+  ;;      File "/home/dan/pers/projects/steno/.venv/lib/python3.11/site-packages/basilisp/edn.lpy", line 687, in read_string__arity2
+  ;;        (when-not (and (nil? s) (= "" s))
+  ;;      File "/home/dan/pers/projects/steno/.venv/lib/python3.11/site-packages/basilisp/edn.lpy", line 659, in read
+  ;;        (defn read
+  ;;      File "/home/dan/pers/projects/steno/.venv/lib/python3.11/site-packages/basilisp/edn.lpy", line 659, in read__arity2
+  ;;        (defn read
+  ;;      File "/home/dan/pers/projects/steno/.venv/lib/python3.11/site-packages/basilisp/edn.lpy", line 528, in read_edn
+  ;;        (let [raw (read-next reader opts)
+  ;;                  ^^^^^^^^^^^^^^^^^^^^^^^
+  ;;      File "/home/dan/pers/projects/steno/.venv/lib/python3.11/site-packages/basilisp/lang/multifn.py", line 82, in __call__
+  ;;        return method(v, *args, **kwargs)
+  ;;               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  ;;      File "/home/dan/pers/projects/steno/.venv/lib/python3.11/site-packages/basilisp/edn.lpy", line 415, in __lisp_fn_6418
+  ;;        (recur (conj objs (read-next reader opts)))))))
+  ;;                          ^^^^^^^^^^^^^^^^^^^^^^^
+  ;;      File "/home/dan/pers/projects/steno/.venv/lib/python3.11/site-packages/basilisp/lang/multifn.py", line 82, in __call__
+  ;;        return method(v, *args, **kwargs)
+  ;;               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  ;;      File "/home/dan/pers/projects/steno/.venv/lib/python3.11/site-packages/basilisp/edn.lpy", line 380, in __lisp_fn_6411
+  ;;        (defmethod read-next :vector
+  ;;      File "/home/dan/pers/projects/steno/.venv/lib/python3.11/site-packages/basilisp/edn.lpy", line 180, in read_coll
+  ;;        (recur (conj objs (read-next reader opts)))))))
+  ;;                          ^^^^^^^^^^^^^^^^^^^^^^^
+  ;;      File "/home/dan/pers/projects/steno/.venv/lib/python3.11/site-packages/basilisp/lang/multifn.py", line 82, in __call__
+  ;;        return method(v, *args, **kwargs)
+  ;;               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  ;;      File "/home/dan/pers/projects/steno/.venv/lib/python3.11/site-packages/basilisp/edn.lpy", line 415, in __lisp_fn_6418
+  ;;        (recur (conj objs (read-next reader opts)))))))
+  ;;                          ^^^^^^^^^^^^^^^^^^^^^^^
+  ;;      File "/home/dan/pers/projects/steno/.venv/lib/python3.11/site-packages/basilisp/lang/multifn.py", line 82, in __call__
+  ;;        return method(v, *args, **kwargs)
+  ;;               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  ;;      File "/home/dan/pers/projects/steno/.venv/lib/python3.11/site-packages/basilisp/edn.lpy", line 443, in __lisp_fn_6452
+  ;;        (throw
+  ;;    basilisp.lang.exception.ExceptionInfo: Invalid escape sequence in string {:escape-sequence "\\u", :error :invalid-escape-sequence}
+
+  #+end_src
+* 2026-10-10
+
+- incerc o implementare de sorted-map:
+  #+begin_src clojure
+;; --- Helper de re-echilibrare (Algoritmul Okasaki) ---
+(defn- balance [color key val left right]
+  (cond
+    ;; Cazul 1: Left-Left (Părinte Negru, Copil stâng Roșu, Nepot stâng Roșu)
+    (and (= color :black)
+         (vector? left)
+         (= (nth left 0) :red)
+         (vector? (nth left 3))
+         (= (nth (nth left 3) 0) :red))
+    (let [[_ x-k x-v a b] (nth left 3)
+          [_ y-k y-v _ c] left]
+      [:red y-k y-v [:black x-k x-v a b] [:black key val c right]])
+
+    ;; Cazul 2: Left-Right
+    (and (= color :black)
+         (vector? left)
+         (= (nth left 0) :red)
+         (vector? (nth left 4))
+         (= (nth (nth left 4) 0) :red))
+    (let [[_ y-k y-v a b] left
+          [_ x-k x-v b1 b2] (nth left 4)]
+      [:red x-k x-v [:black y-k y-v a b1] [:black key val b2 right]])
+
+    ;; Cazul 3: Right-Left
+    (and (= color :black)
+         (vector? right)
+         (= (nth right 0) :red)
+         (vector? (nth right 3))
+         (= (nth (nth right 3) 0) :red))
+    (let [[_ y-k y-v a b] right
+          [_ x-k x-v b1 b2] (nth right 3)]
+      [:red x-k x-v [:black key val left b1] [:black y-k y-v b2 b]])
+
+    ;; Cazul 4: Right-Right
+    (and (= color :black)
+         (vector? right)
+         (= (nth right 0) :red)
+         (vector? (nth right 4))
+         (= (nth (nth right 4) 0) :red))
+    (let [[_ y-k y-v b c] right
+          [_ x-k x-v c1 c2] (nth right 4)]
+      [:red y-k y-v [:black key val left b] [:black x-k x-v c1 c2]])
+
+    :else
+    [color key val left right]))
+
+;; --- Inserare recursivă ---
+(defn- ins [node k v compare-fn]
+  (if (nil? node)
+    [:red k v nil nil]
+    (let [[color node-k node-v left right] node
+          cmp (compare-fn k node-k)]
+      (cond
+        (< cmp 0) (balance color node-k node-v (ins left k v compare-fn) right)
+        (> cmp 0) (balance color node-k node-v left (ins right k v compare-fn))
+        :else     [color k v left right]))))
+
+;; --- API Public Sorted Map ---
+
+(defn sorted-map-assoc
+  "Adaugă o pereche cheie-valoare în arbore (sau actualizează valoarea)."
+  [tree k v & {:keys [compare-fn] :or {compare-fn compare}}]
+  (let [[_ k v left right] (ins tree k v compare-fn)]
+    ;; Rădăcina este întotdeauna forțată să fie NEAGRĂ
+    [:black k v left right]))
+
+(defn sorted-map-get
+  "Căutare în $O(\\log N)$."
+  [tree k & {:keys [default compare-fn] :or {default nil compare-fn compare}}]
+  (loop [node tree]
+    (if (nil? node)
+      default
+      (let [[_ node-k node-v left right] node
+            cmp (compare-fn k node-k)]
+        (cond
+          (< cmp 0) (recur left)
+          (> cmp 0) (recur right)
+          :else     node-v)))))
+
+(defn sorted-map-seq
+  "Returnează o secvență leneșă in-order (cheile sortate)."
+  [tree]
+  (when tree
+    (lazy-seq
+     (let [[_ k v left right] tree]
+       (concat (sorted-map-seq left)
+               [[k v]]
+               (sorted-map-seq right))))))
+
+;; Creăm un sorted-map gol și adăugăm elemente
+(def m1 (-> nil
+            (sorted-map-assoc :c 30)
+            (sorted-map-assoc :a 10)
+            (sorted-map-assoc :b 20)))
+
+;; Căutare
+(sorted-map-get m1 :b)
+;; => 20
+
+;; Obținerea secvenței ordonate
+(sorted-map-seq m1)
+;; => ([:a 10] [:b 20] [:c 30])
+
+;; 1. Salvarea ca vector de perechi [k v] ordonate
+(defn save-canonical-edn
+  [filename tree]
+  (let [kv-pairs (vec (sorted-map-seq tree))]
+    (spit filename (pr-str kv-pairs))))
+
+;; 2. Încarcă datele și reconstruiește Red-Black tree-ul
+(defn load-canonical-edn
+  [filename]
+  (let [kv-pairs (edn/read-string (slurp filename))]
+    (reduce (fn [acc [k v]]
+              (sorted-map-assoc acc k v))
+            nil
+            kv-pairs)))
+
+;; Salvare
+(save-canonical-edn "clean_map.edn" m1)
+
+;; Fișierul `clean_map.edn` va conține:
+;; [[:a 10] [:b 20] [:c 30]]
+
+;; Re-încărcare și reconstrucție
+(def m3 (load-canonical-edn "clean_map.edn"))
+
+(sorted-map-seq m3)
+;; => ([:a 10] [:b 20] [:c 30])
+
+;; o noua versiune
+
+(require '[clojure.string :as str])
+
+
+(defn- make-key-comparator
+  "Creează un comparator pentru ordonarea cheilor (cu suport pentru priorități)."
+  [priority-keys]
+  (let [priority-map (zipmap priority-keys (range))]
+    (fn [k]
+      [(get priority-map k 9999) (str k)])))
+
+(defn- indent-str
+  "Generează un string cu spații pentru nivelul curent de indentare."
+  [level indent-size]
+  (str/join "" (repeat (* level indent-size) " ")))
+
+(defn data->pprint-edn-str
+  "Transformă o structură într-un string EDN formatat frumos (pretty-printed).
+
+   Opțiuni (opts):
+   - :indent-size   numărul de spații per nivel de indentare (default: 2)
+   - :priority-keys vector de chei care să apară primele în hărți"
+  ([data]
+   (data->pprint-edn-str data {}))
+  ([data {:keys [indent-size priority-keys]
+          :or {indent-size 2 priority-keys []}}]
+   (let [key-rank (make-key-comparator priority-keys)]
+     (letfn [(format-node [x level]
+               (let [pad (indent-str level indent-size)
+                     next-pad (indent-str (inc level) indent-size)]
+                 (cond
+                   ;; --- MAPS ---
+                   (map? x)
+                   (if (empty? x)
+                     "{}"
+                     (let [sorted-ks (sort-by key-rank (keys x))
+                           entries (for [k sorted-ks]
+                                     (str next-pad
+                                          (pr-str k) " "
+                                          (format-node (get x k) (inc level))))]
+                       (str "{\n"
+                            (str/join ",\n" entries) "\n"
+                            pad "}")))
+
+                   ;; --- VECTORS ---
+                   (vector? x)
+                   (if (empty? x)
+                     "[]"
+                     (let [items (for [item x]
+                                   (str next-pad (format-node item (inc level))))]
+                       (str "[\n"
+                            (str/join "\n" items) "\n"
+                            pad "]")))
+
+                   ;; --- SETS ---
+                   (set? x)
+                   (if (empty? x)
+                     "#{}"
+                     (let [sorted-items (sort-by str x)
+                           items (for [item sorted-items]
+                                   (str next-pad (format-node item (inc level))))]
+                       (str "#{\n"
+                            (str/join "\n" items) "\n"
+                            pad "}")))
+
+                   ;; --- SCALARS / PRIMITIVES ---
+                   :else
+                   (pr-str x))))]
+       (format-node data 0)))))
+
+(defn save-pprint-edn
+  "Salvează datele în EDN formatat frumos într-un fișier."
+  [filename data & {:as opts}]
+  (spit filename (data->pprint-edn-str data opts)))
+
+(require '[steno.utils :as utl])
+
+(def test (utl/load-edn "resources/diff-references.edn"))
+
+(save-pprint-edn "test_pretty.edn" test
+                 :indent-size 2
+                 :priority-keys [:type-0 :type-1 :letter :min-len :max-len])
+  #+end_src

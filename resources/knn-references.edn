@@ -1,6 +1,9 @@
 {
   :type-0 [
     {
+      :letter "o",
+      :min-len 23,
+      :max-len 50,
       :samples [
         [
           132
@@ -389,12 +392,12 @@
           160
           33
         ]
-      ],
-      :letter "o",
-      :min-len 23,
-      :max-len 50
+      ]
     }
     {
+      :letter "a",
+      :min-len 13,
+      :max-len 25,
       :samples [
         [
           132
@@ -933,14 +936,14 @@
           40
           130
         ]
-      ],
-      :letter "a",
-      :min-len 13,
-      :max-len 25
+      ]
     }
   ],
   :type-1 [
     {
+      :letter "d",
+      :min-len 30,
+      :max-len 39,
       :samples [
         [
           128
@@ -1196,12 +1199,12 @@
           160
           160
         ]
-      ],
-      :letter "d",
-      :min-len 30,
-      :max-len 39
+      ]
     }
     {
+      :letter "t,",
+      :min-len 26,
+      :max-len 29,
       :samples [
         [
           80
@@ -1262,12 +1265,12 @@
           20
           64
         ]
-      ],
-      :letter "\u0163",
-      :min-len 26,
-      :max-len 29
+      ]
     }
     {
+      :letter "j",
+      :min-len 24,
+      :max-len 42,
       :samples [
         [
           132
@@ -1501,12 +1504,12 @@
           80
           66
         ]
-      ],
-      :letter "j",
-      :min-len 24,
-      :max-len 42
+      ]
     }
     {
+      :letter "g",
+      :min-len 24,
+      :max-len 36,
       :samples [
         [
           80
@@ -1572,12 +1575,12 @@
           65
           80
         ]
-      ],
-      :letter "g",
-      :min-len 24,
-      :max-len 36
+      ]
     }
     {
+      :letter "s",
+      :min-len 23,
+      :max-len 39,
       :samples [
         [
           166
@@ -2052,12 +2055,12 @@
           65
           56
         ]
-      ],
-      :letter "s",
-      :min-len 23,
-      :max-len 39
+      ]
     }
     {
+      :letter "n",
+      :min-len 22,
+      :max-len 41,
       :samples [
         [
           160
@@ -2300,12 +2303,12 @@
           160
           128
         ]
-      ],
-      :letter "n",
-      :min-len 22,
-      :max-len 41
+      ]
     }
     {
+      :letter "m",
+      :min-len 21,
+      :max-len 40,
       :samples [
         [
           33
@@ -2529,12 +2532,12 @@
           132
           130
         ]
-      ],
-      :letter "m",
-      :min-len 21,
-      :max-len 40
+      ]
     }
     {
+      :letter "r",
+      :min-len 16,
+      :max-len 51,
       :samples [
         [
           20
@@ -2772,6 +2775,59 @@
           81
         ]
         [
+          160
+          132
+          130
+          130
+          160
+          160
+          160
+          132
+          160
+          132
+          132
+          33
+          132
+          132
+          132
+          132
+          132
+          33
+          132
+          132
+          132
+          33
+          160
+          33
+          132
+          132
+          160
+          132
+          132
+          132
+          132
+          132
+          132
+          160
+          132
+          160
+          132
+          160
+          132
+          33
+          33
+          132
+          132
+          132
+          160
+          160
+          160
+          132
+          160
+          40
+          10
+        ]
+        [
           166
           160
           160
@@ -2951,12 +3007,12 @@
           33
           33
         ]
-      ],
-      :letter "r",
-      :min-len 16,
-      :max-len 51
+      ]
     }
     {
+      :letter "b",
+      :min-len 16,
+      :max-len 19,
       :samples [
         [
           80
@@ -3075,12 +3131,12 @@
           80
           24
         ]
-      ],
-      :letter "b",
-      :min-len 16,
-      :max-len 19
+      ]
     }
     {
+      :letter "v",
+      :min-len 14,
+      :max-len 14,
       :samples [
         [
           24
@@ -3098,12 +3154,12 @@
           66
           80
         ]
-      ],
-      :letter "v",
-      :min-len 14,
-      :max-len 14
+      ]
     }
     {
+      :letter "i^n",
+      :min-len 12,
+      :max-len 12,
       :samples [
         [
           24
@@ -3119,12 +3175,12 @@
           130
           40
         ]
-      ],
-      :letter "\xeen",
-      :min-len 12,
-      :max-len 12
+      ]
     }
     {
+      :letter "c",
+      :min-len 11,
+      :max-len 24,
       :samples [
         [
           80
@@ -3270,12 +3326,12 @@
           80
           80
         ]
-      ],
-      :letter "c",
-      :min-len 11,
-      :max-len 24
+      ]
     }
     {
+      :letter "e`",
+      :min-len 10,
+      :max-len 10,
       :samples [
         [
           33
@@ -3289,12 +3345,12 @@
           33
           128
         ]
-      ],
-      :letter "e`",
-      :min-len 10,
-      :max-len 10
+      ]
     }
     {
+      :letter "l",
+      :min-len 10,
+      :max-len 21,
       :samples [
         [
           160
@@ -3511,12 +3567,12 @@
           33
           65
         ]
-      ],
-      :letter "l",
-      :min-len 10,
-      :max-len 21
+      ]
     }
     {
+      :letter "t",
+      :min-len 9,
+      :max-len 25,
       :samples [
         [
           128
@@ -3881,12 +3937,12 @@
           160
           32
         ]
-      ],
-      :letter "t",
-      :min-len 9,
-      :max-len 25
+      ]
     }
     {
+      :letter "e",
+      :min-len 8,
+      :max-len 18,
       :samples [
         [
           20
@@ -4043,12 +4099,12 @@
           132
           5
         ]
-      ],
-      :letter "e",
-      :min-len 8,
-      :max-len 18
+      ]
     }
     {
+      :letter "f",
+      :min-len 7,
+      :max-len 13,
       :samples [
         [
           160
@@ -4101,12 +4157,12 @@
           24
           2
         ]
-      ],
-      :letter "f",
-      :min-len 7,
-      :max-len 13
+      ]
     }
     {
+      :letter "p",
+      :min-len 7,
+      :max-len 19,
       :samples [
         [
           80
@@ -4241,12 +4297,33 @@
           80
           24
         ]
-      ],
-      :letter "p",
-      :min-len 7,
-      :max-len 15
+        [
+          65
+          80
+          80
+          65
+          80
+          65
+          80
+          80
+          65
+          80
+          80
+          80
+          80
+          80
+          80
+          80
+          80
+          24
+          97
+        ]
+      ]
     }
     {
+      :letter "in",
+      :min-len 6,
+      :max-len 8,
       :samples [
         [
           20
@@ -4296,12 +4373,12 @@
           80
           80
         ]
-      ],
-      :letter "in",
-      :min-len 6,
-      :max-len 8
+      ]
     }
     {
+      :letter "un",
+      :min-len 5,
+      :max-len 11,
       :samples [
         [
           24
@@ -4332,12 +4409,12 @@
           40
           32
         ]
-      ],
-      :letter "un",
-      :min-len 5,
-      :max-len 11
+      ]
     }
     {
+      :letter "i",
+      :min-len 5,
+      :max-len 18,
       :samples [
         [
           80
@@ -4423,10 +4500,7 @@
           33
           132
         ]
-      ],
-      :letter "i",
-      :min-len 5,
-      :max-len 18
+      ]
     }
   ],
   :min-refseq 5

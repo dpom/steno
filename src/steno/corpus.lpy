@@ -7,8 +7,15 @@
    [steno.converter :as conv]
    [steno.extractor :as extr]
    [steno.imageprocessor :as img]
+   [steno.spec :as spec]
    [steno.utils :as utl])
   (:import pathlib))
+
+(defn save-corpus-item
+  [outfile corpus-item]
+  (utl/save-pprint-edn outfile corpus-item
+                       :indent-size 2
+                       :priority-keys spec/corpus-priority-keys))
 
 (defn extract-lsign-from-wsign!
   [imagefile outdir row column wsign]
@@ -22,7 +29,7 @@
                           :pos i})
             outname (format "%s-%02d-%02d-%01d.edn" fname row column i)
             outfile (bio/path outdir outname)]
-        (utl/save-edn outfile lsign)))))
+        (save-corpus-item outfile lsign)))))
 
 (defn walk-matrix!
   "Traverse a matrix and execute the function for each cell. The function has 3 arguments: row index, column index, and cell content."

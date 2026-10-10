@@ -1,5 +1,6 @@
 {
-  :column 0,
+  :fileimage "tmp/template/template-04-04.png",
+  :pos 0,
   :width 58,
   :height 33,
   :ltype 1,
@@ -395,7 +396,6 @@
       194
     ]
   ],
-  :row 0,
-  :pos 0,
-  :fileimage "tmp/template/template-04-04.png"
+  :column 0,
+  :row 0
 }

@@ -1,5 +1,6 @@
 {
-  :column 0,
+  :fileimage "tmp/yoga_001_1/yoga_001_1-19-05.png",
+  :pos 2,
   :width 53,
   :height 37,
   :ltype 0,
@@ -345,7 +346,6 @@
       40
     ]
   ],
-  :row 0,
-  :pos 2,
-  :fileimage "tmp/yoga_001_1/yoga_001_1-19-05.png"
+  :column 0,
+  :row 0
 }
