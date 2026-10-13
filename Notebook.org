@@ -11122,3 +11122,141 @@ ref-cell
                  :indent-size 2
                  :priority-keys [:type-0 :type-1 :letter :min-len :max-len])
   #+end_src
+* 2026-10-12
+
+- incep analiza detectiilor gresite in cele trei fisiere:
+  #+begin_src clojure
+  (require
+ '[steno.imageprocessor :as imgproc]
+ '[steno.converter :as conv]
+ '[dev.show :as show]
+ '[steno.utils :as utl])
+
+(import
+ cv2
+ )
+
+  (def cale-imagine "tmp/template/template-01-01.png")
+  (def image (cv2/imread cale-imagine cv2/IMREAD_GRAYSCALE))
+
+(def best (imgproc/process-image image))
+
+  (show/show-image best)
+
+  (utl/endpoint-coords best)
+  ;; => ([2 2] [49 1])
+
+  (def res0 (conv/image-to-lineseq best))
+  (count res0)
+  ;; => 1
+
+  (def wsign (conv/image-to-wsign best))
+
+  (require
+   '[steno.translator :as tra]
+   '[steno.translators.diff :as diff])
+
+  (def diff-refs (utl/load-edn "resources/diff-references.edn"))
+
+  (def n-ref (->> diff-refs
+                  :type-1
+                  (filter #(= "n" (:letter %)))))
+
+(def lineseq (:lineseq (first wsign)))
+  (def numseq (tra/get-numseq lineseq))
+
+  (diff/check-letter n-ref numseq)
+  ;; => ["n" 0.7386363636363636 28]
+
+  (diff/check-letters (:type-1 diff-refs) numseq)
+  ;; => [["t" 0.8611111111111112] [40 24 66 80 65 80 80 65 65 20 33 5 132 33 132 132 160 132 160 132]]
+
+  #+end_src
+* 2026-10-13
+
+- s-ar parea ca pricipul de alegere a solutiei cu match cel mai mare este gresit, revin la alegerea solutiei cu cea mai mare lungime si mai mare decat min-match
+  #+begin_src clojure
+  (require
+   '[steno.imageprocessor :as imgproc]
+   '[steno.converter :as conv]
+   '[dev.show :as show]
+   '[steno.utils :as utl]
+   '[steno.translator :as tra]
+   '[steno.translators.diff :as diff]
+   )
+
+(import
+ cv2
+ )
+
+  (def cale-imagine "tmp/template/template-01-01.png")
+  (def image (cv2/imread cale-imagine cv2/IMREAD_GRAYSCALE))
+
+(def best (imgproc/process-image image))
+
+  (show/show-image best)
+
+  (utl/endpoint-coords best)
+  ;; => ([2 2] [49 1])
+
+  (def res0 (conv/image-to-lineseq best))
+  (count res0)
+  ;; => 1
+
+  (def wsign (conv/image-to-wsign best))
+  (def lineseq (:lineseq (first wsign)))
+
+  (count lineseq)
+  ;; => 87
+
+
+  (def numseq (tra/get-numseq lineseq))
+  (count numseq)
+  ;; => 87
+
+  (def diff-refs (utl/load-edn "resources/diff-references.edn"))
+
+  (def n-ref (->> diff-refs
+                  :type-1
+                  (filter #(= "n" (:letter %)))))
+
+  (diff/check-letters (:type-1 diff-refs) numseq)
+  ;; => [["n" 0.7846153846153846] [160 132 33 160 160 160 132 1]]
+
+  (require '[steno.translators.freq :as freq])
+
+  (def freq-refs (utl/load-edn "resources/freq-references.edn"))
+    (def n-freq-ref (->> freq-refs
+                         :type-1
+                         (filter #(= "n" (:letter %)))))
+n-freq-ref
+  ;; => ({:min-match 0.6754966887417219, :reference {128 1, 160 11, 33 4, 65 4, 66 5, 130 9, 132 4, 5 4, 40 10, 10 8, 80 18, 20 5, 24 4}, :letter "n", :min-len 65, :max-len 123})
+
+
+  (freq/check-letter (:type-1 freq-refs) numseq)
+  ;; => ["j" 0.8181818181818181 []]
+
+
+  (def seq-len (count numseq))
+  (def results (reduce (fn [acc {:keys [min-len max-len reference letter min-match]}]
+                          (if (< seq-len min-len)
+                            acc
+                            (let [len (min seq-len max-len)
+                                  freq (frequencies (aslice numseq len))
+                                  match (freq/match-freq reference freq)]
+                              (if (< match min-match)
+                                acc
+                                (conj acc [letter match (if (> seq-len max-len) (aslice numseq (- seq-len max-len) seq-len) [])])))))
+                        []
+                       (:type-1 freq-refs)))
+  results
+  [["j" 0.8181818181818181 []]
+   ["s" 0.8089887640449438 []]
+   ["n" 0.7283236994219653 []]
+   ["r" 0.6614173228346456 []]
+   ["c" 0.6984126984126984 [160 40 130 40 130 160 40 130 40 130 40 10 66 24 10 66 80 24 66 80 80 24 66 20 65 80 80 80 80 80 80 80 20 65 80 20 65 80 20 5 5 33 132 5 5 33 132 33 132 33 132 33 160 132 33 132 33 160 160 160 132 33 160 132 33 160 160 160 132 1]]
+   ["t" 0.6329113924050633 [130 160 160 160 40 130 40 130 160 40 130 40 130 40 10 66 24 10 66 80 24 66 80 80 24 66 20 65 80 80 80 80 80 80 80 20 65 80 20 65 80 20 5 5 33 132 5 5 33 132 33 132 33 132 33 160 132 33 132 33 160 160 160 132 33 160 132 33 160 160 160 132 1]]
+   ["e" 0.5 [66 80 80 24 66 20 65 80 80 80 80 80 80 80 20 65 80 20 65 80 20 5 5 33 132 5 5 33 132 33 132 33 132 33 160 132 33 132 33 160 160 160 132 33 160 132 33 160 160 160 132 1]]]
+
+  #+end_src
+- de asemenea am eliminat normalizarea pentru ca mareste gradul de eroare din cauza unuformizarii numseq

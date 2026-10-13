@@ -58,25 +58,24 @@
               (range (inc (- numseq-len ref-len)))))))
 
 (defn check-letter
-  [{:keys [letter min-len max-len max-bits reference]} numseq]
+  [{:keys [letter min-len max-len max-bits reference min-match]} numseq]
   (let [numseq-len (count numseq)]
     (if (< numseq-len min-len)
       nil
       (let [{:keys [diff len]} (get-best-match reference (aslice numseq (min numseq-len max-len)))
             match (tra/compute-match max-bits diff)]
-        [letter match len]))))
+        (if (>= match (or min-match 0))
+          [letter match len]
+          nil)))))
 
-(defn- check-letters
+(defn check-letters
   [references numseq]
-  (let [matches (reduce (fn [acc ref]
-                          (if-let [new-letter (check-letter ref numseq)]
-                            (conj acc new-letter)
-                            acc))
-                        [[tra/unknown-letter 0 (count numseq)]]
-                        references)
-        [letter match len] (->> matches
-                                (sort-by second)
-                                (last))]
+  (let [[letter match len] (reduce (fn [acc ref]
+                                     (if-let [new-letter (check-letter ref numseq)]
+                                       (reduced new-letter)
+                                       acc))
+                                   [tra/unknown-letter 0 (count numseq)]
+                                   references)]
     [[letter match] (aslice numseq len (count numseq))]))
 
 (defn- translate-numseq
@@ -94,7 +93,7 @@
 
 (defn add-numseq
   [{:keys [lineseq] :as lsign}]
-  (let [numseq (tra/normalize-numseq (mapv last lineseq))
+  (let [numseq (mapv last lineseq)
         len (count numseq)]
     (assoc lsign
            :numseq numseq

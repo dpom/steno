@@ -2,336 +2,387 @@
   :type-0 [
     {
       :letter "o",
-      :min-len 23,
-      :max-len 50,
-      :min-match 0.64,
+      :min-len 68,
+      :max-len 150,
+      :min-match 0.6872246696035242,
       :reference {
-        10 1,
-        130 1,
-        132 3,
-        160 6,
-        20 1,
-        24 1,
-        33 2,
-        40 1,
-        5 2,
-        65 2,
-        66 2,
-        80 5
+        10 4,
+        130 3,
+        132 7,
+        160 18,
+        20 2,
+        24 5,
+        33 7,
+        40 2,
+        5 9,
+        65 3,
+        66 5,
+        80 16
       }
     }
     {
       :letter "a",
-      :min-len 13,
-      :max-len 25,
-      :min-match 0.5833333333333333,
+      :min-len 37,
+      :max-len 73,
+      :min-match 0.7010309278350515,
       :reference {
+        10 3,
         130 1,
-        132 2,
-        160 3,
-        33 1,
-        5 1,
-        65 1,
-        66 1,
-        80 3
+        132 3,
+        160 9,
+        20 2,
+        24 2,
+        33 3,
+        40 2,
+        5 4,
+        65 3,
+        66 2,
+        80 9
       }
     }
   ],
   :type-1 [
     {
       :letter "d",
-      :min-len 30,
-      :max-len 39,
-      :min-match 0.8387096774193549,
-      :reference {
-        130 2,
-        132 3,
-        160 27
-      }
-    }
-    {
-      :letter "t,",
-      :min-len 26,
-      :max-len 29,
-      :min-match 0.9019607843137255,
-      :reference {
-        130 7,
-        132 3,
-        160 8,
-        20 2,
-        33 4,
-        40 2,
-        5 2
-      }
-    }
-    {
-      :letter "j",
-      :min-len 24,
-      :max-len 42,
-      :min-match 0.7,
-      :reference {
-        10 3,
-        130 2,
-        132 3,
-        160 6,
-        20 2,
-        24 3,
-        33 2,
-        40 3,
-        5 1,
-        65 1,
-        66 3,
-        80 5
-      }
-    }
-    {
-      :letter "g",
-      :min-len 24,
-      :max-len 36,
-      :min-match 0.8275862068965517,
-      :reference {
-        20 13,
-        65 14,
-        80 7
-      }
-    }
-    {
-      :letter "s",
-      :min-len 23,
-      :max-len 39,
-      :min-match 0.7407407407407407,
-      :reference {
-        10 3,
-        130 2,
-        132 3,
-        160 5,
-        20 2,
-        24 2,
-        33 3,
-        40 2,
-        5 3,
-        65 2,
-        66 2,
-        80 3
-      }
-    }
-    {
-      :letter "n",
-      :min-len 22,
-      :max-len 41,
-      :min-match 0.5882352941176471,
-      :reference {
-        10 2,
-        130 5,
-        132 1,
-        160 3,
-        20 1,
-        24 1,
-        33 2,
-        40 2,
-        5 1,
-        65 3,
-        66 3,
-        80 5
-      }
-    }
-    {
-      :letter "m",
-      :min-len 21,
-      :max-len 40,
-      :min-match 0.6865671641791045,
-      :reference {
-        10 2,
-        130 1,
-        132 3,
-        160 5,
-        20 1,
-        24 2,
-        33 1,
-        40 1,
-        5 1,
-        65 4,
-        66 2,
-        80 5
-      }
-    }
-    {
-      :letter "r",
-      :min-len 16,
-      :max-len 51,
-      :min-match 0.5901639344262295,
-      :reference {
-        132 14,
-        160 7,
-        33 6,
-        5 1
-      }
-    }
-    {
-      :letter "b",
-      :min-len 16,
-      :max-len 19,
-      :min-match 0.896551724137931,
-      :reference {
-        24 1,
-        66 2,
-        80 13
-      }
-    }
-    {
-      :letter "v",
-      :min-len 14,
-      :max-len 14,
-      :min-match 1.0,
-      :reference {
-        10 1,
-        24 3,
-        66 7,
-        80 3
-      }
-    }
-    {
-      :letter "i^n",
-      :min-len 12,
-      :max-len 12,
-      :min-match 1.0,
-      :reference {
-        130 1,
-        132 2,
-        160 2,
-        20 1,
-        24 1,
-        33 1,
-        40 1,
-        5 2,
-        80 1
-      }
-    }
-    {
-      :letter "c",
-      :min-len 11,
-      :max-len 24,
-      :min-match 0.16666666666666663,
-      :reference {
-        20 4,
-        65 4,
-        80 3
-      }
-    }
-    {
-      :letter "e`",
-      :min-len 10,
-      :max-len 10,
-      :min-match 1.0,
+      :min-len 88,
+      :max-len 115,
+      :min-match 0.8571428571428572,
       :reference {
         128 1,
-        132 1,
-        160 1,
-        20 1,
-        24 1,
-        33 2,
-        40 1,
-        65 1,
-        66 1
-      }
-    }
-    {
-      :letter "l",
-      :min-len 10,
-      :max-len 21,
-      :min-match 0.56,
-      :reference {
-        132 9,
-        160 2,
-        33 5
-      }
-    }
-    {
-      :letter "t",
-      :min-len 9,
-      :max-len 25,
-      :min-match 0.09523809523809523,
-      :reference {
         130 2,
-        132 1,
-        160 10
-      }
-    }
-    {
-      :letter "e",
-      :min-len 8,
-      :max-len 18,
-      :min-match 0.3076923076923077,
-      :reference {
-        10 1,
-        130 1,
-        132 2,
-        160 1,
-        24 1,
-        33 1,
-        40 1,
-        5 1,
-        66 1
-      }
-    }
-    {
-      :letter "f",
-      :min-len 7,
-      :max-len 13,
-      :min-match 0.75,
-      :reference {
-        10 4,
-        2 1,
-        24 4,
-        66 1
-      }
-    }
-    {
-      :letter "p",
-      :min-len 7,
-      :max-len 19,
-      :min-match 0.8181818181818181,
-      :reference {
-        80 9
-      }
-    }
-    {
-      :letter "in",
-      :min-len 6,
-      :max-len 8,
-      :min-match 0.0,
-      :reference {
-        10 1,
-        24 1,
+        132 5,
+        160 78,
+        33 6,
         40 2
       }
     }
     {
-      :letter "un",
-      :min-len 5,
-      :max-len 11,
+      :letter "t,",
+      :min-len 77,
+      :max-len 86,
+      :min-match 0.8974358974358975,
+      :reference {
+        130 11,
+        132 10,
+        160 28,
+        20 3,
+        33 10,
+        40 11,
+        5 11,
+        65 2
+      }
+    }
+    {
+      :letter "j",
+      :min-len 71,
+      :max-len 126,
+      :min-match 0.7329192546583851,
+      :reference {
+        10 11,
+        130 5,
+        132 6,
+        16 1,
+        160 18,
+        20 4,
+        24 5,
+        33 5,
+        40 6,
+        5 6,
+        65 4,
+        66 6,
+        80 14
+      }
+    }
+    {
+      :letter "g",
+      :min-len 71,
+      :max-len 107,
+      :min-match 0.7954545454545454,
+      :reference {
+        20 30,
+        5 20,
+        65 30,
+        80 26
+      }
+    }
+    {
+      :letter "s",
+      :min-len 69,
+      :max-len 115,
+      :min-match 0.7421383647798743,
+      :reference {
+        10 10,
+        130 5,
+        132 6,
+        160 20,
+        20 4,
+        24 6,
+        33 7,
+        40 4,
+        5 12,
+        65 4,
+        66 5,
+        80 10
+      }
+    }
+    {
+      :letter "n",
+      :min-len 65,
+      :max-len 123,
+      :min-match 0.6754966887417219,
+      :reference {
+        10 8,
+        128 1,
+        130 9,
+        132 4,
+        160 11,
+        20 5,
+        24 4,
+        33 4,
+        40 10,
+        5 4,
+        65 4,
+        66 5,
+        80 18
+      }
+    }
+    {
+      :letter "m",
+      :min-len 61,
+      :max-len 118,
+      :min-match 0.7474747474747474,
+      :reference {
+        10 6,
+        130 4,
+        132 6,
+        160 12,
+        20 6,
+        24 4,
+        32 1,
+        33 6,
+        40 3,
+        5 6,
+        65 7,
+        66 3,
+        80 17
+      }
+    }
+    {
+      :letter "b",
+      :min-len 47,
+      :max-len 56,
       :min-match 0.8,
       :reference {
-        10 1,
+        20 1,
+        24 5,
+        65 1,
+        66 5,
+        80 39
+      }
+    }
+    {
+      :letter "r",
+      :min-len 46,
+      :max-len 152,
+      :min-match 0.6444444444444444,
+      :reference {
+        132 27,
+        160 20,
+        33 27,
+        5 7
+      }
+    }
+    {
+      :letter "v",
+      :min-len 41,
+      :max-len 41,
+      :min-match 1.0,
+      :reference {
+        10 4,
+        24 12,
+        66 12,
+        8 1,
+        80 12
+      }
+    }
+    {
+      :letter "i^n",
+      :min-len 36,
+      :max-len 36,
+      :min-match 1.0,
+      :reference {
+        130 3,
+        132 3,
+        160 7,
+        2 1,
+        20 2,
         24 2,
+        32 1,
+        33 2,
+        40 3,
+        5 6,
+        65 3,
+        66 1,
+        80 2
+      }
+    }
+    {
+      :letter "c",
+      :min-len 32,
+      :max-len 70,
+      :min-match 0.33333333333333337,
+      :reference {
+        20 12,
+        5 5,
+        65 12,
+        80 11
+      }
+    }
+    {
+      :letter "l",
+      :min-len 29,
+      :max-len 61,
+      :min-match 0.6493506493506493,
+      :reference {
+        132 17,
+        160 11,
+        20 1,
+        33 17,
+        5 4,
+        65 1
+      }
+    }
+    {
+      :letter "e`",
+      :min-len 28,
+      :max-len 28,
+      :min-match 1.0,
+      :reference {
+        10 1,
+        12 1,
+        128 1,
+        130 2,
+        132 3,
+        160 3,
+        20 3,
+        24 1,
+        33 5,
+        40 2,
+        5 1,
+        65 2,
+        66 2,
+        80 1
+      }
+    }
+    {
+      :letter "t",
+      :min-len 26,
+      :max-len 73,
+      :min-match 0.2142857142857143,
+      :reference {
+        130 2,
+        132 2,
+        160 31,
+        33 2,
+        40 2
+      }
+    }
+    {
+      :letter "e",
+      :min-len 23,
+      :max-len 52,
+      :min-match 0.4,
+      :reference {
+        10 3,
+        130 2,
+        132 4,
+        160 5,
+        2 1,
+        20 1,
+        24 2,
+        33 3,
+        40 3,
+        5 3,
+        65 1,
+        66 3,
+        80 2
+      }
+    }
+    {
+      :letter "p",
+      :min-len 21,
+      :max-len 55,
+      :min-match 0.6829268292682926,
+      :reference {
+        20 1,
+        24 1,
+        65 1,
+        66 1,
+        80 25
+      }
+    }
+    {
+      :letter "f",
+      :min-len 19,
+      :max-len 38,
+      :min-match 0.6666666666666667,
+      :reference {
+        10 13,
+        2 1,
+        24 8,
         40 1,
-        66 2
+        66 8
+      }
+    }
+    {
+      :letter "in",
+      :min-len 18,
+      :max-len 24,
+      :min-match 0.43243243243243246,
+      :reference {
+        10 4,
+        130 2,
+        160 2,
+        24 1,
+        40 2,
+        66 1,
+        80 2
+      }
+    }
+    {
+      :letter "un",
+      :min-len 14,
+      :max-len 33,
+      :min-match 0.6382978723404256,
+      :reference {
+        10 4,
+        130 2,
+        24 4,
+        40 3,
+        66 4,
+        80 1
       }
     }
     {
       :letter "i",
-      :min-len 5,
-      :max-len 18,
-      :min-match 0.5714285714285714,
+      :min-len 13,
+      :max-len 52,
+      :min-match 0.5909090909090908,
       :reference {
-        132 2,
-        20 1,
+        10 2,
+        130 2,
+        132 4,
+        160 5,
+        20 2,
         24 1,
-        33 1,
+        33 3,
         40 1,
-        80 2
+        5 4,
+        65 1,
+        66 1,
+        80 5
       }
     }
   ],
-  :min-refseq 5
+  :min-refseq 13
 }

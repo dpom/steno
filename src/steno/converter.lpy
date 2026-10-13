@@ -265,6 +265,7 @@
       (if (empty? (:start-cells new-state))
         (filterv seq new-acc)
         (recur new-state new-acc)))))
+
 (defn- lineseq-to-lsign
   "Convert a LINESEQ in a lsign (a map with lineseq and ltype keys)."
   [lineseq]

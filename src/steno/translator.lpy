@@ -52,8 +52,7 @@
 (defn get-numseq
   [lineseq]
   (->> lineseq
-       (map #(nth % 2))
-       (normalize-numseq)))
+       (mapv #(nth % 2))))
 
 (defn select-char
   [new-text old-text]

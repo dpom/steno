@@ -53,7 +53,7 @@
 
 (defn- add-numseq
   [{:keys [lineseq] :as lsign}]
-  (let [numseq (tra/normalize-numseq (mapv last lineseq))]
+  (let [numseq (mapv last lineseq)]
     (assoc lsign :numseq numseq :len (count numseq))))
 
 (defn- build-letter-reference
@@ -110,7 +110,7 @@
         [[best-letter (:score best-match)] (aslice numseq advance-len (count numseq))]))))
 
 (defn- translate-numseq
-  "Translate a normalized CNUMSEQ of LTYPE using k-NN with K neighbors."
+  "Translate a CNUMSEQ of LTYPE using k-NN with K neighbors."
   [references cnumseq ltype k]
   (if (zero? ltype)
     [(first (classify-numseq (:type-0 references) cnumseq k))]
