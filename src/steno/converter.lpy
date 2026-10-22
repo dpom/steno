@@ -58,16 +58,16 @@
           [#{} 0]
           spec/all-directions))
 
-(defn- get-liniar-sequence
+(defn get-liniar-sequence
   "Return a liniar numeric sequence.
 
    Params:
    - mat : the word matrix
-   - status: (map) status of the extracting process
+   - state: (map) state of the extracting process
      - start-cell : [row column]
      - prev-cells : (set) previous cells with value 1 processed
 
-   Returns: status map updated + numseq"
+   Returns: state map updated + numseq"
   [mat {:keys [start-cell prev-cells]}]
   (loop [start start-cell
          prev prev-cells
@@ -111,11 +111,12 @@
                                              acc
                                              (let [new-seq (get-liniar-sequence mat
                                                                                 (assoc acc
+                                                                                       :line []
+                                                                                       :start-cells #{}
                                                                                        :start-cell cell))
                                                    new-acc  {:prev-cells (:prev-cells new-seq)
                                                              :line (conj (:line acc) (:line new-seq))
                                                              :start-cells (into (:start-cells acc) (:start-cells new-seq))}]
-                                               ;; (tap> tap-topic new-acc)
                                                new-acc)))
                                          {:prev-cells prev-cells
                                           :line []
@@ -175,10 +176,12 @@
         res1 (into (aslice mod-lseq min-point) (rseq ref-lseq))]
     [res1 (drop min-point mod-lseq)]))
 
+(declare normalize-lineseqs)
+
 (defn process-lineseq
   [{:keys [prev res modifs-count]} lseq]
   (if (parallel-lineseq? lseq)
-    (let [[lseq1 lseq2] lseq]
+    (let [[lseq1 lseq2] (if (> (count lseq) 2) (normalize-lineseqs lseq) lseq)]
       (cond
         (or (= (get-ltype lseq1) 0) (= (get-ltype lseq2) 0)) ; exist already a loop
         {:prev nil
@@ -221,6 +224,18 @@
       {:prev lseq
        :res (filterv identity (conj res prev))
        :modifs-count modifs-count})))
+
+(defn normalize-lineseqs
+  [lineseqs]
+  (let [{:keys [prev res modifs-count]} (reduce process-lineseq
+                                                {:prev nil
+                                                 :res []
+                                                 :modifs-count 0}
+                                                lineseqs)
+        new-lineseqs (filterv identity (conj res prev))]
+    (if (zero? modifs-count)
+      new-lineseqs
+      (normalize-lineseqs new-lineseqs))))
 
 (defn- get-loop-start
   [line]
@@ -274,20 +289,12 @@
     {:ltype ltype
      :lineseq ls}))
 
-(defn- lineseqs-to-wsign
+(defn lineseqs-to-wsign
   "Convert a sequence of LINESEQ in a wsign (a sequence of lsign)."
   [lineseqs]
-  (let [{:keys [prev res modifs-count]} (reduce process-lineseq
-                                                {:prev nil
-                                                 :res []
-                                                 :modifs-count 0}
-                                                lineseqs)
-        new-lineseqs (filterv identity (conj res prev))]
-    ;; (tap> tap-topic {:modifs modifs-count
-    ;;                  :lineseq new-lineseqs})
-    (if (zero? modifs-count)
-      (mapv lineseq-to-lsign new-lineseqs)
-      (lineseqs-to-wsign new-lineseqs))))
+  (->> lineseqs
+       normalize-lineseqs
+       (mapv lineseq-to-lsign)))
 
 (defn- normalize1-lsign
   "LSIGN lineseq should start with the cell closest to the origin."

@@ -2,7 +2,6 @@
   (:require
    [basilisp.edn :as edn]
    [basilisp.io :as bio]
-   [basilisp.pprint :as p]
    [basilisp.string :as str])
   (:import
    cv2
@@ -21,11 +20,6 @@
   "Get a slice of a matrix"
   [m r1 r2 c1 c2]
   `(aget ~m (python/tuple [(python/slice ~r1 ~r2) (python/slice ~c1 ~c2)])))
-
-(defn print4tap
-  "Print function for tap>, useful in REPL."
-  [map]
-  (p/print-table (keys map) [map]))
 
 (defn bin-u8
   "Convert 0/255 skeleton as uint8 0/1."
@@ -184,10 +178,6 @@
       (first)))
 
 (comment
-
-  (add-tap (bound-fn* print4tap))
-
-  (tap> {:a 2 :b 5})
 
   (nested-levels [1 2 3])               ; => 1
   (nested-levels [[1 2] 3])             ; => 2

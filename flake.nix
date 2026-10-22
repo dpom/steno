@@ -32,7 +32,7 @@
               pkgs.clj-kondo
               pkgs.cljfmt
               pkgs.cq
-              pkgs.gimp
+              pkgs.pinta
               pkgs.openspec
               pkgs.uv
               python

@@ -115,7 +115,7 @@
   (let [outfile (entry-path corpus-dir select imagefile pos)
         lsign (cnv/normalize2-lsign lsign)]
     (.mkdir (.-parent outfile) ** :parents true :exist_ok true)
-    (utl/save-edn outfile (lsign-entry imagefile pos lsign))
+    (utl/save-pprint-edn  outfile (lsign-entry imagefile pos lsign))
     (.info logger "Saved in %s" outfile)
     outfile))
 
