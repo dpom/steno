@@ -16,6 +16,7 @@
    [basilisp.io :as bio]
    [basilisp.string :as str]
    [steno.converter :as cnv]
+   [steno.corpus :as corp]
    [steno.imageprocessor :as img]
    [steno.translator :as tra]
    [steno.utils :as utl])
@@ -87,8 +88,6 @@
   {:ltype (:ltype lsign)
    :lineseq (:lineseq lsign)
    :fileimage imagefile
-   :row 0
-   :column 0
    :pos pos})
 
 (defn entry-filename
@@ -115,7 +114,7 @@
   (let [outfile (entry-path corpus-dir select imagefile pos)
         lsign (cnv/normalize2-lsign lsign)]
     (.mkdir (.-parent outfile) ** :parents true :exist_ok true)
-    (utl/save-pprint-edn  outfile (lsign-entry imagefile pos lsign))
+    (corp/save-corpus-item  outfile (lsign-entry imagefile pos lsign))
     (.info logger "Saved in %s" outfile)
     outfile))
 
