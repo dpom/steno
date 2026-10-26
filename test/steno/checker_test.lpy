@@ -1,5 +1,5 @@
 (require '[steno.checker :as chk])
-(import [cv2] [numpy :as np] [tempfile :as tf] [logging])
+(import pathlib [tempfile :as tf] [logging])
 
 (defn- check!
   [cond msg]
@@ -21,14 +21,8 @@
         "previous available when not on first glyph")
 
 ;; 1.2 loadable-file?: nil image or empty wsign counts as unreadable
-(def ring
-  (np/array [[0 0 255 0 0 0]
-             [0 255 0 255 0 0]
-             [255 0 0 0 255 0]
-             [0 255 0 255 0 0]
-             [0 0 255 0 0 0]] ** :dtype np/uint8))
 (def tmp-goods (tf/NamedTemporaryFile ** :suffix ".png" :delete false))
-(.write tmp-goods (second (cv2/imencode ".png" ring)))
+(.write tmp-goods (.read_bytes (pathlib/Path "test/resources/rol.png")))
 (.close tmp-goods)
 
 (def tmp-bad (tf/NamedTemporaryFile ** :suffix ".png" :delete false))

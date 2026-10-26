@@ -11,7 +11,8 @@
    [steno.translators.diff]
    [steno.translators.freq]
    [steno.translators.knn]
-   [steno.utils :as utl])
+   [steno.utils :as utl]
+   [steno.web-checker :as web])
   (:import
    [argparse :as arg]
    [logging :as log]
@@ -156,10 +157,12 @@
         translators (get config "translators")
         logger (:logger config)]
     (.info logger "Check %s using %s" infile translators)
-    (chk/run-checker! (tra/prepare-translations config translators)
+    (web/run-checker! (tra/prepare-translations config translators)
                       translators
-                      (chk/expand-input infile)
-                      outdir)))
+                      (if infile (chk/expand-input infile) [])
+                      outdir
+                      :port (get config "port" web/default-port)
+                      :no-browser? (boolean (get config "no_browser")))))
 
 (def actions
   {"help"               action-help
@@ -188,6 +191,11 @@
                    :action "append")
     (.add_argument parser  "-d" "--debug" ** :help "debug mode"
                    :action "store_true")
+    (.add_argument parser "--port" ** :help "checker web server port"
+                   :type int
+                   :default web/default-port)
+    (.add_argument parser "--no-browser" ** :help "do not open the checker in a browser"
+                   :action "store_true")
     (let [args   (.parse_args parser)
           logger (log/getLogger "steno")
           config (assoc (get-config args)
@@ -197,7 +205,7 @@
           log-formatter (log/Formatter "%(asctime)s - %(levelname)s - %(message)s")
           action (get actions (get config "action"))]
       (.setLevel logger log/DEBUG)
-      (.setLevel ch (if (.- args debug) log/DEBUG log/INFO))
+      (.setLevel ch (if (get config "debug") log/DEBUG log/INFO))
       (.setFormatter ch log-formatter)
       (.addHandler logger ch)
       (action config))))

@@ -65,8 +65,6 @@
 (def CORPUS-ITEM
   [:map
    [:fileimage string?]
-   [:row nat-int?]
-   [:column nat-int?]
    [:pos nat-int?]
    [:ltype LTYPE]
    [:lineseq LSEQ]

@@ -1,30 +1,30 @@
 ## 1. Pure checker core
 
-- [ ] 1.1 Remove the tkinter imports, widget builders, and `run-checker!` from `src/steno/checker.lpy`; keep every pure function and its docstring
-- [ ] 1.2 Keep image encoding out of the pure core and available to the web adapter (`matrix -> PNG bytes`)
-- [ ] 1.3 Run `test/steno/checker_test.lpy` to confirm the pure core still passes
+- [x] 1.1 Remove the tkinter imports, widget builders, and `run-checker!` from `src/steno/checker.lpy`; keep every pure function and its docstring
+- [x] 1.2 Keep image encoding out of the pure core and available to the web adapter (`matrix -> PNG bytes`)
+- [x] 1.3 Run `test/steno/checker_test.lpy` to confirm the pure core still passes
 
 ## 2. Web checker server
 
-- [ ] 2.1 Add `src/steno/web_checker.lpy` with the session state atom, mutation lock, and JSON response helpers
-- [ ] 2.2 Serialize the current state: queue position, glyph original and processed images, rows with thumbnails and formatted translator chains, letters, status, and busy flag
-- [ ] 2.3 Implement `GET /api/state` and `POST /api/open`, `/api/nav`, `/api/save`, and `/api/delete`
-- [ ] 2.4 Reuse `load-position-data`, `save-row!`, and `savable-row?` so skip and corpus semantics stay unchanged (ADR-0002)
-- [ ] 2.5 Serve `index.html`, `app.js`, and `app.css` from `src/steno/web/`
-- [ ] 2.6 Implement the lifecycle: loopback bind, port 8765 default, ephemeral fallback, `--no-browser`, and URL reporting
+- [x] 2.1 Add `src/steno/web_checker.lpy` with the session state atom, mutation lock, and JSON response helpers
+- [x] 2.2 Serialize the current state: queue position, glyph original and processed images, rows with thumbnails and formatted translator chains, letters, status, and busy flag
+- [x] 2.3 Implement `GET /api/state` and `POST /api/open`, `/api/nav`, `/api/save`, and `/api/delete`
+- [x] 2.4 Reuse `load-position-data`, `save-row!`, and `savable-row?` so skip and corpus semantics stay unchanged (ADR-0002)
+- [x] 2.5 Serve `index.html`, `app.js`, and `app.css` from `src/steno/web/`
+- [x] 2.6 Implement the lifecycle: loopback bind, port 8765 default, ephemeral fallback, `--no-browser`, and URL reporting
 
 ## 3. Browser UI
 
-- [ ] 3.1 Add the three-panel page: path field and Open control, "gliph image" panel, "lsigns" table, controls, and status line
-- [ ] 3.2 Render the rows with Lsign, start, freq, diff, knn, select (with existing-letter suggestions), and save columns
-- [ ] 3.3 Add Save, Previous, Next, and Delete actions with delete confirmation
-- [ ] 3.4 Disable controls while a request is in flight, show progress, and surface boundary, skip, save, and error messages
-- [ ] 3.5 Add keyboard shortcuts matching the previous app: Ctrl-S save, Ctrl-Left previous, Ctrl-Right next, Ctrl-D delete
+- [x] 3.1 Add the three-panel page: path field and Open control, "gliph image" panel, "lsigns" table, controls, and status line
+- [x] 3.2 Render the rows with Lsign, start, freq, diff, knn, select (with existing-letter suggestions), and save columns
+- [x] 3.3 Add Save, Previous, Next, and Delete actions with delete confirmation
+- [x] 3.4 Disable controls while a request is in flight, show progress, and surface boundary, skip, save, and error messages
+- [x] 3.5 Add keyboard shortcuts matching the previous app: Ctrl-S save, Ctrl-Left previous, Ctrl-Right next, Ctrl-D delete
 
 ## 4. CLI integration
 
-- [ ] 4.1 Rewire `action-check` in `src/steno/core.lpy` to start the web checker and accept an omitted input
-- [ ] 4.2 Add `--port` and `--no-browser` arguments and pass them to the checker lifecycle
+- [x] 4.1 Rewire `action-check` in `src/steno/core.lpy` to start the web checker and accept an omitted input
+- [x] 4.2 Add `--port` and `--no-browser` arguments and pass them to the checker lifecycle
 
 ## 5. Tests
 

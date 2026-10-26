@@ -1,0 +1,272 @@
+(require '[basilisp.json :as json]
+         '[basilisp.io :as bio]
+         '[basilisp.string :as str]
+         '[steno.utils :as utl]
+         '[steno.web-checker :as web])
+(import pathlib
+        [logging]
+        [shutil :as sh]
+        [tempfile :as tf]
+        [threading :as th]
+        [urllib.request :as req])
+
+(defn- check!
+  [cond msg]
+  (when-not cond
+    (throw (Exception. msg))))
+
+(def test-ctx {:logger (logging/getLogger "web-checker-test")})
+(def test-translators [])
+
+(defn- with-tmp
+  [f]
+  (let [tmp (tf/TemporaryDirectory)]
+    (try
+      (f (.-name tmp))
+      (finally (.cleanup tmp)))))
+
+(defn- copy-glyph
+  [dir name]
+  (let [dest (bio/path dir name)]
+    (sh/copyfile "test/resources/rol.png" dest)
+    (str dest)))
+
+(defn- write-bad
+  [dir name]
+  (let [dest (bio/path dir name)]
+    (spit dest "not an image")
+    (str dest)))
+
+(defn- with-server
+  [thunk opts]
+  (let [{:keys [inputs corpus-dir]} opts
+        session (web/make-session test-ctx test-translators corpus-dir (vec (or inputs [])))
+        server (web/make-server session "127.0.0.1" 0)
+        base (str "http://127.0.0.1:" (.-server_port server))
+        thread (th/Thread ** :daemon true
+                           :target (fn [] (.serve_forever server)))]
+    (.start thread)
+    (try
+      (thunk base)
+      (finally
+        (.shutdown server)
+        (.server_close server)))))
+
+(defn- http-json
+  [url & [opts]]
+  (let [{:keys [method body]} opts
+        data (when body (.encode (json/write-str body) "utf-8"))
+        request (req/Request url ** :method (or method "GET")
+                             :data data
+                             :headers (if data {"Content-Type" "application/json"} {}))]
+    (with-open [resp (req/urlopen request)]
+      (json/read-str (.decode (.read resp) "utf-8")))))
+
+(defn- http-text
+  [url]
+  (with-open [resp (req/urlopen url)]
+    (.decode (.read resp) "utf-8")))
+
+(defn- glyph-dir
+  [root]
+  (let [dir (str (pathlib/Path root) "/glyphs")]
+    (.mkdir (pathlib/Path dir) ** :parents true :exist_ok true)
+    dir))
+
+(defn- corpus-dir
+  [root]
+  (str (pathlib/Path root) "/corpus"))
+
+(defn test-initial-state!
+  []
+  (with-tmp
+    (fn [root]
+      (with-server
+        (fn [base]
+          (let [state (http-json (str base "/api/state"))]
+            (check! (= 0 (get state "count")) "empty queue count")
+            (check! (= [] (get state "rows")) "empty queue rows")
+            (check! (= "Ready" (get state "status")) "initial status")
+            (check! (false? (get state "busy?")) "initially idle")
+            (check! (= [] (get state "letters")) "no letters yet")))
+        {:corpus-dir (corpus-dir root)}))))
+
+(defn test-static-assets!
+  []
+  (with-tmp
+    (fn [root]
+      (with-server
+        (fn [base]
+          (check! (str/includes? (http-text (str base "/")) "gliph image")
+                  "index page has the glyph panel label")
+          (let [app-js (http-text (str base "/app.js"))]
+            (check! (str/includes? app-js "fetch(")
+                    "javascript asset is served")
+            (check! (str/includes? app-js "\"save?\"")
+                    "javascript uses the save? API key"))
+          (check! (str/includes? (http-text (str base "/app.css")) ".glyph")
+                  "stylesheet asset is served"))
+        {:corpus-dir (corpus-dir root)}))))
+
+(defn test-open-skips-unreadable!
+  []
+  (with-tmp
+    (fn [root]
+      (let [dir (glyph-dir root)]
+        (write-bad dir "01-bad.png")
+        (let [good (copy-glyph dir "02-good.png")]
+          (write-bad dir "03-bad.png")
+          (with-server
+            (fn [base]
+              (let [state (http-json (str base "/api/open")
+                                     {:method "POST"
+                                      :body {"path" dir}})]
+                (check! (= 3 (get state "count")) "queue keeps all images")
+                (check! (= 1 (get state "idx")) "skip lands on the readable glyph")
+                (check! (= good (get state "imagefile")) "readable glyph is current")
+                (check! (str/starts-with? (get state "status") "Skipped unreadable glyph")
+                        "skip is reported")
+                (check! (= 3 (count (get state "rows"))) "rows for the readable glyph")
+                (check! (str/starts-with? (get-in state ["glyph" "original"])
+                                          "data:image/png;base64,")
+                        "original glyph is inlined")
+                (check! (str/starts-with? (get-in state ["glyph" "processed"])
+                                          "data:image/png;base64,")
+                        "processed glyph is inlined")
+                (check! (true? (get state "can-prev")) "previous is available")
+                (check! (true? (get state "can-next")) "next is available")))
+            {:corpus-dir (corpus-dir root)}))))))
+
+(defn test-navigation-boundaries!
+  []
+  (with-tmp
+    (fn [root]
+      (let [dir (glyph-dir root)]
+        (copy-glyph dir "01-a.png")
+        (let [good2 (copy-glyph dir "02-b.png")]
+          (with-server
+            (fn [base]
+              (let [_ (http-json (str base "/api/open")
+                                     {:method "POST"
+                                      :body {"path" dir}})
+                    first-state (http-json (str base "/api/nav")
+                                     {:method "POST"
+                                      :body {"direction" "prev"}})]
+                (check! (= 0 (get first-state "idx")) "stays on the first glyph")
+                (check! (= "This is the first glyph" (get first-state "status"))
+                        "first boundary is reported")
+                (let [second-state (http-json (str base "/api/nav")
+                                     {:method "POST"
+                                      :body {"direction" "next"}})]
+                  (check! (= 1 (get second-state "idx")) "advances one glyph")
+                  (check! (= good2 (get second-state "imagefile")) "second glyph is current")
+                  (check! (= "Ready" (get second-state "status")) "navigation is ready")
+                  (let [last-state (http-json (str base "/api/nav")
+                                     {:method "POST"
+                                      :body {"direction" "next"}})]
+                    (check! (= 1 (get last-state "idx")) "stays on the last glyph")
+                    (check! (= good2 (get last-state "imagefile")) "last glyph stays current")
+                    (check! (= "No more glyphs to review" (get last-state "status"))
+                            "last boundary is reported")
+                    (let [back-state (http-json (str base "/api/nav")
+                                     {:method "POST"
+                                      :body {"direction" "prev"}})]
+                      (check! (= 0 (get back-state "idx")) "returns to the previous glyph"))))))
+            {:corpus-dir (corpus-dir root)}))))))
+
+(defn test-save-filtering!
+  []
+  (with-tmp
+    (fn [root]
+      (let [dir (glyph-dir root)
+            corpus (corpus-dir root)]
+        (let [good (copy-glyph dir "01-good.png")]
+          (with-server
+            (fn [base]
+              (http-json (str base "/api/open")
+                                     {:method "POST"
+                                      :body {"path" dir}})
+              (let [saved (http-json (str base "/api/save")
+                                     {:method "POST"
+                                      :body {"rows" [{"pos" 0 "select" "t" "save?" true}
+                                                    {"pos" 1 "select" "t" "save?" false}
+                                                    {"pos" 2 "select" "" "save?" true}]}})
+                    rows (get saved "rows")
+                    entry-path (str (pathlib/Path corpus) "/t/01-good-0.edn")]
+                (check! (= "Saved 1 signs" (get saved "status")) "only one row is saved")
+                (check! (= ["t"] (get saved "letters")) "the new letter folder is listed")
+                (check! (.is_file (pathlib/Path entry-path)) "corpus entry is written")
+                (let [entry (utl/load-edn entry-path)]
+                  (check! (= 0 (:pos entry)) "entry keeps the lsign position")
+                  (check! (= good (:fileimage entry)) "entry keeps the source image")
+                  (check! (vector? (:lineseq entry)) "entry keeps the lineseq"))
+                (check! (= "t" (get (first rows) "select")) "first selection is merged")
+                (check! (false? (get (second rows) "save?")) "unchecked save is merged")
+                (check! (= "" (get (nth rows 2) "select")) "empty selection is merged")))
+            {:corpus-dir corpus}))))))
+
+(defn test-delete!
+  []
+  (with-tmp
+    (fn [root]
+      (let [dir (glyph-dir root)]
+        (let [good1 (copy-glyph dir "01-a.png")
+              good2 (copy-glyph dir "02-b.png")]
+          (with-server
+            (fn [base]
+              (http-json (str base "/api/open")
+                                     {:method "POST"
+                                      :body {"path" dir}})
+              (let [after-first (http-json (str base "/api/delete") {:method "POST"})]
+                (check! (= 1 (get after-first "count")) "queue shrinks")
+                (check! (= 0 (get after-first "idx")) "index stays at the front")
+                (check! (= good2 (get after-first "imagefile")) "next glyph becomes current")
+                (check! (str/starts-with? (get after-first "status") "Deleted")
+                        "deletion is reported")
+                (check! (not (.exists (pathlib/Path good1))) "first glyph is removed")
+                (let [after-second (http-json (str base "/api/delete") {:method "POST"})]
+                  (check! (= 0 (get after-second "count")) "empty queue after last delete")
+                  (check! (nil? (get after-second "imagefile")) "no current glyph")
+                  (check! (= [] (get after-second "rows")) "no rows")
+                  (check! (= "No more glyphs to review" (get after-second "status"))
+                          "empty queue is reported")
+                  (check! (not (.exists (pathlib/Path good2))) "last glyph is removed"))))
+            {:corpus-dir (corpus-dir root)}))))))
+
+(defn test-open-unknown-path!
+  []
+  (with-tmp
+    (fn [root]
+      (with-server
+        (fn [base]
+          (let [state (http-json (str base "/api/open")
+                                     {:method "POST"
+                                      :body {"path" "/does/not/exist"}})]
+            (check! (str/starts-with? (get state "status") "No glyph images found")
+                    "unknown path is reported")))
+        {:corpus-dir (corpus-dir root)}))))
+
+(defn test-port-fallback!
+  []
+  (with-tmp
+    (fn [root]
+      (let [session (web/make-session test-ctx test-translators (corpus-dir root) [])
+            first (web/make-server session "127.0.0.1" 0)
+            taken (.-server_port first)
+            second (web/make-server session "127.0.0.1" taken)]
+        (try
+          (check! (not= taken (.-server_port second))
+                  "busy port falls back to an ephemeral port")
+          (finally
+            (.server_close first)
+            (.server_close second)))))))
+
+(test-initial-state!)
+(test-static-assets!)
+(test-open-skips-unreadable!)
+(test-navigation-boundaries!)
+(test-save-filtering!)
+(test-delete!)
+(test-open-unknown-path!)
+(test-port-fallback!)
+(println "web checker HTTP tests passed")

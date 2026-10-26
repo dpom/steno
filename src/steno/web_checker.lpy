@@ -1,0 +1,406 @@
+(ns steno.web-checker
+  "Loopback web UI and HTTP session for the translator checker.
+
+   The namespace owns the browser-facing state, the JSON API, the static
+   page assets and the server lifecycle. All domain behavior is delegated to
+   the pure functions in `steno.checker`, so corpus writes keep the ADR-0002
+   contract."
+  (:require
+   [basilisp.core :refer [format]]
+   [basilisp.json :as json]
+   [basilisp.string :as str]
+   [steno.checker :as chk]
+   [steno.imageprocessor :as img])
+  (:import
+   base64
+   cv2
+   pathlib
+   [threading :as th]
+   [wsgiref.simple_server :as wsgi]
+   webbrowser))
+
+(def thumbnail-height 40)
+(def default-port 8765)
+
+;; ---------------------------------------------------------------------------
+;; Images
+;; ---------------------------------------------------------------------------
+
+(defn- scale-height
+  "Resize MAT proportionally to HEIGHT pixels."
+  [mat height]
+  (let [[h w] (.-shape mat)]
+    (if (= h height)
+      mat
+      (cv2/resize mat
+                  (python/tuple [(int (* w (/ height h))) height])
+                  ** :interpolation cv2/INTER_NEAREST))))
+
+(defn- png-bytes
+  "Encode MAT as PNG bytes."
+  [mat]
+  (.tobytes (second (cv2/imencode ".png" mat))))
+
+(defn- data-uri
+  "Encode MAT as a base64 PNG data URI, optionally resized to HEIGHT."
+  ([mat] (data-uri mat nil))
+  ([mat height]
+   (let [mat (if height (scale-height mat height) mat)
+         encoded (.decode (base64/b64encode (png-bytes mat)) "ascii")]
+     (str "data:image/png;base64," encoded))))
+
+(defn- row->json
+  "Convert one review ROW into the JSON row shape used by the page."
+  [row]
+  {:pos (:pos row)
+   :start (:start row)
+   :results (chk/format-results (:results row))
+   :thumb (data-uri (:matrix row) thumbnail-height)
+   :best (:best row)
+   :select (:select row)
+   :save? (boolean (:save? row))})
+
+(defn- glyph->json
+  "Return the original and processed forms of IMAGEFILE as data URIs."
+  [imagefile]
+  (when imagefile
+    (let [original (cv2/imread imagefile cv2/IMREAD_GRAYSCALE)]
+      (when-not (nil? original)
+        {:original (data-uri original)
+         :processed (data-uri (img/process-image original))}))))
+
+(defn- state->json
+  "Serialize the current session state for the browser."
+  [session]
+  (let [{:keys [files idx rows imagefile status busy? corpus-dir]} @(:state* session)]
+    {:count (count files)
+     :idx idx
+     :imagefile imagefile
+     :glyph (glyph->json imagefile)
+     :rows (mapv row->json rows)
+     :letters (chk/letters-list corpus-dir)
+     :status status
+     :busy? (boolean busy?)
+     :can-prev (chk/prev-available? files idx)
+     :can-next (chk/next-available? files idx)}))
+
+;; ---------------------------------------------------------------------------
+;; Session actions
+;; ---------------------------------------------------------------------------
+
+(defn- load-at!
+  "Load the glyph at IDX of the current queue and update the session state."
+  [session idx]
+  (let [{:keys [ctx translators files]} @(:state* session)
+        total (count files)]
+    (swap! (:state* session) assoc
+           :busy? true
+           :status (format "Processing %d/%d …" (inc idx) total))
+    (let [loaded (try
+                   (chk/load-position-data ctx translators files idx)
+                   (catch Exception _
+                     {:imagefile nil :idx idx :rows [] :skipped []}))
+          {:keys [imagefile rows skipped]} loaded
+          status (cond
+                   (seq skipped) (format "Skipped unreadable glyph %s" (first skipped))
+                   imagefile "Ready"
+                   (seq files) "No more glyphs to review"
+                   :else "Ready")]
+      (swap! (:state* session) assoc
+             :idx (:idx loaded)
+             :rows (vec rows)
+             :imagefile imagefile
+             :busy? false
+             :status status)
+      @(:state* session))))
+
+(defn- open-input!
+  "Replace the review queue with INPUT (a glyph image or directory)."
+  [session input]
+  (if (:busy? @(:state* session))
+    @(:state* session)
+    (cond
+      (str/blank? input)
+      (do (swap! (:state* session) assoc
+                 :status "Enter a glyph image or directory path")
+          @(:state* session))
+
+      :else
+      (let [files (vec (chk/expand-input input))]
+        (if (empty? files)
+          (do (swap! (:state* session) assoc
+                     :status (format "No glyph images found at %s" input))
+              @(:state* session))
+          (do
+            (swap! (:state* session) assoc
+                   :files files :idx 0 :rows [] :imagefile nil :busy? false)
+            (load-at! session 0)))))))
+
+(defn- navigate!
+  "Move the queue to DIRECTION (\"next\" or \"prev\")."
+  [session direction]
+  (let [{:keys [files idx busy?]} @(:state* session)]
+    (if busy?
+      @(:state* session)
+      (case direction
+        "next" (if (chk/next-available? files idx)
+                 (load-at! session (inc idx))
+                 (swap! (:state* session) assoc
+                        :status "No more glyphs to review"))
+        "prev" (if (chk/prev-available? files idx)
+                 (load-at! session (dec idx))
+                 (swap! (:state* session) assoc
+                        :status "This is the first glyph"))
+        (swap! (:state* session) assoc
+               :status "Unknown navigation direction")))))
+
+(defn- merge-selection
+  "Merge the browser's selection UPDATE into ROW."
+  [row update]
+  (assoc row
+         :select (get update "select" (:select row))
+         :save? (boolean (get update "save?" (:save? row)))))
+
+(defn- apply-selections
+  "Merge the browser UPDATES into the server ROWS by lsign position."
+  [rows updates]
+  (let [by-pos (into {} (map (fn [u] [(get u "pos") u]) updates))]
+    (mapv (fn [row]
+            (if-let [update (get by-pos (:pos row))]
+              (merge-selection row update)
+              row))
+          rows)))
+
+(defn- save-checked!
+  "Persist every merged row accepted by `savable-row?`."
+  [session updates]
+  (let [{:keys [rows imagefile corpus-dir ctx busy?]} @(:state* session)]
+    (if busy?
+      @(:state* session)
+      (let [merged (apply-selections rows updates)
+            savable (filter chk/savable-row? merged)
+            saved-count (count savable)]
+        (swap! (:state* session) assoc :rows merged)
+        (cond
+          (and imagefile (seq savable))
+          (try
+            (doseq [row savable]
+              (chk/save-row! (:logger ctx) corpus-dir imagefile row))
+            (swap! (:state* session) assoc
+                   :status (format "Saved %d signs" saved-count))
+            (catch Exception e
+              (swap! (:state* session) assoc
+                     :status (format "Save failed: %s" e))))
+
+          :else
+          (swap! (:state* session) assoc :status "Nothing to save"))
+        @(:state* session)))))
+
+(defn- delete-current!
+  "Delete the current glyph image, drop it from the queue and reload."
+  [session]
+  (let [{:keys [files idx imagefile busy?]} @(:state* session)]
+    (cond
+      busy? @(:state* session)
+
+      (nil? imagefile)
+      (do (swap! (:state* session) assoc :status "No glyph to delete")
+          @(:state* session))
+
+      :else
+      (let [path (pathlib/Path imagefile)]
+        (when (.exists path)
+          (.unlink path))
+        (let [new-files (vec (keep-indexed (fn [i f] (when (not= i idx) f)) files))
+              new-idx (if (empty? new-files) 0 (min idx (dec (count new-files))))]
+          (swap! (:state* session) assoc
+                 :files new-files :idx new-idx :rows [] :imagefile nil)
+          (if (empty? new-files)
+            (swap! (:state* session) assoc
+                   :status "No more glyphs to review")
+            (do
+              (load-at! session new-idx)
+              (swap! (:state* session) assoc
+                     :status (format "Deleted %s" imagefile))))
+          @(:state* session))))))
+
+;; ---------------------------------------------------------------------------
+;; HTTP layer
+;; ---------------------------------------------------------------------------
+
+(defmacro with-session-lock
+  "Run BODY while holding the session mutation lock."
+  [session & body]
+  `(do
+     (.acquire (:lock ~session))
+     (try
+       ~@body
+       (finally (.release (:lock ~session))))))
+
+(defn- respond
+  "Write one HTTP response with STATUS, CONTENT-TYPE and BODY."
+  [start-response status content-type body]
+  (let [body (if (string? body) (.encode body "utf-8") body)]
+    (start-response status
+                    (python/list [(python/tuple ["Content-Type" content-type])
+                                  (python/tuple ["Content-Length" (str (count body))])
+                                  (python/tuple ["Cache-Control" "no-store"])]))
+    (python/list [body])))
+
+(defn- json-response
+  "Write DATA as a JSON HTTP response."
+  [start-response status data]
+  (respond start-response status
+           "application/json; charset=utf-8"
+           (json/write-str data)))
+
+(defn- read-body
+  "Read and decode the JSON request body from ENVIRON."
+  [environ]
+  (let [length (try (int (or (get environ "CONTENT_LENGTH") "0"))
+                    (catch Exception _ 0))
+        stream (get environ "wsgi.input")]
+    (if (pos? length)
+      (json/read-str (.decode (.read stream length) "utf-8"))
+      {})))
+
+(defn- asset-root
+  "Directory holding the installed `steno.web-checker` namespace."
+  []
+  (let [module (.-module (find-ns 'steno.web-checker))
+        file (.-__file__ module)]
+    (.-parent (pathlib/Path file))))
+
+(defn- asset-file
+  "Resolve ASSET inside the package web directory, or nil when absent."
+  [asset]
+  (let [root (asset-root)
+        web-dir (.resolve (.joinpath root "web"))
+        path (.resolve (.joinpath web-dir asset))]
+    (when (and (.is_file path)
+               (.is_relative_to path web-dir))
+      path)))
+
+(defn- content-type
+  "Content type for the static ASSET name."
+  [asset]
+  (cond
+    (str/ends-with? asset ".html") "text/html; charset=utf-8"
+    (str/ends-with? asset ".js") "application/javascript; charset=utf-8"
+    (str/ends-with? asset ".css") "text/css; charset=utf-8"
+    :else "application/octet-stream"))
+
+(defn- static-asset
+  "Map a request PATH to a static asset name."
+  [path]
+  (cond
+    (or (= path "/") (= path "/index.html")) "index.html"
+    (= path "/app.js") "app.js"
+    (= path "/app.css") "app.css"
+    :else nil))
+
+(defn- serve-static
+  "Serve the page assets or a JSON 404."
+  [start-response path]
+  (let [asset (static-asset path)]
+    (if-let [file (and asset (asset-file asset))]
+      (respond start-response "200 OK" (content-type asset) (.read_bytes file))
+      (json-response start-response "404 Not Found" {:error "Not found"}))))
+
+(defn make-app
+  "Build the WSGI application bound to SESSION."
+  [session]
+  (fn [environ start-response]
+    (let [method (get environ "REQUEST_METHOD" "GET")
+          path (get environ "PATH_INFO" "/")]
+      (try
+        (cond
+          (and (= method "GET") (= path "/api/state"))
+          (with-session-lock session
+            (json-response start-response "200 OK" (state->json session)))
+
+          (and (= method "POST") (= path "/api/open"))
+          (with-session-lock session
+            (let [body (read-body environ)]
+              (open-input! session (get body "path"))
+              (json-response start-response "200 OK" (state->json session))))
+
+          (and (= method "POST") (= path "/api/nav"))
+          (with-session-lock session
+            (let [body (read-body environ)]
+              (navigate! session (get body "direction"))
+              (json-response start-response "200 OK" (state->json session))))
+
+          (and (= method "POST") (= path "/api/save"))
+          (with-session-lock session
+            (let [body (read-body environ)]
+              (save-checked! session (get body "rows" []))
+              (json-response start-response "200 OK" (state->json session))))
+
+          (and (= method "POST") (= path "/api/delete"))
+          (with-session-lock session
+            (delete-current! session)
+            (json-response start-response "200 OK" (state->json session)))
+
+          (= method "GET")
+          (serve-static start-response path)
+
+          (or (= method "POST") (= method "GET"))
+          (json-response start-response "404 Not Found" {:error "Not found"})
+
+          :else
+          (json-response start-response "405 Method Not Allowed"
+                         {:error "Method not allowed"}))
+        (catch Exception e
+          (json-response start-response "500 Internal Server Error"
+                         {:error (str e)}))))))
+
+(defn make-server
+  "Bind a WSGI server for SESSION on HOST/PORT, falling back to an ephemeral
+   port when PORT is unavailable."
+  [session host port]
+  (let [app (make-app session)]
+    (try
+      (wsgi/make_server host port app)
+      (catch Exception _
+        (wsgi/make_server host 0 app)))))
+
+(defn make-session
+  "Create the in-memory review session for CTX, TRANSLATORS, CORPUS-DIR and
+   the initial INPUTS queue."
+  [ctx translators corpus-dir inputs]
+  (let [state* (atom {:files (vec inputs)
+                      :idx 0
+                      :rows []
+                      :imagefile nil
+                      :status "Ready"
+                      :busy? false
+                      :ctx ctx
+                      :translators translators
+                      :corpus-dir corpus-dir})
+        session {:state* state* :lock (th/Lock)}]
+    (when (seq inputs)
+      (load-at! session 0))
+    session))
+
+(defn run-checker!
+  "Run the checker web server until interrupted.
+
+   CTX is the translation context built once by the check action;
+   TRANSLATORS the selected translator names; INPUTS the initial review
+   queue (expanded glyph image paths); CORPUS-DIR the curated corpus output
+   directory. Options: :port (default 8765) and :no-browser?."
+  [ctx translators inputs corpus-dir & {:keys [port no-browser?]
+                                        :or {port default-port no-browser? false}}]
+  (let [session (make-session ctx translators corpus-dir (vec inputs))
+        server (make-server session "127.0.0.1" port)
+        url (format "http://127.0.0.1:%d/" (.-server_port server))]
+    (when-let [logger (:logger ctx)]
+      (.info logger "Checker available at %s" url))
+    (println (format "Checker available at %s" url))
+    (when-not no-browser?
+      (webbrowser/open url))
+    (try
+      (.serve_forever server)
+      (finally
+        (.server_close server)))))

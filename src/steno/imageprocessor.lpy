@@ -1,7 +1,6 @@
 (ns steno.imageprocessor
   "Prepare the page image"
   (:require
-   [steno.spec :as spec]
    [steno.utils :as utl])
   (:import
    cv2
