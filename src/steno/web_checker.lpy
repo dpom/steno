@@ -14,6 +14,7 @@
   (:import
    base64
    cv2
+   [numpy :as np]
    pathlib
    [threading :as th]
    [wsgiref.simple_server :as wsgi]
@@ -66,8 +67,10 @@
   (when imagefile
     (let [original (cv2/imread imagefile cv2/IMREAD_GRAYSCALE)]
       (when-not (nil? original)
-        {:original (data-uri original)
-         :processed (data-uri (img/process-image original))}))))
+        (let [processed (img/process-image original)
+              display-img (.astype (np/where (np/greater processed 0) 255 0) np/uint8)]
+          {:original (data-uri original)
+           :processed (data-uri display-img)})))))
 
 (defn- state->json
   "Serialize the current session state for the browser."

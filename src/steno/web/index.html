@@ -8,10 +8,23 @@
   </head>
   <body>
     <header>
-      <label for="path">glyph image or directory</label>
-      <input id="path" type="text" spellcheck="false"
-             placeholder="/path/to/glyph.png or /path/to/directory">
-      <button id="open" type="button">Open</button>
+      <div class="open-path">
+        <label for="path">glyph image or directory</label>
+        <input id="path" type="text" spellcheck="false"
+          placeholder="/path/to/glyph.png or /path/to/directory">
+        <button id="open" type="button">Open</button>
+      </div>
+      <div class="controls">
+        <button id="save" type="button">Save</button>
+        <button id="prev" type="button">Previous</button>
+        <button id="next" type="button">Next</button>
+        <button id="delete" type="button">Delete</button>
+      </div>
+      <div class="status-row">
+        <progress id="progress" hidden></progress>
+        <span id="status" role="status">Ready</span>
+        <span id="position"></span>
+      </div>
     </header>
 
     <main>
@@ -50,20 +63,6 @@
         </div>
       </section>
     </main>
-
-    <footer class="panel controls-panel">
-      <div class="controls">
-        <button id="save" type="button">Save</button>
-        <button id="prev" type="button">Previous</button>
-        <button id="next" type="button">Next</button>
-        <button id="delete" type="button">Delete</button>
-      </div>
-      <div class="status-row">
-        <progress id="progress" hidden></progress>
-        <span id="status" role="status">Ready</span>
-        <span id="position"></span>
-      </div>
-    </footer>
 
     <datalist id="letters"></datalist>
     <script src="/app.js"></script>

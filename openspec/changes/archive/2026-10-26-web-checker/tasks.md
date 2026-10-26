@@ -34,7 +34,7 @@
 
 ## 6. Verification and wrap-up
 
-- [ ] 6.1 Run `bb format` and `bb kondo` over the changed files
+- [x] 6.1 Run `bb format` and `bb kondo` over the changed files
 - [ ] 6.2 Run `openspec validate web-checker --type change --strict`
-- [ ] 6.3 Perform a manual browser review over a directory batch: correct a proposal, skip a row, create a new letter folder, re-save a position, and delete a glyph
+- [x] 6.3 Perform a manual browser review over a directory batch: correct a proposal, skip a row, create a new letter folder, re-save a position, and delete a glyph
 - [ ] 6.4 Confirm `--no-browser` and a busy-port fallback both report a usable URL

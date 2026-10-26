@@ -18,6 +18,7 @@
     progress: document.getElementById("progress"),
     status: document.getElementById("status"),
     position: document.getElementById("position"),
+    glyphTitle: document.getElementById("glyph-title"),
   };
 
   let busy = false;
@@ -118,12 +119,14 @@
       els.grid.hidden = false;
       els.original.src = glyph.original;
       els.processed.src = glyph.processed;
-      els.caption.textContent = imagefile || "processed";
+      els.glyphTitle.textContent = imagefile || "gliph image";
+      els.caption.textContent = "processed";
     } else {
       els.empty.hidden = false;
       els.grid.hidden = true;
       els.original.removeAttribute("src");
       els.processed.removeAttribute("src");
+      els.glyphTitle.textContent = "gliph image";
       els.caption.textContent = "processed";
     }
   }
