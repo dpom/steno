@@ -26,17 +26,22 @@
                               (if (empty? src-file)
                                 "src resources"
                                 src-file))))}
-  format {:doc  "Format codebase on default or specific file"
-          :task (let [[src-file] *command-line-args*]
-                  (shell  (str "cljfmt fix "
-                               (if (empty? src-file)
-                                 "src resources"
-                                 src-file))))}
-  edn    {:doc "Format an edn file"
-          :task (let [[edn-file] *command-line-args*
-                      edn (slurp edn-file)]
-                  (-> (process {:in edn :out :write :out-file (io/file edn-file)} "cq -i edn -o edn")
-                      check))}
+   format {:doc  "Format codebase on default or specific file"
+           :task (let [[src-file] *command-line-args*]
+                   (shell  (str "cljfmt fix "
+                                (if (empty? src-file)
+                                  "src resources"
+                                  src-file))))}
+   test   {:doc  "Run all tests"
+           :task (let [files (fs/glob "test/steno" "*.lpy")]
+                   (doseq [f files]
+                     (println (str "\nRunning " f "..."))
+                     (shell "uv run basilisp run" (str f))))}
+   edn    {:doc "Format an edn file"
+           :task (let [[edn-file] *command-line-args*
+                       edn (slurp edn-file)]
+                   (-> (process {:in edn :out :write :out-file (io/file edn-file)} "cq -i edn -o edn")
+                       check))}
   app    {:doc      "Run the application"
           :requires ([clojure.string :as str])
           :task     (apply shell "uv run steno" *command-line-args*)}}}

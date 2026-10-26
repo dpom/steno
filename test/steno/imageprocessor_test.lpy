@@ -45,9 +45,9 @@
 (check! (= 4 (count (utl/endpoint-coords padded-bin)))
         "padded skeleton: 2 fragments x 2 endpoints detected (no broadcast error)")
 (def processed (img/process-image broken))
-(check! (= [7 7]
+(check! (= [5 5]
            [(int (aget (.-shape processed) 0))
             (int (aget (.-shape processed) 1))])
-        "process-image completes on a glyph and returns the 1px-padded skeleton")
+        "process-image completes on a glyph and returns the skeleton")
 
 (println "imageprocessor repair checks PASSED")

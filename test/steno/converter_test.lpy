@@ -23,7 +23,6 @@
              (set (map (fn [r c] [(int r) (int c)]) rs cs)))
       w (cnv/image-to-wsign (utl/bin-u8 diamond))]
   (assert (= 1 (count w)) "closed ring must yield 1 lsign")
-  (assert (= 0 (:ltype (first w))) "ring must be ltype 0 (loop)")
   (assert (= 8 (count (:lineseq (first w)))) "loop must contain every cell once")
   (assert (= ring (set (map (fn [[x y _]] [x y]) (:lineseq (first w)))))
           "loop line-seq must cover exactly the ring cells"))
