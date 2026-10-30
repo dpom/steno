@@ -10,11 +10,11 @@
 
 (def type-0-min-len
   "Minimum len of a type 0 lseq."
-  13)
+  20)
 
 (def type-1-min-len
   "Minimum len of a type 1 lseq."
-  5)
+  10)
 
 (def neighbor-factor
   "Factor that determines how close two cells must be to be neighbors."
@@ -137,7 +137,7 @@
   "True if lineseq size is small (5-)"
   [lseq]
   (let [size (count lseq)]
-    (and (pos? size) (< size 5))))
+    (and (pos? size) (< size type-1-min-len))))
 
 (defn small-type-0-lineseq?
   "True if lineseq size is smaller than min type 0."
@@ -150,88 +150,146 @@
   [lseq]
   (if (and (not (small-type-0-lineseq? lseq)) (neighbors? (first lseq) (last lseq))) 0 1))
 
+(defn lseqs-loop?
+  "Check if the 2 lseqs could be a loop."
+  [lseq1 lseq2]
+  (or (not (small-type-0-lineseq? lseq1))
+      (not (small-type-0-lineseq? lseq2))))
+
 (defn loop?
   "True if the 2 line sequences build a loop"
   [lseq1 lseq2]
-  (and (neighbors? (first lseq1) (first lseq2))
-       (neighbors? (last lseq1) (last lseq2))))
+  (and
+   (lseqs-loop? lseq1 lseq2)
+   (neighbors? (first lseq1) (first lseq2))
+   (neighbors? (last lseq1) (last lseq2))))
 
 (defn reverse-loop?
   "True if the 2 line sequences build a loop, second lseq is reversed"
   [lseq1 lseq2]
-  (and (neighbors? (first lseq1) (last lseq2))
-       (neighbors? (last lseq1) (first lseq2))))
+  (and
+   (lseqs-loop? lseq1 lseq2)
+   (neighbors? (first lseq1) (last lseq2))
+   (neighbors? (last lseq1) (first lseq2))))
 
 (defn extract-loop
   [lseq1 lseq2]
   (let [c (< (count lseq1) (count lseq2))
         ref-lseq (if c lseq1 lseq2)
         mod-lseq (if c lseq2 lseq1)
-        df (partial dist (last ref-lseq))
+        ref-point (last ref-lseq)
+        df (partial dist ref-point)
         min-point (->> mod-lseq
                        (map df)
                        (map-indexed vector)
                        (apply min-key second)
-                       first)
-        res1 (into (aslice mod-lseq min-point) (rseq ref-lseq))]
-    [res1 (drop min-point mod-lseq)]))
+                       first)]
+    (if (neighbors? ref-point (nth mod-lseq min-point))
+      (let [res1 (into (aslice mod-lseq min-point) (rseq ref-lseq))]
+        [res1 (vec (drop min-point mod-lseq))])
+      [lseq1 lseq2])))
 
 (declare normalize-lineseqs)
 
 (defn process-lineseq
-  [{:keys [prev res modifs-count]} lseq]
+  [{:keys [prev res modifs-count] :as status} lseq]
+  (tap> "***")
+  (tap> status)
   (if (parallel-lineseq? lseq)
     (let [[lseq1 lseq2] (if (> (count lseq) 2) (normalize-lineseqs lseq) lseq)]
       (cond
-        (or (= (get-ltype lseq1) 0) (= (get-ltype lseq2) 0)) ; exist already a loop
-        {:prev nil
-         :res (filterv identity  (conj res prev lseq1 lseq2))
-         :modifs-count (inc modifs-count)}
-
-        (loop? lseq1 lseq2) ; the 2 lseqs make a loop
-        {:prev nil
-         :res (filterv identity  (conj res prev (into lseq1 (rseq lseq2))))
-         :modifs-count (inc modifs-count)}
-
-        (and (small-type-0-lineseq? lseq1) (small-type-0-lineseq? lseq2)) ; break the parallel sequence
-        {:prev lseq2
-         :res (filterv identity  (conj res prev lseq1))
-         :modifs-count (inc modifs-count)}
-
+        ;; first lseq is a loop
+        (= (get-ltype lseq1) 0)
+        (do
+          (tap> {:cond 1 :lseq1 lseq1 :lseq2 lseq2})
+          {:prev lseq2
+           :res (filterv identity  (conj res prev lseq1))
+           :modifs-count modifs-count})
+        ;; second lseq is a loop
+        (= (get-ltype lseq2) 0)
+        (do
+          (tap> {:cond 2 :lseq1 lseq1 :lseq2 lseq2})
+          {:prev nil
+           :res (filterv identity  (conj res prev lseq1 lseq2))
+           :modifs-count modifs-count})
+        ;; the 2 lseqs make a loop
+        (loop? lseq1 lseq2)
+        (do
+          (tap> {:cond 3 :lseq1 lseq1 :lseq2 lseq2})
+          {:prev nil
+           :res (filterv identity  (conj res prev (into lseq1 (rseq lseq2))))
+           :modifs-count modifs-count})
+        ;; remove the noise (2 small lseqs)
+        (and (small-type-1-lineseq? lseq1) (small-type-1-lineseq? lseq2))
+        (do
+          (tap> {:cond 4 :lseq1 lseq1 :lseq2 lseq2})
+          {:prev nil
+           :res res
+           :modifs-count modifs-count})
+        ;; extract a loop and remove noise
         :else
         (let [[res1 res2] (extract-loop lseq1 lseq2)]
+          (tap> {:cond 5 :res1 res1 :res2 res2})
           {:prev nil
-           :res (filterv identity  (conj res prev res1 res2))
+           :res (filterv identity (cond->  (conj res prev)
+                                    (not (small-type-1-lineseq? res1)) (conj res1)
+                                    (not (small-type-1-lineseq? res2)) (conj res2)))
            :modifs-count (inc modifs-count)})))
     (cond
+      ;; prev and lseq are a loop
       (and prev (loop? prev lseq))
-      {:prev nil
-       :res (filterv identity  (conj res (into prev (rseq lseq))))
-       :modifs-count (inc modifs-count)}
+      (do
+        (tap> {:cond 11 :prev prev :lseq lseq})
+        {:prev nil
+         :res (filterv identity  (conj res (into prev (rseq lseq))))
+         :modifs-count modifs-count})
+      ;; prev and lseq are a reverse loop
       (and prev (reverse-loop? prev lseq))
-      {:prev nil
-       :res (filterv identity  (conj res (into prev lseq)))
-       :modifs-count (inc modifs-count)}
+      (do
+        (tap> {:cond 12 :prev prev :lseq lseq})
+        {:prev nil
+         :res (filterv identity  (conj res (into prev lseq)))
+         :modifs-count modifs-count})
+      ;; lseq is already a loop
       (= (get-ltype lseq) 0)
-      {:prev nil
-       :res (filterv identity  (conj res prev lseq))
-       :modifs-count modifs-count}
-      (small-type-1-lineseq? prev) ; small  prev, add it to the lseq
-      {:prev (into prev lseq)
-       :res res
-       :modifs-count (inc modifs-count)}
+      (do
+        (tap> {:cond 13 :prev prev :lseq lseq})
+        {:prev nil
+         :res (filterv identity  (conj res prev lseq))
+         :modifs-count modifs-count})
+      ;; prev prezent
+      prev
+      (do
+        (tap> {:cond 14 :prev prev :lseq lseq})
+        {:prev (into prev lseq)
+         :res res
+         :modifs-count modifs-count})
+      ;; current lseq too small, ignore
+      (small-type-1-lineseq? lseq)
+      (do
+        (tap> {:cond 15 :prev prev :lseq lseq})
+        {:prev lseq
+         :res res
+         :modifs-count (inc modifs-count)})
+      ;; nothing to do
       :else
-      {:prev lseq
-       :res (filterv identity (conj res prev))
-       :modifs-count modifs-count})))
+      (do
+        (tap> {:cond 16 :prev prev :lseq lseq})
+        {:prev lseq
+         :res res
+         :modifs-count modifs-count}))))
+
+(defn process-all-lineseqs
+  [lineseqs]
+  (reduce process-lineseq
+          {:prev nil
+           :res []
+           :modifs-count 0}
+          lineseqs))
 
 (defn normalize-lineseqs
   [lineseqs]
-  (let [{:keys [prev res modifs-count]} (reduce process-lineseq
-                                                {:prev nil
-                                                 :res []
-                                                 :modifs-count 0}
-                                                lineseqs)
+  (let [{:keys [prev res modifs-count]} (process-all-lineseqs lineseqs)
         new-lineseqs (filterv identity (conj res prev))]
     (if (zero? modifs-count)
       new-lineseqs
