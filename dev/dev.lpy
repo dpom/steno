@@ -1,16 +1,25 @@
 (ns dev.dev
   (:require [basilisp.pprint :as p]))
 
-(defn print4tap
+(defn table4tap
   "Print function for tap>, useful in REPL."
   [map]
   (p/print-table (keys map) [map]))
 
+(defn pp4tap
+  "Pretty print an object in REPl"
+  [obj]
+  (p/pprint obj))
+
 (comment
 
   ;; print4tap usage
-  (add-tap (bound-fn* print4tap))
+  (add-tap (bound-fn* pp4tap))
 
   (tap> {:a 2 :b 5})
+
+  (remove-tap pp4tap)
+
+  (doc basilisp.pprint)
   ;;
   )
