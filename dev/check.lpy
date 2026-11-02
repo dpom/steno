@@ -3,10 +3,10 @@
    [basilisp.io :as bio]
    [dev.show :as show]
    [steno.corpus :as corpus]
-   [steno.utils :as utl])
+   [steno.utils :as utl]
+   [steno.translator :as tra])
   (:import
-   os
-   pathlib))
+   os))
 
 (def corpus-dir "/home/dan/pers/projects/steno/resources/corpus")
 

@@ -223,7 +223,7 @@
         (and (small-type-1-lineseq? lseq1) (small-type-1-lineseq? lseq2))
         (do
           (tap> {:cond 4 :lseq1 lseq1 :lseq2 lseq2})
-          {:prev nil
+          {:prev prev
            :res res
            :modifs-count modifs-count})
         ;; extract a loop and remove noise

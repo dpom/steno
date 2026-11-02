@@ -1,0 +1,16 @@
+(ns dev.converter
+  "Helpers to debug converter."
+  (:require
+   [dev.show :as show]
+   [steno.imageprocessor :as imgproc]
+   [steno.utils :as utl]
+   [steno.converter :as conv])
+  (:import
+   cv2))
+
+(defn get-res
+   [imagefile]
+   (-> imagefile
+       (cv2/imread cv2/IMREAD_GRAYSCALE)
+       (imgproc/process-image)
+       conv/image-to-lineseq))

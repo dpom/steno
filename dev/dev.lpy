@@ -18,8 +18,5 @@
 
   (tap> {:a 2 :b 5})
 
-  (remove-tap pp4tap)
-
-  (doc basilisp.pprint)
   ;;
   )
