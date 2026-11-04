@@ -2,11 +2,31 @@
 (require '[steno.utils :as utl])
 (import [numpy :as np])
 
+(defn- check!
+  [cond msg]
+  (when-not cond
+    (throw (Exception. msg))))
+
+(defn- lseq
+  "Build a lineseq of [x y 1] cells from [[x y] ...] coordinates."
+  [coords]
+  (mapv (fn [[x y]] [x y 1]) coords))
+
+(defn- square-ring
+  "Cells of an N x N square perimeter, ordered as one closed line."
+  [n]
+  (let [last-i (dec n)]
+    (lseq (concat
+           (map (fn [c] [0 c]) (range n))
+           (map (fn [r] [r last-i]) (range 1 n))
+           (map (fn [c] [last-i c]) (reverse (range 0 last-i)))
+           (map (fn [r] [r 0]) (reverse (range 1 last-i)))))))
+
 ;; diamond ring: every cell has exactly 2 neighbours, so the glyph has no
 ;; degree-1 endpoints. This is the "loop-start" case: extraction must fall
-;; back to a foreground start cell and walk the whole loop as a single ltype-0
-;; lsign. (Rings with axis-aligned corners still trip 3-way adjacency in the
-;; parallel merge and may drop the corner cell -- separate limitation.)
+;; back to a foreground start cell and walk the whole loop as a single lsign.
+;; The ring has 8 cells, below type-0-min-len (20), so it is classified as
+;; linear even though it is geometrically closed.
 (def diamond
   (np/array [[0 0 1 0 0 0]
              [0 1 0 1 0 0]
@@ -14,16 +34,93 @@
              [0 1 0 1 0 0]
              [0 0 1 0 0 0]]))
 
-(assert (nil? (seq (utl/endpoint-coords (utl/bin-u8 diamond))))
+(check! (nil? (seq (utl/endpoint-coords (utl/bin-u8 diamond))))
         "ring must have no degree-1 endpoints")
-(assert (= [0 2] (cnv/get-start-point (utl/bin-u8 diamond)))
+(check! (= [0 2] (cnv/get-start-point (utl/bin-u8 diamond)))
         "loop-start must fall back to the topmost-leftmost foreground cell")
 
 (let [ring (let [[rs cs] (np/where (np/greater (utl/bin-u8 diamond) 0))]
              (set (map (fn [r c] [(int r) (int c)]) rs cs)))
       w (cnv/image-to-wsign (utl/bin-u8 diamond))]
-  (assert (= 1 (count w)) "closed ring must yield 1 lsign")
-  (assert (= 8 (count (:lineseq (first w)))) "loop must contain every cell once")
-  (assert (= ring (set (map (fn [[x y _]] [x y]) (:lineseq (first w)))))
-          "loop line-seq must cover exactly the ring cells"))
-(println "converter loop-start tests passed")
+  (check! (= 1 (count w)) "closed ring must yield 1 lsign")
+  (check! (= 8 (count (:lineseq (first w)))) "loop must contain every cell once")
+  (check! (= ring (set (map (fn [[x y _]] [x y]) (:lineseq (first w)))))
+          "loop line-seq must cover exactly the ring cells")
+  (check! (= 1 (:ltype (first w)))
+          "short closed ring stays linear because type-0-min-len is 20"))
+
+;; type-0-min-len remains the loop threshold.
+(check! (= 1 (cnv/get-ltype (lseq [[0 0] [0 1] [0 2] [0 3] [1 3] [1 2] [1 1] [1 0]])))
+        "8-cell closed ring must be linear")
+(check! (= 0 (cnv/get-ltype (square-ring 6)))
+        "20-cell closed ring must be a loop")
+
+;; A single short trace must terminate and be preserved.
+(let [short (lseq [[0 0]])
+      res (cnv/normalize-lineseqs [short])]
+  (check! (= [short] res) "single short trace must terminate and be preserved"))
+
+;; A blank image must produce no lineseqs.
+(check! (= [] (cnv/image-to-lineseq (np/zeros [5 5] ** :dtype np/uint8)))
+        "blank image must yield an empty lineseq vector")
+
+;; The parallel branch must not drop 3+ traces.
+(let [traces [(lseq [[0 0] [0 1] [0 2]])
+              (lseq [[20 0] [20 1] [20 2]])
+              (lseq [[40 0] [40 1] [40 2]])]
+      res (cnv/normalize-lineseqs traces)]
+  (check! (= 3 (count res)) "3 parallel traces must all be preserved")
+  (check! (= 9 (reduce + (map count res))) "3 parallel traces must keep every cell"))
+
+;; Disjoint traces must not be fused.
+(check! (= 2 (count (cnv/normalize-lineseqs
+                     [(lseq [[0 0] [0 1] [0 2]])
+                      (lseq [[0 20] [0 21] [0 22]])])))
+        "non-adjacent traces must stay separate")
+
+;; Adjacent traces must join in either orientation.
+(let [a (lseq (map (fn [c] [0 c]) (range 16)))
+      b (lseq (map (fn [c] [0 c]) (range 16 32)))
+      b-rev (vec (reverse b))]
+  (check! (= 1 (count (cnv/normalize-lineseqs [a b])))
+          "forward adjacent traces must join")
+  (check! (= 32 (count (first (cnv/normalize-lineseqs [a b]))))
+          "forward join must keep every cell")
+  (check! (= 1 (count (cnv/normalize-lineseqs [a b-rev])))
+          "reverse adjacent traces must join")
+  (check! (= 32 (count (first (cnv/normalize-lineseqs [a b-rev]))))
+          "reverse join must keep every cell"))
+
+;; Two parallel traces sharing both endpoints form one closed line.
+(let [a (lseq (map (fn [c] [0 c]) (range 16)))
+      b (lseq (map (fn [c] [1 c]) (range 16)))
+      res (cnv/normalize-lineseqs [a b])]
+  (check! (= 1 (count res)) "two parallel traces must form one line")
+  (check! (= 32 (count (first res))) "loop join must keep every cell")
+  (check! (cnv/neighbors? (first (first res)) (last (first res)))
+          "joined parallel traces must be closed")
+  (check! (= 0 (cnv/get-ltype (first res)))
+          "closed 32-cell line must be a loop"))
+
+;; A 3-way junction must keep its branches separate instead of concatenating
+;; them into one artificial line.
+(let [a (lseq (map (fn [i] [0 i]) (range 12)))
+      b (lseq (map (fn [i] [i 0]) (range 12)))
+      c (lseq (map (fn [i] [i i]) (range 12)))
+      res (cnv/normalize-lineseqs [a b c])]
+  (check! (= 3 (count res)) "3-way junction must keep 3 branches"))
+
+;; A tiny fragment sitting on a junction is noise and must be dropped, while
+;; the larger branches survive.
+(let [a (lseq (map (fn [i] [0 i]) (range 12)))
+      b (lseq (map (fn [i] [i 0]) (range 12)))
+      noise (lseq [[0 0]])
+      res (cnv/normalize-lineseqs [a b noise])]
+  (check! (= 2 (count res)) "junction noise must not become a lsign"))
+
+;; Endpoint start must prefer the topmost row over the leftmost column.
+(let [img (utl/bin-u8 (utl/cells-to-matrix [11 7] [[0 5] [0 6] [10 0] [10 1]]))]
+  (check! (= [0 5] (cnv/get-start-point img))
+          "start point must be the topmost endpoint"))
+
+(println "converter normalization tests passed")

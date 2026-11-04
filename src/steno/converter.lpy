@@ -26,7 +26,7 @@
   [image]
   (let [cells (utl/endpoint-coords image)]
     (if (seq cells)
-      (first (sort-by second cells))
+      (first (sort-by (juxt first second) cells))
       (let [mask (np/greater image 0)
             [rs cs] (np/where mask)]
         (->> (map (fn [r c] [(int r) (int c)]) rs cs)
@@ -150,150 +150,122 @@
   [lseq]
   (if (and (not (small-type-0-lineseq? lseq)) (neighbors? (first lseq) (last lseq))) 0 1))
 
-(defn lseqs-loop?
-  "Check if the 2 lseqs could be a loop."
-  [lseq1 lseq2]
-  (or (not (small-type-0-lineseq? lseq1))
-      (not (small-type-0-lineseq? lseq2))))
-
-(defn loop?
-  "True if the 2 line sequences build a loop"
-  [lseq1 lseq2]
-  (and
-   (lseqs-loop? lseq1 lseq2)
-   (neighbors? (first lseq1) (first lseq2))
-   (neighbors? (last lseq1) (last lseq2))))
-
-(defn reverse-loop?
-  "True if the 2 line sequences build a loop, second lseq is reversed"
-  [lseq1 lseq2]
-  (and
-   (lseqs-loop? lseq1 lseq2)
-   (neighbors? (first lseq1) (last lseq2))
-   (neighbors? (last lseq1) (first lseq2))))
-
-(defn extract-loop
-  [lseq1 lseq2]
-  (let [c (< (count lseq1) (count lseq2))
-        ref-lseq (if c lseq1 lseq2)
-        mod-lseq (if c lseq2 lseq1)
-        ref-point (last ref-lseq)
-        df (partial dist ref-point)
-        min-point (->> mod-lseq
-                       (map df)
-                       (map-indexed vector)
-                       (apply min-key second)
-                       first)]
-    (if (neighbors? ref-point (nth mod-lseq min-point))
-      (let [res1 (into (aslice mod-lseq min-point) (rseq ref-lseq))]
-        [res1 (vec (drop min-point mod-lseq))])
-      [lseq1 lseq2])))
-
-(declare normalize-lineseqs)
-
-(defn process-lineseq
-  [{:keys [prev res modifs-count] :as status} lseq]
-  (tap> "***")
-  (tap> status)
-  (if (parallel-lineseq? lseq)
-    (let [[lseq1 lseq2] (if (> (count lseq) 2) (normalize-lineseqs lseq) lseq)]
-      (cond
-        ;; first lseq is a loop
-        (= (get-ltype lseq1) 0)
-        (do
-          (tap> {:cond 1 :lseq1 lseq1 :lseq2 lseq2})
-          {:prev lseq2
-           :res (filterv identity  (conj res prev lseq1))
-           :modifs-count modifs-count})
-        ;; second lseq is a loop
-        (= (get-ltype lseq2) 0)
-        (do
-          (tap> {:cond 2 :lseq1 lseq1 :lseq2 lseq2})
-          {:prev nil
-           :res (filterv identity  (conj res prev lseq1 lseq2))
-           :modifs-count modifs-count})
-        ;; the 2 lseqs make a loop
-        (loop? lseq1 lseq2)
-        (do
-          (tap> {:cond 3 :lseq1 lseq1 :lseq2 lseq2})
-          {:prev nil
-           :res (filterv identity  (conj res prev (into lseq1 (rseq lseq2))))
-           :modifs-count modifs-count})
-        ;; remove the noise (2 small lseqs)
-        (and (small-type-1-lineseq? lseq1) (small-type-1-lineseq? lseq2))
-        (do
-          (tap> {:cond 4 :lseq1 lseq1 :lseq2 lseq2})
-          {:prev prev
-           :res res
-           :modifs-count modifs-count})
-        ;; extract a loop and remove noise
-        :else
-        (let [[res1 res2] (extract-loop lseq1 lseq2)]
-          (tap> {:cond 5 :res1 res1 :res2 res2})
-          {:prev nil
-           :res (filterv identity (cond->  (conj res prev)
-                                    (not (small-type-1-lineseq? res1)) (conj res1)
-                                    (not (small-type-1-lineseq? res2)) (conj res2)))
-           :modifs-count (inc modifs-count)})))
-    (cond
-      ;; prev and lseq are a loop
-      (and prev (loop? prev lseq))
-      (do
-        (tap> {:cond 11 :prev prev :lseq lseq})
-        {:prev nil
-         :res (filterv identity  (conj res (into prev (rseq lseq))))
-         :modifs-count modifs-count})
-      ;; prev and lseq are a reverse loop
-      (and prev (reverse-loop? prev lseq))
-      (do
-        (tap> {:cond 12 :prev prev :lseq lseq})
-        {:prev nil
-         :res (filterv identity  (conj res (into prev lseq)))
-         :modifs-count modifs-count})
-      ;; lseq is already a loop
-      (= (get-ltype lseq) 0)
-      (do
-        (tap> {:cond 13 :prev prev :lseq lseq})
-        {:prev nil
-         :res (filterv identity  (conj res prev lseq))
-         :modifs-count modifs-count})
-      ;; prev prezent
-      prev
-      (do
-        (tap> {:cond 14 :prev prev :lseq lseq})
-        {:prev (into prev lseq)
-         :res res
-         :modifs-count modifs-count})
-      ;; current lseq too small, ignore
-      (small-type-1-lineseq? lseq)
-      (do
-        (tap> {:cond 15 :prev prev :lseq lseq})
-        {:prev lseq
-         :res res
-         :modifs-count (inc modifs-count)})
-      ;; nothing to do
-      :else
-      (do
-        (tap> {:cond 16 :prev prev :lseq lseq})
-        {:prev lseq
-         :res res
-         :modifs-count modifs-count}))))
-
-(defn process-all-lineseqs
+(defn- flatten-lineseqs
+  "Flatten nested parallel traces into a flat vector of line sequences."
   [lineseqs]
-  (reduce process-lineseq
-          {:prev nil
-           :res []
-           :modifs-count 0}
+  (reduce (fn [acc lseq]
+            (if (> (utl/nested-levels lseq) 2)
+              (into acc (flatten-lineseqs lseq))
+              (if (seq lseq) (conj acc lseq) acc)))
+          []
           lineseqs))
 
-(defn normalize-lineseqs
+(defn- junction-points
+  "Endpoint cells shared by more than two traces in the original extraction."
   [lineseqs]
-  (let [{:keys [prev res modifs-count]} (process-all-lineseqs lineseqs)
-        new-lineseqs (filterv identity (conj res prev))]
-    (if (zero? modifs-count)
-      new-lineseqs
-      (normalize-lineseqs new-lineseqs))))
+  (let [endpoints (mapcat (fn [lseq] (distinct [(first lseq) (last lseq)]))
+                          lineseqs)]
+    (->> endpoints
+         (filter (fn [point]
+                   (> (count (filter (fn [lseq]
+                                       (or (neighbors? point (first lseq))
+                                           (neighbors? point (last lseq))))
+                                     lineseqs))
+                      2)))
+         set)))
+
+(defn- junction-point?
+  "True if POINT lies on a junction found in the original extraction."
+  [junctions point]
+  (some (fn [junction] (neighbors? point junction)) junctions))
+
+(defn- junction-free?
+  "True if neither join point lies on a junction."
+  [junctions p1 p2]
+  (and (not (junction-point? junctions p1))
+       (not (junction-point? junctions p2))))
+
+(defn- noise-lineseq?
+  "True for a tiny fragment that sits on a junction."
+  [junctions lseq]
+  (and (small-type-1-lineseq? lseq)
+       (or (junction-point? junctions (first lseq))
+           (junction-point? junctions (last lseq)))))
+
+(defn- join-loop
+  "Join two line sequences into one closed line when both endpoint pairs are
+   adjacent and neither join point is a junction. Return nil when the sequences
+   do not form a loop."
+  [junctions lseq1 lseq2]
+  (when (and (seq lseq1) (seq lseq2))
+    (cond
+      (and (neighbors? (first lseq1) (first lseq2))
+           (neighbors? (last lseq1) (last lseq2))
+           (junction-free? junctions (first lseq1) (last lseq1)))
+      (into lseq1 (rseq lseq2))
+
+      (and (neighbors? (first lseq1) (last lseq2))
+           (neighbors? (last lseq1) (first lseq2))
+           (junction-free? junctions (first lseq1) (last lseq1)))
+      (into lseq1 lseq2))))
+
+(defn- join-linear
+  "Join two line sequences end-to-end when any endpoint pair is adjacent and
+   the join point is not a junction. Return nil when the sequences are not
+   adjacent."
+  [junctions lseq1 lseq2]
+  (when (and (seq lseq1) (seq lseq2))
+    (cond
+      (and (neighbors? (last lseq1) (first lseq2))
+           (junction-free? junctions (last lseq1) (first lseq2)))
+      (into lseq1 lseq2)
+
+      (and (neighbors? (last lseq1) (last lseq2))
+           (junction-free? junctions (last lseq1) (last lseq2)))
+      (into lseq1 (rseq lseq2))
+
+      (and (neighbors? (first lseq1) (first lseq2))
+           (junction-free? junctions (first lseq1) (first lseq2)))
+      (into (vec (rseq lseq1)) lseq2)
+
+      (and (neighbors? (first lseq1) (last lseq2))
+           (junction-free? junctions (first lseq1) (last lseq2)))
+      (into lseq2 lseq1))))
+
+(defn- flush-pending
+  "Append PENDING to OUT unless it is noise sitting on a junction."
+  [junctions pending out]
+  (if (or (nil? pending) (noise-lineseq? junctions pending))
+    out
+    (conj out pending)))
+
+(defn- normalize-once
+  "Join adjacent line sequences in one left-to-right pass."
+  [junctions lineseqs]
+  (let [{:keys [pending out]}
+        (reduce
+         (fn [{:keys [pending out]} lseq]
+           (if-not pending
+             {:pending lseq :out out}
+             (if-let [joined (join-loop junctions pending lseq)]
+               {:pending nil :out (conj out joined)}
+               (if-let [joined (join-linear junctions pending lseq)]
+                 {:pending joined :out out}
+                 {:pending lseq :out (flush-pending junctions pending out)}))))
+         {:pending nil :out []}
+         lineseqs)]
+    (flush-pending junctions pending out)))
+
+(defn normalize-lineseqs
+  "Flatten nested line sequences and join adjacent traces until stable."
+  [lineseqs]
+  (let [lines (flatten-lineseqs lineseqs)
+        junctions (junction-points lines)]
+    (loop [lines lines]
+      (let [next-lines (normalize-once junctions lines)]
+        (if (< (count next-lines) (count lines))
+          (recur next-lines)
+          next-lines)))))
 
 (defn- get-loop-start
   [line]
@@ -326,18 +298,19 @@
 (defn image-to-lineseq
   "Convert a gliph image in a vector of line sequences."
   [mat]
-  (loop [state {:start-cells #{(get-start-point mat)}
-                :prev-cells #{}
-                :line []}
-         acc []]
-    (tap> state)
-    (let [new-state (if (= (count (:start-cells state)) 1)
-                      (get-liniar-sequence mat (assoc state :start-cell (first (:start-cells state))))
-                      (get-parallel-sequence mat state))
-          new-acc (conj acc (:line new-state))]
-      (if (empty? (:start-cells new-state))
-        (filterv seq new-acc)
-        (recur new-state new-acc)))))
+  (if-let [start (get-start-point mat)]
+    (loop [state {:start-cells #{start}
+                  :prev-cells #{}
+                  :line []}
+           acc []]
+      (let [new-state (if (= (count (:start-cells state)) 1)
+                        (get-liniar-sequence mat (assoc state :start-cell (first (:start-cells state))))
+                        (get-parallel-sequence mat state))
+            new-acc (conj acc (:line new-state))]
+        (if (empty? (:start-cells new-state))
+          (filterv seq new-acc)
+          (recur new-state new-acc))))
+    []))
 
 (defn- lineseq-to-lsign
   "Convert a LINESEQ in a lsign (a map with lineseq and ltype keys)."
@@ -393,17 +366,16 @@
   (show/show-image img)
 
   (def start
+
     (get-start-point img))
   ;; => [101 4]
+  ;; => [7 196]
 
   (get-cell-value img start)
   ;; => 1
 
   (get-cnum-and-neighbors img start)
   ;; => [#{[100 5]} 1]
-
-  (get-liniar-sequence img {:start-cell [101 4] :prev-cells #{} :line []})
-  ;; => {:prev-cells #{[81 38] [80 41] [74 55] [68 66] [69 64] [63 78] [81 39] [76 47] [86 27] [70 62] [62 80] [69 65] [78 44] [67 67] [87 26] [74 54] [59 85] [84 32] [95 12] [55 88] [56 88] [85 29] [57 87] [66 68] [75 52] [94 13] [91 18] [89 23] [84 33] [85 30] [81 37] [99 6] [91 19] [66 69] [86 28] [54 89] [100 5] [96 9] [59 86] [73 56] [66 70] [87 25] [58 87] [77 46] [95 11] [90 20] [65 73] [84 31] [61 83] [70 61] [83 34] [88 24] [98 7] [92 17] [77 45] [66 71] [65 74] [53 90] [83 35] [61 82] [72 57] [90 21] [96 10] [75 53] [71 58] [79 42] [64 76] [90 22] [93 15] [75 51] [61 81] [70 63] [76 49] [71 59] [82 36] [64 75] [93 16] [60 84] [80 40] [75 50] [94 14] [64 77] [78 43] [62 79] [70 60] [97 8] [101 4] [65 72] [76 48]}, :line [[101 4 1] [100 5 5] [99 6 5] [98 7 5] [97 8 5] [96 9 132] [96 10 33] [95 11 132] [95 12 33] [94 13 132] [94 14 33] [93 15 132] [93 16 33] [92 17 5] [91 18 132] [91 19 33] [90 20 132] [90 21 160] [90 22 33] [89 23 5] [88 24 5] [87 25 132] [87 26 33] [86 27 132] [86 28 33] [85 29 132] [85 30 33] [84 31 132] [84 32 160] [84 33 33] [83 34 132] [83 35 33] [82 36 5] [81 37 132] [81 38 160] [81 39 33] [80 40 132] [80 41 33] [79 42 5] [78 43 132] [78 44 33] [77 45 132] [77 46 33] [76 47 132] [76 48 160] [76 49 33] [75 50 132] [75 51 160] [75 52 160] [75 53 33] [74 54 132] [74 55 33] [73 56 5] [72 57 5] [71 58 132] [71 59 33] [70 60 132] [70 61 160] [70 62 160] [70 63 33] [69 64 132] [69 65 33] [68 66 5] [67 67 5] [66 68 132] [66 69 160] [66 70 160] [66 71 33] [65 72 132] [65 73 160] [65 74 33] [64 75 132] [64 76 160] [64 77 33] [63 78 5] [62 79 132] [62 80 33] [61 81 132] [61 82 160] [61 83 33] [60 84 5] [59 85 132] [59 86 33] [58 87 20] [57 87 65] [56 88 20] [55 88 65] [54 89 5] [53 90 148]], :start-cells #{[52 90] [53 91]}}
 
   (def lines
     (image-to-lineseq img))
@@ -413,9 +385,7 @@
 
   (def wsign
     (image-to-wsign img))
-  [{:ltype 1, :lineseq [[48 0 1] [47 1 5] [46 2 5] [45 3 5] [44 4 5] [43 5 132] [43 6 33] [42 7 132] [42 8 33] [41 9 132] [41 10 33] [40 11 132] [40 12 33] [39 13 5] [38 14 132] [38 15 33] [37 16 132] [37 17 160] [37 18 33] [36 19 5] [35 20 5] [34 21 132] [34 22 33] [33 23 132] [33 24 33] [32 25 132] [32 26 33] [31 27 132] [31 28 160] [31 29 33] [30 30 132] [30 31 33] [29 32 5] [28 33 132] [28 34 160] [28 35 33] [27 36 132] [27 37 33] [26 38 5] [25 39 132] [25 40 33] [24 41 132] [24 42 33] [23 43 132] [23 44 160] [23 45 33] [22 46 132] [22 47 160] [22 48 160] [22 49 33] [21 50 132] [21 51 33] [20 52 5] [19 53 5] [18 54 132] [18 55 33] [17 56 132] [17 57 160] [17 58 160] [17 59 33] [16 60 132] [16 61 33] [15 62 5] [14 63 5] [13 64 132] [13 65 160] [13 66 160] [13 67 33] [12 68 132] [12 69 160] [12 70 33] [11 71 132] [11 72 160] [11 73 33] [10 74 5] [9 75 132] [9 76 33] [8 77 132] [8 78 160] [8 79 33] [7 80 5] [6 81 132] [6 82 33] [5 83 20] [4 83 65] [3 84 20] [2 84 65] [1 85 5] [0 86 148]]}
-   {:ltype 0, :lineseq [[0 30 160] [0 29 132] [1 28 33] [1 27 160] [1 26 132] [2 25 33] [2 24 160] [2 23 160] [2 22 132] [3 21 33] [3 20 160] [3 19 160] [3 18 160] [3 17 132] [4 16 5] [5 15 33] [5 14 160] [5 13 132] [6 12 5] [7 11 5] [8 10 33] [8 9 132] [9 8 5] [10 7 5] [11 6 65] [12 6 20] [13 5 65] [14 5 20] [15 4 5] [16 3 65] [17 3 20] [18 2 5] [19 1 65] [20 1 20] [21 0 65] [22 0 80] [23 0 80] [24 0 80] [25 0 80] [26 0 80] [27 0 80] [28 0 80] [29 0 80] [30 0 80] [31 0 24] [32 1 66] [33 1 80] [34 1 24] [35 2 66] [36 2 24] [37 3 66] [38 3 24] [39 4 66] [40 4 24] [41 5 66] [42 5 24] [43 6 10] [44 7 74] [45 8 162] [45 9 33] [44 10 132] [44 11 160] [44 12 160] [44 13 160] [44 14 160] [44 15 160] [44 16 33] [43 17 132] [43 18 160] [43 19 160] [43 20 160] [43 21 160] [43 22 160] [43 23 33] [42 24 132] [42 25 33] [41 26 132] [41 27 33] [40 28 132] [40 29 33] [39 30 5] [38 31 5] [37 32 132] [37 33 33] [36 34 132] [36 35 160] [36 36 33] [35 37 5] [34 38 132] [34 39 33] [33 40 132] [33 41 160] [33 42 33] [32 43 132] [32 44 160] [32 45 33] [31 46 5] [30 47 132] [30 48 160] [30 49 160] [30 50 33] [29 51 20] [28 51 65] [27 52 5] [26 53 132] [26 54 33] [25 55 132] [25 56 33] [24 57 5] [23 58 132] [23 59 33] [22 60 5] [21 61 21] [19 61 88] [18 61 66] [17 60 24] [16 60 80] [15 60 80] [14 60 66] [13 59 24] [12 59 80] [11 59 66] [10 58 10] [9 57 10] [8 56 10] [7 55 10] [6 54 10] [5 53 10] [4 52 40] [4 51 130] [3 50 40] [3 49 160] [3 48 160] [3 47 130] [2 46 40] [2 45 160] [2 44 130] [1 43 40] [1 42 130] [0 41 40] [0 40 160] [0 39 160] [0 38 160] [0 37 160] [0 36 160] [0 35 160] [0 34 160] [0 33 160] [0 32 160] [0 31 160]]}
-   {:ltype 1, :lineseq [[21 0 39] [20 1 132] [20 2 160] [20 3 33] [19 4 132] [19 5 160] [19 6 160] [19 7 160] [19 8 160] [19 9 160] [19 10 33] [18 11 132] [18 12 160] [18 13 33] [17 14 132] [17 15 33] [16 16 132] [16 17 160] [16 18 160] [16 19 160] [16 20 33] [15 21 5] [14 22 132] [14 23 33] [13 24 5] [12 25 132] [12 26 33] [11 27 132] [11 28 160] [11 29 160] [11 30 160] [11 31 33] [10 32 132] [10 33 160] [10 34 160] [10 35 33] [9 36 132] [9 37 33] [8 38 132] [8 39 33] [7 40 132] [7 41 160] [7 42 160] [7 43 33] [6 44 132] [6 45 160] [6 46 160] [6 47 33] [5 48 20] [4 48 65] [3 49 5] [2 50 20] [1 50 65] [0 51 4]]}]
+  ({:ltype 1, :lineseq ([101 4 1] [100 5 5] [99 6 5] [98 7 5] [97 8 5] [96 9 132] [96 10 33] [95 11 132] [95 12 33] [94 13 132] [94 14 33] [93 15 132] [93 16 33] [92 17 5] [91 18 132] [91 19 33] [90 20 132] [90 21 160] [90 22 33] [89 23 5] [88 24 5] [87 25 132] [87 26 33] [86 27 132] [86 28 33] [85 29 132] [85 30 33] [84 31 132] [84 32 160] [84 33 33] [83 34 132] [83 35 33] [82 36 5] [81 37 132] [81 38 160] [81 39 33] [80 40 132] [80 41 33] [79 42 5] [78 43 132] [78 44 33] [77 45 132] [77 46 33] [76 47 132] [76 48 160] [76 49 33] [75 50 132] [75 51 160] [75 52 160] [75 53 33] [74 54 132] [74 55 33] [73 56 5] [72 57 5] [71 58 132] [71 59 33] [70 60 132] [70 61 160] [70 62 160] [70 63 33] [69 64 132] [69 65 33] [68 66 5] [67 67 5] [66 68 132] [66 69 160] [66 70 160] [66 71 33] [65 72 132] [65 73 160] [65 74 33] [64 75 132] [64 76 160] [64 77 33] [63 78 5] [62 79 132] [62 80 33] [61 81 132] [61 82 160] [61 83 33] [60 84 5] [59 85 132] [59 86 33] [58 87 20] [57 87 65] [56 88 20] [55 88 65] [54 89 5] [53 90 148] [53 91 162] [53 92 33] [52 93 132] [52 94 160] [52 95 160] [52 96 160] [52 97 160] [52 98 160] [52 99 33] [51 100 132] [51 101 160] [51 102 160] [51 103 160] [51 104 160] [51 105 160] [51 106 33] [50 107 132] [50 108 33] [49 109 132] [49 110 33] [48 111 132] [48 112 33] [47 113 5] [46 114 5] [45 115 132] [45 116 33] [44 117 132] [44 118 160] [44 119 33] [43 120 5] [42 121 132] [42 122 33] [41 123 132] [41 124 160] [41 125 33] [40 126 132] [40 127 160] [40 128 33] [39 129 5] [38 130 132] [38 131 160] [38 132 160] [38 133 33] [37 134 20] [36 134 65] [35 135 5] [34 136 132] [34 137 33] [33 138 132] [33 139 33] [32 140 5] [31 141 132] [31 142 33] [30 143 5] [29 144 21])} {:ltype 1, :lineseq ([52 90 74] [51 89 10] [50 88 24] [49 88 66] [48 87 24] [47 87 66] [46 86 24] [45 86 66] [44 85 24] [43 85 66] [42 84 24] [41 84 80] [40 84 66] [39 83 24] [38 83 80] [37 83 80] [36 83 80] [35 83 80] [34 83 80] [33 83 80] [32 83 80] [31 83 80] [30 83 80] [29 83 65] [28 84 20] [27 84 65] [26 85 5] [25 86 20] [24 86 65] [23 87 5] [22 88 20] [21 88 65] [20 89 20] [19 89 65] [18 90 5] [17 91 5] [16 92 132] [16 93 33] [15 94 5] [14 95 5] [13 96 132] [13 97 160] [13 98 33] [12 99 5] [11 100 132] [11 101 160] [11 102 160] [11 103 160] [11 104 33] [10 105 132] [10 106 160] [10 107 160] [10 108 33] [9 109 132] [9 110 160] [9 111 33] [8 112 132] [8 113 160] [8 114 160] [8 115 160] [8 116 160] [8 117 160] [8 118 160] [8 119 160] [8 120 160] [8 121 160] [8 122 160] [8 123 160] [8 124 40] [9 125 130] [9 126 40] [10 127 130] [10 128 160] [10 129 40] [11 130 130] [11 131 160] [11 132 160] [11 133 40] [12 134 130] [12 135 40] [13 136 10] [14 137 10] [15 138 10] [16 139 10] [17 140 10] [18 141 10] [19 142 66] [20 142 80] [21 142 24] [22 143 66] [23 143 80] [24 143 80] [25 143 24] [26 144 66] [27 144 88])} {:ltype 1, :lineseq ([28 145 39] [27 146 132] [27 147 160] [27 148 33] [26 149 132] [26 150 160] [26 151 160] [26 152 160] [26 153 160] [26 154 160] [26 155 33] [25 156 132] [25 157 160] [25 158 33] [24 159 132] [24 160 33] [23 161 132] [23 162 160] [23 163 160] [23 164 160] [23 165 33] [22 166 5] [21 167 132] [21 168 33] [20 169 5] [19 170 132] [19 171 33] [18 172 132] [18 173 160] [18 174 160] [18 175 160] [18 176 33] [17 177 132] [17 178 160] [17 179 160] [17 180 33] [16 181 132] [16 182 33] [15 183 132] [15 184 33] [14 185 132] [14 186 160] [14 187 160] [14 188 33] [13 189 132] [13 190 160] [13 191 160] [13 192 33] [12 193 20] [11 193 65] [10 194 5] [9 195 20] [8 195 65] [7 196 4])})
 
 ;;
   )
