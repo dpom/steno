@@ -61,18 +61,25 @@
               p2))))
 
 (defn repair-skeleton
-  "Bridge small gaps in a 1px skeleton IMAGE by connecting nearby dangling endpoints."
+  "Bridge small gaps in a 1px skeleton IMAGE by connecting dangling endpoints
+   that belong to different connected components. Endpoints already joined by a
+   stroke are never bridged: that only adds shortcuts and junctions, which the
+   converter then drops as noise."
   ([image] (repair-skeleton image gap-distance))
   ([image max-gap]
    (let [eps (utl/endpoint-coords image)
-         result (np/copy image)]
+         result (np/copy image)
+         [_ labels] (cv2/connectedComponents image nil 8)]
      (when (> (count eps) 2)
        (doseq [p1 eps
                p2 eps]
-         (when (and (not= p1 p2) (< (math/dist p1 p2) max-gap))
+         (when (and (not= p1 p2)
+                    (< (math/dist p1 p2) max-gap)
+                    (not= (int (aget labels (first p1) (second p1)))
+                          (int (aget labels (first p2) (second p2)))))
            (let [[y1 x1] p1
                  [y2 x2] p2]
-             (cv2/line result [x1 y1] [x2 y2] 255 1)))))
+             (cv2/line result [x1 y1] [x2 y2] 1 1)))))
      result)))
 
 (defn process-image

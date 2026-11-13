@@ -1,4 +1,5 @@
 (require '[steno.imageprocessor :as img])
+(require '[steno.converter :as conv])
 (require '[steno.utils :as utl])
 (import [cv2] [numpy :as np])
 
@@ -23,8 +24,8 @@
 (def fixed (img/repair-skeleton (utl/bin-u8 broken)))
 (check! (= 2 (first (cv2/connectedComponents fixed nil 8)))
         "repair must reconnect to 1 component (+1 background label)")
-(check! (= 255 (int (aget fixed 2 2)))
-        "bridge must fill the gap pixel (2,2)")
+(check! (= 1 (int (aget fixed 2 2)))
+        "bridge must fill the gap pixel (2,2) with the binary foreground value")
 
 ;; A clean continuous stroke must be left unchanged
 (def clean
@@ -49,5 +50,28 @@
            [(int (aget (.-shape processed) 0))
             (int (aget (.-shape processed) 1))])
         "process-image completes on a glyph and returns the skeleton")
+
+;; Regression: endpoints of the SAME connected component must not be bridged.
+;; This Y-shaped stroke has 3 dangling ends; the two on the right/bottom are
+;; 8.5px apart but already connected through the junction. Bridging them creates
+;; a shortcut and turns every trace into a junction fragment that normalize
+;; drops, so the whole glyph used to yield zero line sequences.
+(defn- put-cells!
+  [mat cells]
+  (doseq [[row col] cells]
+    (aset mat row col 1))
+  mat)
+
+(def same-component-y
+  (put-cells! (np/zeros [18 24] ** :dtype np/uint8)
+              (concat (map (fn [c] [6 c]) (range 12 22))
+                      (map (fn [c] [7 c]) (range 8 12))
+                      [[8 11] [9 11] [10 12] [11 13] [12 13] [13 14]
+                       [14 15] [14 16] [14 17] [14 18]])))
+(def y-before (conv/image-to-wsign same-component-y))
+(check! (= 2 (count y-before)) "Y glyph must start with 2 line sequences")
+(def y-after (conv/image-to-wsign (img/repair-skeleton same-component-y)))
+(check! (= (count y-before) (count y-after))
+        "repair must not bridge same-component endpoints and drop line sequences")
 
 (println "imageprocessor repair checks PASSED")
