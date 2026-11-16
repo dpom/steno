@@ -11612,3 +11612,832 @@ res0
 
 
   #+end_src
+
+* 2026-11-13
+
+- algoritmul de conversie de la imagine la lineseqs continuă să nu dea rezultate satisfăcătoare și după ultima refactorizare făcută cu ajutorul AI
+- încerc o nouă abordare folosind biblioteci python specializate:
+  #+begin_src clojure
+  (import
+   [cv2 :as cv2]
+   [numpy :as np]
+   [skimage.morphology :as morph]
+   [scipy.ndimage :as ndimage]
+   [scipy.spatial.distance :as distance])
+
+(defn extrage-forme-elementare
+  "Extrage și clasifică liniile, semicercurile și ovale dintr-o imagine skeletizată.
+   Returnează o colecție de dicționare (map-uri Lisp) cu proprietățile fiecărei forme."
+  [cale-imagine]
+  (let [;; 1. Încărcare și binarizare imagine
+        img (cv2/imread cale-imagine cv2/IMREAD_GRAYSCALE)
+        [_ binary] (cv2/threshold img 127 1 cv2/THRESH_BINARY_INV)
+
+        ;; 2. Scheletizare (asigură grosimea strictă de 1 pixel)
+        ;; În interop, apelăm metodele obiectelor Python folosind prefixul punct (.)
+        skeleton-float (morph/skeletonize binary)
+        skeleton (.astype skeleton-float np/uint8)
+
+        ;; 3. Identificarea intersecțiilor (Junction Detection)
+        kernel (np/array [[1 1 1]
+                          [1 0 1]
+                          [1 1 1]])
+        ;; Kwargs-urile din Python devin perechi de keyword-uri Lisp
+        vecini (ndimage/convolve skeleton kernel :mode "constant" :cval 0)
+
+        ;; Creăm masca booleană folosind funcțiile ufunc din numpy
+        ;; Echivalentul Python: (skeleton == 1) & (vecini > 2)
+        is-skel (np/equal skeleton 1)
+        many-neighbors (np/greater vecini 2)
+        intersectii (np/logical_and is-skel many-neighbors)
+
+        ;; 4. Izolarea segmentelor
+        segmente-img (.copy skeleton)
+
+        ;; Echivalentul Python pentru `segmente_img[intersectii] = 0`
+        ;; În Lisp/Basilisp evităm mutațiile directe prin indecși, folosind funcția nativă numpy `putmask`
+        _ (np/putmask segmente-img intersectii 0)
+
+        ;; Etichetarea fiecărui segment individual
+        [num-labels labels] (cv2/connectedComponents segmente-img)]
+
+    ;; 5. Clasificarea formelor elementare
+    ;; Folosim `keep` pentru a mapa și a filtra simultan fragmentele prea mici (mai mici de 5 pixeli)
+    (vec
+     (keep (fn [label]
+             (let [;; Extragem coordonatele și lungimea
+                   puncte (np/column_stack (np/where (np/equal labels label)))
+                   lungime-arc (count puncte)]
+
+               ;; Trecem mai departe doar dacă lungimea este >= 5
+               (when (>= lungime-arc 5)
+                 (let [distante (distance/pdist puncte)
+                       distanta-maxima (np/max distante)
+                       raport (/ distanta-maxima lungime-arc)
+
+                       ;; Condițiile de clasificare
+                       tip-forma (cond
+                                   (< raport 0.45) "Oval / Buclă"
+                                   (< raport 0.85) "Semicerc / Curbă"
+                                   :else "Linie (dreaptă)")]
+
+                   ;; Returnăm dicționarul Lisp
+                   {:id label
+                    :tip tip-forma
+                    :numar_pixeli lungime-arc
+                    :raport_geometric (round raport 2)}))))
+           (range 1 num-labels)))))
+
+;; Exemplu de apel:
+;; (def rezultate (extrage-forme-elementare "are.png"))
+;; (doseq [forma rezultate] (println forma))
+
+  (require
+   '[dev.show :as show])
+
+
+
+  (def cale-imagine "test/resources/rol.png")
+  (def img (cv2/imread cale-imagine cv2/IMREAD_GRAYSCALE))
+  (show/show-image img)
+
+  (def bin-img (second (cv2/threshold img 127 1 cv2/THRESH_BINARY_INV)))
+
+  (show/show-image bin-img)
+
+(def rezultate (extrage-forme-elementare cale-imagine))
+  ;; (doseq [forma rezultate] (println forma))
+
+(defn extrage-forme-elementare
+  [cale-imagine]
+  (let [;; 1. Încărcare imagine
+        img (cv2/imread cale-imagine cv2/IMREAD_GRAYSCALE)
+
+        ;; Extragere clasică (evităm vector destructuring pentru compatibilitate Basilisp)
+        thresh-result (cv2/threshold img 127 1 cv2/THRESH_BINARY_INV)
+        binary (second thresh-result)
+
+        ;; 2. Scheletizare
+        skeleton-float (morph/skeletonize binary)
+        skeleton (.astype skeleton-float np/uint8)
+
+        ;; 3. Identificarea intersecțiilor
+        kernel (np/array [[1 1 1]
+                          [1 0 1]
+                          [1 1 1]])
+
+        ;; FIX: Pasăm argumentele pozițional: input, weights, output=nil, mode="constant", cval=0
+        vecini (ndimage/convolve skeleton kernel nil "constant" 0)
+
+        is-skel (np/equal skeleton 1)
+        many-neighbors (np/greater vecini 2)
+        intersectii (np/logical_and is-skel many-neighbors)
+
+        ;; 4. Izolarea segmentelor
+        segmente-img (.copy skeleton)
+        _ (np/putmask segmente-img intersectii 0)
+
+        ;; Extragere conectivități tot prin first/second
+        cc-result (cv2/connectedComponents segmente-img)
+        num-labels (first cc-result)
+        labels (second cc-result)]
+
+    ;; 5. Clasificarea formelor elementare
+    (vec
+     (keep (fn [label]
+             (let [puncte (np/column_stack (np/where (np/equal labels label)))
+                   lungime-arc (count puncte)]
+
+               (when (>= lungime-arc 5)
+                 (let [distante (distance/pdist puncte)
+                       distanta-maxima (np/max distante)
+                       raport (/ distanta-maxima lungime-arc)
+
+                       tip-forma (cond
+                                   (< raport 0.45) "Oval / Buclă"
+                                   (< raport 0.85) "Semicerc / Curbă"
+                                   :else "Linie (dreaptă)")]
+
+                   {:id label
+                    :tip tip-forma
+                    :numar_pixeli lungime-arc
+                    :raport_geometric (round raport 2)}))))
+           (range 1 num-labels)))))
+
+  (def rezultate (extrage-forme-elementare cale-imagine))
+  (doseq [forma rezultate] (println forma))
+#+end_src
+- incerc sa modific functia generata de Gemini:
+  #+begin_src clojure
+  (import
+   [cv2 :as cv2]
+   [numpy :as np]
+   [skimage.morphology :as morph]
+   [scipy.ndimage :as ndimage]
+   [scipy.spatial.distance :as distance])
+
+  (require
+   '[dev.show :as show]
+   '[steno.imageprocessor :as imgproc])
+
+  (defn skeletize
+    [cale-imagine]
+    (-> cale-imagine
+        (cv2/imread cv2/IMREAD_GRAYSCALE)
+        (cv2/threshold 127 1 cv2/THRESH_BINARY_INV)
+        (second)
+        (morph/skeletonize)
+        (.astype np/uint8)))
+
+  (def cale-imagine "test/resources/rol.png")
+  (def img (cv2/imread cale-imagine cv2/IMREAD_GRAYSCALE))
+  (show/show-image img)
+
+  (def skeleton (skeletize cale-imagine))
+
+  (def skeleton2 (imgproc/process-image img))
+
+
+  (show/show-image skeleton)
+
+  (show/show-two-images [skeleton skeleton2])
+
+  (show/show-image (imgproc/process-image-best img))
+
+(defn extract-basic-shapes
+  "Extrage și clasifică liniile, semicercurile și ovalele dintr-un skeleton de
+   1 pixel (ieșirea lui `steno.imageprocessor/process-image`)."
+  [skeleton]
+  (let [;; Identificarea intersecțiilor
+        kernel (np/array [[1 1 1]
+                          [1 0 1]
+                          [1 1 1]])
+
+        ;; FIX: Pasăm argumentele pozițional: input, weights, output=nil, mode="constant", cval=0
+        vecini (ndimage/convolve skeleton kernel nil "constant" 0)
+
+        is-skel (np/equal skeleton 1)
+        many-neighbors (np/greater vecini 2)
+        intersectii (np/logical_and is-skel many-neighbors)
+
+        ;; Izolarea segmentelor
+        segmente-img (.copy skeleton)
+        _ (np/putmask segmente-img intersectii 0)
+
+        ;; Extragere conectivități tot prin first/second
+        cc-result (cv2/connectedComponents segmente-img)
+        num-labels (first cc-result)
+        labels (second cc-result)]
+
+    ;; Clasificarea formelor elementare
+    (vec
+     (keep (fn [label]
+             (let [puncte (np/column_stack (np/where (np/equal labels label)))
+                   lungime-arc (count puncte)]
+
+ ))
+           (range 1 num-labels)))))
+
+  (def skeleton3 (imgproc/process-image-best img))
+
+  (def shapes (extrage-forme-elementare skeleton2))
+
+  (count shapes)
+
+#+end_src
+
+* 2026-11-14
+
+- i-am cerut lui Gemini un tutorial despre extragerea de forme geometrice elementare si pe baza lui rectorizez modulul de conversie:
+  #+begin_src clojure
+  (import
+   [cv2 :as cv2]
+   [numpy :as np]
+   [numpy.linalg :as lin]
+   [skimage.morphology :as morph]
+   [scipy.ndimage :as ndimage]
+   [scipy.spatial.distance :as distance])
+
+  (require
+   '[dev.show :as show]
+   '[steno.imageprocessor :as imgproc])
+
+  (def cale-imagine "test/resources/rol.png")
+  (def img (cv2/imread cale-imagine cv2/IMREAD_GRAYSCALE))
+  (show/show-image img)
+
+  (def skeleton(imgproc/process-image img))
+
+  (show/show-image skeleton)
+
+  (def kernel (np/array [[1 1 1]
+                          [1 0 1]
+                         [1 1 1]]))
+
+  (def vecini (ndimage/convolve skeleton kernel nil "constant" 0))
+
+  (def is-skel (np/equal skeleton 1))
+
+  (def end-points (np/logical_and is-skel (np/equal vecini 1)))
+
+  (defn get-junctions
+    [skeleton]
+    (let [kernel (np/array [[1 1 1]
+                          [1 0 1]
+                            [1 1 1]])
+          vecini (ndimage/convolve skeleton kernel nil "constant" 0)
+          is-skel (np/equal skeleton 1)]
+      (np/logical_and is-skel (np/greater vecini 2))))
+
+  (def junctions (get-junctions skeleton))
+
+  (def seg-img (.copy skeleton))
+
+  (np/putmask seg-img junctions 0)
+
+  (show/show-image seg-img)
+
+  (def cc-result (cv2/connectedComponents seg-img))
+
+  (defn classify-shape
+    [puncte]
+    (let [lungime-arc (count puncte)
+          p-first (aget puncte 0)
+          p-last (aget puncte -1)
+          ;; We calculate the direct Euclidean distance between the ends.
+          dist-start-end (lin/norm (np/subtract p-first p-last))
+          raport-inchidere (/ dist-start-end lungime-arc)]
+      (if (and (< raport-inchidere 0.15) (> lungime-arc 15))
+        ;; The ends are very close together, but the bow is long, we have a closed loop.
+        :loop
+        ;; Otherwise, we use the maximum distance between points.
+        (let [distante (distance/pdist puncte)
+              distanta-maxima (if (pos? (count distante)) (np/max distante) 0)
+              raport-max (/ distanta-maxima lungime-arc)]
+          (if (< raport-max 0.65)
+            :curve
+            :straight-line)))))
+
+
+  (defn extract-basic-shapes
+    [skeleton]
+    (let [junctions (get-junctions skeleton)
+          skcopy (.copy skeleton)
+          ;; isolate the segments
+          _ (np/putmask skcopy junctions 0)
+          [num-labels labels] (cv2/connectedComponents skcopy)]
+      (vec (keep (fn [label]
+                   (let [puncte (np/column_stack (np/where (np/equal labels label)))
+                         lungime-arc (count puncte)]
+                     (when (>= lungime-arc 5)
+                       {:id label
+                        :type (classify-shape puncte)
+                        :lseq puncte
+                        :len lungime-arc})))
+                 (range 1 num-labels)))))
+
+  (def rol-shapes (extract-basic-shapes skeleton))
+  (count rol-shapes)
+  ;; => 4
+
+  rol-shapes
+  [{:type :loop,
+    :lseq [[  7, 196],
+            [  8, 195],
+            [  9, 195],
+            [ 10, 194],
+            [ 11, 193],
+            [ 12, 193],
+            [ 13, 189],
+            [ 13, 190],
+            [ 13, 191],
+            [ 13, 192],
+            [ 14, 185],
+            [ 14, 186],
+            [ 14, 187],
+            [ 14, 188],
+            [ 15, 183],
+            [ 15, 184],
+            [ 16, 181],
+            [ 16, 182],
+            [ 17, 177],
+            [ 17, 178],
+            [ 17, 179],
+            [ 17, 180],
+            [ 18, 172],
+            [ 18, 173],
+            [ 18, 174],
+            [ 18, 175],
+            [ 18, 176],
+            [ 19, 170],
+            [ 19, 171],
+            [ 20, 169],
+            [ 21, 167],
+            [ 21, 168],
+            [ 22, 166],
+            [ 23, 161],
+            [ 23, 162],
+            [ 23, 163],
+            [ 23, 164],
+            [ 23, 165],
+            [ 24, 159],
+            [ 24, 160],
+            [ 25, 156],
+            [ 25, 157],
+            [ 25, 158],
+            [ 26, 149],
+            [ 26, 150],
+            [ 26, 151],
+            [ 26, 152],
+            [ 26, 153],
+            [ 26, 154],
+            [ 26, 155],
+            [ 27, 146],
+            [ 27, 147],
+           [ 27, 148]]),
+    :id 1,
+    :len 53}
+   {:type :loop,
+    :lseq [[  8, 112],
+            [  8, 113],
+            [  8, 114],
+            [  8, 115],
+            [  8, 116],
+            [  8, 117],
+            [  8, 118],
+            [  8, 119],
+            [  8, 120],
+            [  8, 121],
+            [  8, 122],
+            [  8, 123],
+            [  8, 124],
+            [  9, 109],
+            [  9, 110],
+            [  9, 111],
+            [  9, 125],
+            [  9, 126],
+            [ 10, 105],
+            [ 10, 106],
+            [ 10, 107],
+            [ 10, 108],
+            [ 10, 127],
+            [ 10, 128],
+            [ 10, 129],
+            [ 11, 100],
+            [ 11, 101],
+            [ 11, 102],
+            [ 11, 103],
+            [ 11, 104],
+            [ 11, 130],
+            [ 11, 131],
+            [ 11, 132],
+            [ 11, 133],
+            [ 12,  99],
+            [ 12, 134],
+            [ 12, 135],
+            [ 13,  96],
+            [ 13,  97],
+            [ 13,  98],
+            [ 13, 136],
+            [ 14,  95],
+            [ 14, 137],
+            [ 15,  94],
+            [ 15, 138],
+            [ 16,  92],
+            [ 16,  93],
+            [ 16, 139],
+            [ 17,  91],
+            [ 17, 140],
+            [ 18,  90],
+            [ 18, 141],
+            [ 19,  89],
+            [ 19, 142],
+            [ 20,  89],
+            [ 20, 142],
+            [ 21,  88],
+            [ 21, 142],
+            [ 22,  88],
+            [ 22, 143],
+            [ 23,  87],
+            [ 23, 143],
+            [ 24,  86],
+            [ 24, 143],
+            [ 25,  86],
+            [ 25, 143],
+            [ 26,  85],
+            [ 26, 144],
+            [ 27,  84],
+            [ 28,  84],
+            [ 29,  83],
+            [ 30,  83],
+            [ 31,  83],
+            [ 32,  83],
+            [ 33,  83],
+            [ 34,  83],
+            [ 35,  83],
+            [ 36,  83],
+            [ 37,  83],
+            [ 38,  83],
+            [ 39,  83],
+            [ 40,  84],
+            [ 41,  84],
+            [ 42,  84],
+            [ 43,  85],
+            [ 44,  85],
+            [ 45,  86],
+            [ 46,  86],
+            [ 47,  87],
+            [ 48,  87],
+            [ 49,  88],
+            [ 50,  88],
+                 [ 51,  89]],
+    :id 2,
+    :len 93}
+   {:type :loop,
+    :lseq [[ 30, 143],
+            [ 31, 141],
+            [ 31, 142],
+            [ 32, 140],
+            [ 33, 138],
+            [ 33, 139],
+            [ 34, 136],
+            [ 34, 137],
+            [ 35, 135],
+            [ 36, 134],
+            [ 37, 134],
+            [ 38, 130],
+            [ 38, 131],
+            [ 38, 132],
+            [ 38, 133],
+            [ 39, 129],
+            [ 40, 126],
+            [ 40, 127],
+            [ 40, 128],
+            [ 41, 123],
+            [ 41, 124],
+            [ 41, 125],
+            [ 42, 121],
+            [ 42, 122],
+            [ 43, 120],
+            [ 44, 117],
+            [ 44, 118],
+            [ 44, 119],
+            [ 45, 115],
+            [ 45, 116],
+            [ 46, 114],
+            [ 47, 113],
+            [ 48, 111],
+            [ 48, 112],
+            [ 49, 109],
+            [ 49, 110],
+            [ 50, 107],
+            [ 50, 108],
+            [ 51, 100],
+            [ 51, 101],
+            [ 51, 102],
+            [ 51, 103],
+            [ 51, 104],
+            [ 51, 105],
+            [ 51, 106],
+            [ 52,  93],
+            [ 52,  94],
+            [ 52,  95],
+            [ 52,  96],
+            [ 52,  97],
+            [ 52,  98],
+            [ 52,  99],
+                        [ 53,  92]],
+    :id 3,
+    :len 53}
+   {:type :loop,
+    :lseq [[ 54,  89],
+           [ 55,  88],
+            [ 56,  88],
+            [ 57,  87],
+            [ 58,  87],
+            [ 59,  85],
+            [ 59,  86],
+            [ 60,  84],
+            [ 61,  81],
+            [ 61,  82],
+            [ 61,  83],
+            [ 62,  79],
+            [ 62,  80],
+            [ 63,  78],
+            [ 64,  75],
+            [ 64,  76],
+            [ 64,  77],
+            [ 65,  72],
+            [ 65,  73],
+            [ 65,  74],
+            [ 66,  68],
+            [ 66,  69],
+            [ 66,  70],
+            [ 66,  71],
+            [ 67,  67],
+            [ 68,  66],
+            [ 69,  64],
+            [ 69,  65],
+            [ 70,  60],
+            [ 70,  61],
+            [ 70,  62],
+            [ 70,  63],
+            [ 71,  58],
+            [ 71,  59],
+            [ 72,  57],
+            [ 73,  56],
+            [ 74,  54],
+            [ 74,  55],
+            [ 75,  50],
+            [ 75,  51],
+            [ 75,  52],
+            [ 75,  53],
+            [ 76,  47],
+            [ 76,  48],
+            [ 76,  49],
+            [ 77,  45],
+            [ 77,  46],
+            [ 78,  43],
+            [ 78,  44],
+            [ 79,  42],
+            [ 80,  40],
+            [ 80,  41],
+            [ 81,  37],
+            [ 81,  38],
+            [ 81,  39],
+            [ 82,  36],
+            [ 83,  34],
+            [ 83,  35],
+            [ 84,  31],
+            [ 84,  32],
+            [ 84,  33],
+            [ 85,  29],
+            [ 85,  30],
+            [ 86,  27],
+            [ 86,  28],
+            [ 87,  25],
+            [ 87,  26],
+            [ 88,  24],
+            [ 89,  23],
+            [ 90,  20],
+            [ 90,  21],
+            [ 90,  22],
+            [ 91,  18],
+            [ 91,  19],
+            [ 92,  17],
+            [ 93,  15],
+            [ 93,  16],
+            [ 94,  13],
+            [ 94,  14],
+            [ 95,  11],
+            [ 95,  12],
+            [ 96,   9],
+            [ 96,  10],
+            [ 97,   8],
+            [ 98,   7],
+            [ 99,   6],
+                        [100,   5],
+                        [101,   4]],
+    :id 4,
+    :len 88}]
+
+  (def puncte (:lseq (first rol-shapes)))
+
+  (def lungime-arc (count puncte))
+  (def p-first (aget puncte 0))
+  (def p-last (aget puncte -1))
+  (def dist-start-end (lin/norm (np/subtract p-first p-last)))
+  (def raport-inchidere (/ dist-start-end lungime-arc))
+#+end_src
+
+* 2026-11-15
+
+- continui lucru la refactorizare
+  #+begin_src clojure
+  (import
+   [cv2 :as cv2]
+   [math :as math]
+   [numpy :as np]
+   [numpy.linalg :as lin]
+   [skimage.morphology :as morph]
+   [scipy.ndimage :as ndimage]
+   [scipy.spatial.distance :as distance])
+
+  (require
+   '[dev.show :as show]
+   '[steno.converter :as conv]
+   '[steno.imageprocessor :as imgproc])
+
+(defn get-junctions
+    [skeleton]
+    (let [kernel (np/array [[1 1 1]
+                          [1 0 1]
+                            [1 1 1]])
+          vecini (ndimage/convolve skeleton kernel nil "constant" 0)
+          is-skel (np/equal skeleton 1)]
+      (np/logical_and is-skel (np/greater vecini 2))))
+
+(defn- pt-dist [a b]
+  (math/hypot (- (first a) (first b)) (- (second a) (second b))))
+
+(defn- neighbors [pts p]
+  (filter #(and (not= p %) (<= (pt-dist p %) 1.5)) pts))
+
+(defn- order-path [pts]
+  (let [nb (into {} (map (fn [p] [p (vec (neighbors pts p))]) pts))
+        start (or (first (filter #(= 1 (count (nb %))) pts)) (first pts))]
+    (loop [prev nil cur start seen #{} path []]
+      (if (contains? seen cur)
+        path
+        (let [path (conj path cur)
+              seen (conj seen cur)
+              nxt  (first (remove #(or (= % prev) (contains? seen %)) (nb cur)))]
+          (if nxt (recur cur nxt seen path) path))))))
+
+(defn- arc-length [path]
+  (reduce + 0.0 (map (fn [[a b]] (pt-dist a b)) (partition 2 1 path))))
+
+(defn classify-shape [puncte]
+  (let [pts   (mapv #(vector (int (aget % 0)) (int (aget % 1))) puncte)
+        path  (order-path pts)
+        arc   (arc-length path)
+        chord (pt-dist (first path) (last path))
+        ratio (if (pos? arc) (/ chord arc) 0.0)]
+    (cond
+      (and (> arc 15.0) (< ratio 0.15)) :loop
+      (> ratio 0.80)                    :straight-line
+      :else                             :curve)))
+
+
+(defn extract-basic-shapes
+    [skeleton]
+    (let [junctions (get-junctions skeleton)
+          skcopy (.copy skeleton)
+          ;; isolate the segments
+          _ (np/putmask skcopy junctions 0)
+          [num-labels labels] (cv2/connectedComponents skcopy)]
+      (vec (keep (fn [label]
+                   (let [puncte (np/column_stack (np/where (np/equal labels label)))
+                         lungime-arc (count puncte)]
+                     (when (>= lungime-arc 5)
+                       {:id label
+                        :type (classify-shape puncte)
+                        :lseq puncte
+                        :len lungime-arc})))
+                 (range 1 num-labels)))))
+
+  (defn get-skeleton
+    [filepath]
+    (let [img (cv2/imread filepath cv2/IMREAD_GRAYSCALE)]
+      (imgproc/process-image img)))
+
+  (defn get-shapes
+    [filepath]
+      (extract-basic-shapes (get-skeleton filepath)))
+
+  (defn test-classifier
+    [filepath]
+    (let [shapes (get-shapes filepath)]
+      (mapv (fn [{:keys [id type len]}] [id type len]) shapes)))
+
+  (defn test-seg-skeleton
+    [filepath]
+    (let [img (cv2/imread filepath cv2/IMREAD_GRAYSCALE)
+          skeleton (imgproc/process-image img)
+          junctions (get-junctions skeleton)]
+      (np/putmask skeleton junctions 0)
+      (show/show-image skeleton)))
+
+
+  (test-classifier "test/resources/rol.png")
+  ;; => [[1 :straight-line 53] [2 :curve 93] [3 :straight-line 53] [4 :straight-line 88]]
+
+
+  (test-classifier "test/resources/mos.png")
+  ;; => [[1 :curve 76] [2 :loop 68] [3 :curve 74]]
+
+  (test-classifier "test/resources/ajuns.png")
+  ;; => [[1 :curve 367] [2 :curve 117] [3 :straight-line 17] [4 :straight-line 5]]
+    (test-seg-skeleton "test/resources/ajuns.png")
+
+  (test-classifier "test/resources/are.png")
+  ;; => [[1 :curve 305] [2 :loop 178] [3 :straight-line 6] [4 :straight-line 9]]
+
+  (test-classifier "test/resources/conduce.png")
+  ;; => [[1 :curve 286] [2 :straight-line 99] [3 :straight-line 69] [4 :straight-line 9] [5 :straight-line 20] [6 :straight-line 9] [7 :curve 21] [8 :straight-line 45] [9 :curve 76] [10 :straight-line 10] [11 :curve 80]]
+
+  (test-classifier "test/resources/control.png")
+  ;; => [[1 :curve 190] [2 :straight-line 104] [3 :straight-line 10] [4 :straight-line 10] [5 :straight-line 19] [6 :straight-line 81] [7 :straight-line 6] [8 :straight-line 91] [9 :straight-line 273] [10 :straight-line 11]]
+
+  (test-classifier "test/resources/cort,.png")
+  ;; => [[1 :straight-line 86] [3 :straight-line 46] [4 :straight-line 161] [5 :straight-line 68] [8 :curve 14] [9 :straight-line 53] [11 :straight-line 15] [14 :straight-line 7] [17 :straight-line 7] [18 :straight-line 15] [19 :straight-line 19] [20 :straight-line 64] [21 :curve 99] [25 :straight-line 8] [26 :straight-line 7] [27 :straight-line 5] [28 :straight-line 12] [29 :straight-line 5] [30 :straight-line 6]]
+
+  (test-classifier "test/resources/cu.png")
+  ;; => [[1 :straight-line 79] [2 :straight-line 5] [3 :curve 163] [4 :straight-line 53]]
+
+  (test-classifier "test/resources/oma.png")
+  ;; => [[1 :loop 314] [2 :curve 168] [3 :curve 75] [4 :straight-line 64] [5 :straight-line 5]]
+
+  (test-classifier "test/resources/prin.png")
+  ;; => [[1 :straight-line 63] [2 :straight-line 149] [3 :straight-line 8] [5 :straight-line 64] [6 :straight-line 16]]
+
+  (test-classifier "test/resources/va.png")
+  ;; => [[1 :straight-line 160] [2 :straight-line 33] [3 :straight-line 12] [4 :straight-line 13] [5 :curve 89] [6 :straight-line 8]]
+
+  (def skeleton (get-skeleton "test/resources/rol.png"))
+
+  (def shapes (get-shapes "test/resources/rol.png"))
+
+  (def shape (first shapes))
+
+  (defn get-lseq-element
+    [skeleton cell]
+    (let [row (int (aget cell 0))
+          column (int (aget cell 1))]
+      [row column (second (conv/get-cnum-and-neighbors skeleton [row column]))]))
+
+
+
+  (first (first (:lseq shape)))
+  ;; => np.int64(7)
+  (second (first (:lseq shape)))
+  ;; => np.int64(196)
+
+
+  ;; => array([  7, 196])
+
+
+
+  (mapv #(get-lseq-element skeleton %) (vec (:lseq shape)))
+  ;; => [[7 196 4] [8 195 65] [9 195 20] [10 194 5] [11 193 65] [12 193 20] [13 189 132] [13 190 160] [13 191 160] [13 192 33] [14 185 132] [14 186 160] [14 187 160] [14 188 33] [15 183 132] [15 184 33] [16 181 132] [16 182 33] [17 177 132] [17 178 160] [17 179 160] [17 180 33] [18 172 132] [18 173 160] [18 174 160] [18 175 160] [18 176 33] [19 170 132] [19 171 33] [20 169 5] [21 167 132] [21 168 33] [22 166 5] [23 161 132] [23 162 160] [23 163 160] [23 164 160] [23 165 33] [24 159 132] [24 160 33] [25 156 132] [25 157 160] [25 158 33] [26 149 132] [26 150 160] [26 151 160] [26 152 160] [26 153 160] [26 154 160] [26 155 33] [27 146 132] [27 147 160] [27 148 33]]
+
+
+(defn classify-shape [pts]
+  (let [path  (order-path pts)
+        arc   (arc-length path)
+        chord (pt-dist (first path) (last path))
+        ratio (if (pos? arc) (/ chord arc) 0.0)]
+    (cond
+      (and (> arc 15.0) (< ratio 0.15)) :loop
+      (> ratio 0.80)                    :straight-line
+      :else                             :curve)))
+
+
+(defn extract-basic-shapes
+    [skeleton]
+    (let [junctions (get-junctions skeleton)
+          skcopy (.copy skeleton)
+          ;; isolate the segments
+          _ (np/putmask skcopy junctions 0)
+          [num-labels labels] (cv2/connectedComponents skcopy)]
+      (vec (keep (fn [label]
+                   (let [puncte (np/column_stack (np/where (np/equal labels label)))
+                         lungime-arc (count puncte)]
+                     (when (>= lungime-arc 5)
+                       {:id label
+                        :type (classify-shape puncte)
+                        :lseq (mapv #(get-lseq-element skcopy %) (vec puncte))
+                        :len lungime-arc})))
+                 (range 1 num-labels)))))
+
+#+end_src

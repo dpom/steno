@@ -1,0 +1,146 @@
+(ns steno.converter2
+  "Convert images in numeric sequences"
+  (:require
+   [steno.spec :as spec])
+  (:import
+   [cv2 :as cv2]
+   [math :as math]
+   [numpy :as np]
+   [scipy.ndimage :as ndimage]))
+
+(defn get-junctions
+  [skeleton]
+  (let [kernel (np/array [[1 1 1]
+                          [1 0 1]
+                          [1 1 1]])
+        vecini (ndimage/convolve skeleton kernel nil "constant" 0)
+        is-skel (np/equal skeleton 1)]
+    (np/logical_and is-skel (np/greater vecini 2))))
+
+(defn- pt-dist [a b]
+  (math/hypot (- (first a) (first b)) (- (second a) (second b))))
+
+(defn- neighbors [pts p]
+  (filter #(and (not= p %) (<= (pt-dist p %) 1.5)) pts))
+
+(defn- order-path [pts]
+  (let [nb (into {} (map (fn [p] [p (vec (neighbors pts p))]) pts))
+        start (or (first (filter #(= 1 (count (nb %))) pts)) (first pts))]
+    (loop [prev nil cur start seen #{} path []]
+      (if (contains? seen cur)
+        path
+        (let [path (conj path cur)
+              seen (conj seen cur)
+              nxt  (first (remove #(or (= % prev) (contains? seen %)) (nb cur)))]
+          (if nxt (recur cur nxt seen path) path))))))
+
+(defn- arc-length [path]
+  (reduce + 0.0 (map (fn [[a b]] (pt-dist a b)) (partition 2 1 path))))
+
+(defn classify-shape [pts]
+  (let [path  (order-path pts)
+        arc   (arc-length path)
+        chord (pt-dist (first path) (last path))
+        ratio (if (pos? arc) (/ chord arc) 0.0)]
+    (cond
+      (and (> arc 15.0) (< ratio 0.15)) :loop
+      (> ratio 0.80)                    :straight-line
+      :else                             :curve)))
+
+(defn get-cell-value
+  "Get cell value. If row or column index is wrong return 0."
+  ([mat [row column]]
+   (let [[h w] (.-shape mat)]
+     (try
+       (if (or (neg? row) (neg? column) (>= row h) (>= column w))
+         0
+         (int (aget mat row column)))
+       (catch Exception _e
+         0))))
+  ([mat [row column] [dr dc]]
+   (get-cell-value mat [(+ row dr) (+ column dc)])))
+
+(defn get-cnum
+  "Get the cell cnum."
+  [mat cell]
+  (let [row (int (aget cell 0))
+        column (int (aget cell 1))]
+    (reduce (fn [num dir]
+              (let [v (get-cell-value mat [row column] dir)]
+                (+ (* num 2) v)))
+            0
+            spec/all-directions)))
+
+(defn get-lseq-element
+  [skeleton cell]
+  (let [row (int (aget cell 0))
+        column (int (aget cell 1))]
+    [row column (get-cnum skeleton [row column])]))
+
+(defn- leftmost-column
+  "Leftmost column occupied by a shape's points."
+  [shape]
+  (reduce min (map second (:lseq shape))))
+
+(defn extract-basic-shapes
+  [skeleton]
+  (let [junctions (get-junctions skeleton)
+        skcopy (.copy skeleton)
+          ;; isolate the segments
+        _ (np/putmask skcopy junctions 0)
+        gle-fn (partial get-lseq-element skcopy)
+        [num-labels labels] (cv2/connectedComponents skcopy)]
+    (vec
+     (map-indexed (fn [idx shape] (assoc shape :id (inc idx)))
+                  (sort-by leftmost-column
+                           (keep
+                            (fn [label]
+                              (let [lseq (->> label
+                                              (np/equal labels)
+                                              np/where
+                                              np/column_stack
+                                              vec
+                                              (mapv gle-fn))
+                                    lungime-arc (count lseq)]
+                                (when (>= lungime-arc 5)
+                                  {:id label
+                                   :type (classify-shape lseq)
+                                   :lseq lseq
+                                   :len lungime-arc})))
+                            (range 1 num-labels)))))))
+
+(comment
+
+  (require
+   '[dev.show :as show]
+   '[steno.imageprocessor :as imgproc])
+
+  (defn get-skeleton
+    [filepath]
+    (let [img (cv2/imread filepath cv2/IMREAD_GRAYSCALE)]
+      (imgproc/process-image img)))
+
+  (defn get-shapes
+    [filepath]
+    (extract-basic-shapes (get-skeleton filepath)))
+
+  (defn test-classifier
+    [filepath]
+    (let [shapes (get-shapes filepath)]
+      (mapv (fn [{:keys [id type len]}] [id type len]) shapes)))
+
+  (defn test-seg-skeleton
+    [filepath]
+    (let [img (cv2/imread filepath cv2/IMREAD_GRAYSCALE)
+          skeleton (imgproc/process-image img)
+          junctions (get-junctions skeleton)]
+      (np/putmask skeleton junctions 0)
+      (show/show-image skeleton)))
+
+  (test-seg-skeleton "test/resources/rol.png")
+
+  (test-classifier "test/resources/rol.png")
+  ;; => [[1 :straight-line 88] [2 :curve 93] [3 :straight-line 53] [4 :straight-line 53]]
+
+;;
+  )

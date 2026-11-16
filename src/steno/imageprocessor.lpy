@@ -55,7 +55,7 @@
         sc2 (skeleton-score p2)]
     (cond
       (< sc1 sc2) p1
-      (< sc1 sc2) p2
+      (< sc2 sc1) p2
       :else (if (<= (count (utl/endpoint-coords p1)) (count (utl/endpoint-coords p2)))
               p1
               p2))))

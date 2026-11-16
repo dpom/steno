@@ -623,6 +623,7 @@ dependencies = [
     { name = "opencv-python" },
     { name = "pyaml-env" },
     { name = "scikit-image" },
+    { name = "scipy" },
 ]
 
 [package.metadata]
@@ -634,6 +635,7 @@ requires-dist = [
     { name = "opencv-python", specifier = ">=4.10.0.84" },
     { name = "pyaml-env", specifier = ">=1.2.2" },
     { name = "scikit-image", specifier = ">=0.25.0" },
+    { name = "scipy", specifier = ">=1.15.0" },
 ]
 
 [[package]]
