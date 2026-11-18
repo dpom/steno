@@ -1,0 +1,34 @@
+(require '[steno.utils :as utl])
+(import [numpy :as np])
+
+(defn- check!
+  [cond msg]
+  (when-not cond
+    (throw (Exception. msg))))
+
+(def all-false
+  (np/array [[false false false]
+             [false false false]]
+            ** :dtype "bool"))
+
+(def single-true
+  (np/array [[false false false]
+             [false true false]
+             [false false false]]
+            ** :dtype "bool"))
+
+(def corners
+  (np/array [[true false true]
+             [false false false]
+             [true false true]]
+            ** :dtype "bool"))
+
+(check! (empty? (utl/true-coords all-false))
+        "all-False mask must have no coordinates")
+(check! (= [[1 1]] (vec (utl/true-coords single-true)))
+        "single True cell must return its [row column]")
+(check! (= [[0 0] [0 2] [2 0] [2 2]]
+           (vec (utl/true-coords corners)))
+        "True cells must be returned in row-major order")
+
+(println "utils true-coords tests PASSED")
