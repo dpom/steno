@@ -1,9 +1,10 @@
 {
   :fileimage "tmp/yoga_001_1/yoga_001_1-18-00.png",
   :pos 2,
+  :ltype 1,
+  :len 129,
   :width 127,
   :height 39,
-  :ltype 1,
   :lineseq [
     [
       39

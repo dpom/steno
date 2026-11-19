@@ -100,4 +100,4 @@
 
 (def references-priority-keys [:type-0 :type-1 :letter :min-len :max-len])
 
-(def corpus-priority-keys [:fileimage :pos :width :height :ltype :lineseq])
+(def corpus-priority-keys [:fileimage :pos :ltype :len :width :height :lineseq])

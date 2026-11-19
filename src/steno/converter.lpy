@@ -342,6 +342,7 @@
         new-lineseq (mapv (fn [[x y n]] [(- x x-min) (- y y-min) n]) lineseq)]
     (assoc lsign
            :lineseq new-lineseq
+           :len (count new-lineseq)
            :width (apply max (map second new-lineseq))
            :height (apply max (map first new-lineseq)))))
 

@@ -12644,9 +12644,10 @@ nodes
   (let [vecini (ndimage/convolve skeleton conv/kernel nil "constant" 0)
         is-skel (np/equal skeleton 1)
         nodes (np/argwhere (np/logical_and is-skel (np/logical_or (np/equal vecini 1) (np/greater vecini 2))))]
-    (clean-nodes
-    (mapv (fn [a] [(int (aget a 0)) (int (aget a 1))])
-      nodes))))
+    (->> nodes
+    (mapv (fn [a] [(int (aget a 0)) (int (aget a 1))]))
+    clean-nodes
+    (sort-by second))))
 
 (mapv vec
  (get-nodes rol-sk))
@@ -12658,6 +12659,14 @@ nodes
 ;; => [[7 196] [27 144] [28 144] [28 145] [29 144] [52 90] [53 90] [53 91] [87 179] [87 180] [87 181] [87 182] [88 174] [88 175] [88 176] [88 177] [88 178] [88 179] [88 180] [89 174] [89 175] [89 176] [89 177] [89 178] [89 179] [89 180] [90 174] [90 175] [90 176] [101 4]]
 
 (get-nodes rol-sk)
-;; => [[7 196] [28 144] [53 90] [87 180] [89 176] [101 4]]
+;; => ([101 4] [53 90] [28 144] [89 176] [87 180] [7 196])
+
+(import [networkx :as nx])
+
+
+(def G (nx/Graph))
+
+(doseq [[idx coord] (map-indexed vector nod-coords)]
+            (.add_node G idx :pos coord))
 
 #+end_src

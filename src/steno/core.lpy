@@ -76,37 +76,6 @@
         (corpus/walk-matrix! wsigns f!)))
     (.info logger "Saved in %s" outfile)))
 
-(defn action-make-corpus
-  [config]
-  (let [infile (get config "input")
-        outdir (get config "output" default-corpus-dir)
-        translators (get config "translators")
-        logger (:logger config)]
-    (.mkdir (pathlib/Path outdir) ** :parents true :exist_ok true)
-    (.info logger "Make corpus %s using %s" infile translators)
-    (let [ctx (tra/prepare-translations config translators)
-          mtx (ext/extract-glyphs infile)
-          wsigns (utl/map-glyph-matrix mtx corpus/convert-glyph)
-          f! (fn [row column cell]
-               (let [fname (utl/get-filename infile)
-                     ws (:wsign cell)]
-                 (doseq [i (range (count ws))]
-                   (let [lsign (merge (nth ws i)
-                                      {:fileimage infile
-                                       :row row
-                                       :column column
-                                       :pos i})
-                         text* (get (tra/translate-lsign ctx translators lsign) :text)
-                         text (or text* "@")
-                         lsign-dir (bio/path outdir text)
-
-                         outname (format "%s-%02d-%02d-%01d.edn" fname row column i)
-                         outfile (bio/path lsign-dir outname)]
-                     (.mkdir lsign-dir ** :parents true :exist_ok true)
-                     (corpus/save-corpus-item outfile lsign)
-                     (.debug logger "Saved in %s" outfile)))))]
-      (corpus/walk-matrix! wsigns f!))))
-
 (defn action-make-references
   "Build translators references using a corpus."
   [config]
@@ -168,7 +137,6 @@
   {"help"               action-help
    "check"              action-check
    "list-config"        action-list-config
-   "make-corpus"        action-make-corpus
    "make-references"    action-make-references
    "renormalize-corpus" action-renormalize-corpus
    "save-glyphs"        action-save-glyphs

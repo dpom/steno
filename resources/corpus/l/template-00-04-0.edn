@@ -1,9 +1,10 @@
 {
   :fileimage "tmp/template/template-00-04.png",
   :pos 0,
+  :ltype 1,
+  :len 51,
   :width 49,
   :height 23,
-  :ltype 1,
   :lineseq [
     [
       23
