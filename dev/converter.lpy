@@ -3,14 +3,35 @@
   (:require
    [dev.show :as show]
    [steno.imageprocessor :as imgproc]
-   [steno.utils :as utl]
-   [steno.converter :as conv])
+   [steno.converter2 :as conv]
+   [steno.utils :as utl])
   (:import
-   cv2))
+   [cv2 :as cv2]
+   [numpy :as np]))
 
-(defn get-res
-   [imagefile]
-   (-> imagefile
-       (cv2/imread cv2/IMREAD_GRAYSCALE)
-       (imgproc/process-image)
-       conv/image-to-lineseq))
+(defn get-skeleton
+  [filepath]
+  (let [img (cv2/imread filepath cv2/IMREAD_GRAYSCALE)]
+    (imgproc/process-image img)))
+
+(defn get-shapes
+  [filepath]
+  (conv/extract-basic-shapes (get-skeleton filepath)))
+
+(defn test-classifier
+  [filepath]
+  (let [shapes (get-shapes filepath)]
+    (mapv #((juxt :type :len) %) shapes)))
+
+(defn show-seg-skeleton
+  [filepath]
+  (let [img (cv2/imread filepath cv2/IMREAD_GRAYSCALE)
+        skeleton (imgproc/process-image img)
+        junctions (conv/get-junctions skeleton)]
+    (np/putmask skeleton junctions 0)
+    (show/show-image skeleton)))
+
+(defn show-shapes
+  "Show two shapes of a sequences of shapes."
+  [shapes n1 n2]
+  (show/show-two-lseqs [(:lseq (nth shapes n1)) (:lseq (nth shapes n2))]))

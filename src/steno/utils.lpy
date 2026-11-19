@@ -50,7 +50,7 @@
   "Coordinates of the cells whose value is True in a boolean mask."
   [mask]
   (let [[rs cs] (np/where mask)]
-    (map (fn [r c] [(int r) (int c)]) rs cs)))
+    (mapv (fn [r c] [(int r) (int c)]) rs cs)))
 
 (defn nested-levels
   "Return the depth level of a nested Vector."

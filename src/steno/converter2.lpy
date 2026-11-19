@@ -8,12 +8,14 @@
    [numpy :as np]
    [scipy.ndimage :as ndimage]))
 
+(def min-length 10)
+
+(def kernel (np/array [[1 1 1]
+                       [1 0 1]
+                       [1 1 1]]))
 (defn get-junctions
   [skeleton]
-  (let [kernel (np/array [[1 1 1]
-                          [1 0 1]
-                          [1 1 1]])
-        vecini (ndimage/convolve skeleton kernel nil "constant" 0)
+  (let [vecini (ndimage/convolve skeleton kernel nil "constant" 0)
         is-skel (np/equal skeleton 1)]
     (np/logical_and is-skel (np/greater vecini 2))))
 
@@ -102,7 +104,7 @@
                                               vec
                                               (mapv gle-fn))
                                     lungime-arc (count lseq)]
-                                (when (>= lungime-arc 5)
+                                (when (>= lungime-arc min-length)
                                   {:id label
                                    :type (classify-shape lseq)
                                    :lseq lseq
@@ -112,34 +114,11 @@
 (comment
 
   (require
-   '[dev.show :as show]
-   '[steno.imageprocessor :as imgproc])
+   '[dev.converter :as devconv])
 
-  (defn get-skeleton
-    [filepath]
-    (let [img (cv2/imread filepath cv2/IMREAD_GRAYSCALE)]
-      (imgproc/process-image img)))
+  (devconv/test-seg-skeleton "test/resources/rol.png")
 
-  (defn get-shapes
-    [filepath]
-    (extract-basic-shapes (get-skeleton filepath)))
-
-  (defn test-classifier
-    [filepath]
-    (let [shapes (get-shapes filepath)]
-      (mapv (fn [{:keys [id type len]}] [id type len]) shapes)))
-
-  (defn test-seg-skeleton
-    [filepath]
-    (let [img (cv2/imread filepath cv2/IMREAD_GRAYSCALE)
-          skeleton (imgproc/process-image img)
-          junctions (get-junctions skeleton)]
-      (np/putmask skeleton junctions 0)
-      (show/show-image skeleton)))
-
-  (test-seg-skeleton "test/resources/rol.png")
-
-  (test-classifier "test/resources/rol.png")
+  (devconv/test-classifier "test/resources/rol.png")
   ;; => [[1 :straight-line 88] [2 :curve 93] [3 :straight-line 53] [4 :straight-line 53]]
 
 ;;

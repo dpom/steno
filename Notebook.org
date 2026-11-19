@@ -12441,3 +12441,223 @@ res0
                  (range 1 num-labels)))))
 
 #+end_src
+* 2026-11-16
+
+- noul converter pare promitator, continui cu rafinarea lui:
+  #+begin_src clojure
+(require '[dev.converter :as devconv])
+
+(def rol-file "test/resources/rol.png")
+(devconv/test-seg-skeleton rol-file)
+(devconv/test-classifier rol-file)
+;; => [[:straight-line 88] [:curve 93] [:straight-line 53] [:straight-line 53]]
+;; correct result: [[:straight-line 88] [:loop 146] [:straight-line 53]]
+
+(def rol-shapes (devconv/get-shapes rol-file))
+
+(devconv/show-shapes rol-shapes 1 2)
+
+(def are-file "test/resources/are.png")
+(devconv/test-classifier are-file)
+;; => [[:loop 178] [:curve 305]]
+
+(devconv/test-seg-skeleton are-file)
+
+(def ajuns-file "test/resources/ajuns.png")
+(devconv/test-classifier ajuns-file)
+;; => [[:curve 117] [:straight-line 17] [:curve 367]]
+;; correct result: [[:loop 134] [:curve 367]]
+
+(devconv/test-seg-skeleton ajuns-file)
+
+(def conduce-file "test/resources/conduce.png")
+(devconv/test-classifier conduce-file)
+;; => [[:curve 286] [:straight-line 10] [:straight-line 45] [:curve 80] [:straight-line 20] [:curve 21] [:straight-line 99] [:curve 76] [:straight-line 69]]
+;; correct result: [[:curve 286] [:loop 252] [:curve 168]]
+(devconv/test-seg-skeleton conduce-file)
+
+(def conduce-shapes (devconv/get-shapes conduce-file))
+
+(devconv/show-shapes conduce-shapes 6 8)
+
+(def control-file "test/resources/control.png")
+(devconv/test-classifier control-file)
+;; => [[:straight-line 81] [:straight-line 273] [:straight-line 11] [:curve 190] [:straight-line 91] [:straight-line 19] [:straight-line 10] [:straight-line 10] [:straight-line 104]]
+;; correct result: [[:straight-line 81] [:straight-line 273] [:straight-line 11] [:loop 320] [:straight-line 104]]
+(devconv/test-seg-skeleton control-file)
+(def control-shapes (devconv/get-shapes control-file))
+(devconv/show-shapes control-shapes 7 8)
+
+(def fort-file "test/resources/fort,.png")
+(devconv/test-classifier fort-file)
+;; => [[:curve 99] [:straight-line 86] [:straight-line 12] [:straight-line 19] [:straight-line 15] [:straight-line 64] [:straight-line 161] [:straight-line 68] [:curve 14] [:straight-line 15] [:straight-line 53] [:straight-line 46]]
+;; correct result: [[:loop 99] [:straight-line 86] [:straight-line 12] [:straight-line 19] [:straight-line 15] [:straight-line 64] [:straight-line 161] [:straight-line 68] [:curve 14] [:straight-line 15] [:straight-line 53] [:straight-line 46]]
+(devconv/test-seg-skeleton fort-file)
+(def fort-shapes (devconv/get-shapes fort-file))
+(devconv/show-shapes fort-shapes 2 3)
+#+end_src
+
+* 2026-11-18
+
+- incerc un algorith de detectie bucle
+  #+begin_src clojure
+(require
+ '[dev.converter :as devconv]
+ '[steno.converter2 :as conv]
+ '[steno.utils :as utl])
+
+(import
+ [numpy :as np]
+ [math :as math])
+
+
+(def rol-file "test/resources/rol.png")
+(def rol-sk (devconv/get-skeleton rol-file))
+(devconv/show-seg-skeleton rol-file)
+
+(def junctions (conv/get-junctions rol-sk))
+
+(def nodes (utl/true-coords junctions))
+nodes
+;; => ([27 144] [28 144] [28 145] [29 144] [52 90] [53 90] [53 91] [87 179] [87 180] [87 181] [88 174] [88 175] [88 176] [88 177] [88 178] [88 179] [88 180] [89 174] [89 175] [89 176] [89 177] [89 178] [89 179] [89 180] [90 174] [90 175] [90 176])
+(count nodes)
+;; => 27
+
+
+
+(defn get-start-point
+  "Get the start point of the glyph: the topmost degree-1 endpoint, or when the
+   glyph has no endpoints (a closed loop) the topmost-leftmost foreground cell."
+  [image]
+  (let [cells (utl/endpoint-coords image)]
+    (if (seq cells)
+      (first (sort-by (juxt second first) cells))
+      (let [mask (np/greater image 0)
+            [rs cs] (np/where mask)]
+        (->> (map (fn [r c] [(int r) (int c)]) rs cs)
+             (sort-by (juxt first second))
+             first)))))
+
+(get-start-point rol-sk)
+;; => [101 4]
+
+(def nodes (conj nodes (get-start-point rol-sk)))
+(sort-by second nodes)
+;; => ([101 4] [52 90] [53 90] [53 91] [27 144] [28 144] [29 144] [28 145] [88 174] [89 174] [90 174] [88 175] [89 175] [90 175] [88 176] [89 176] [90 176] [88 177] [89 177] [88 178] [89 178] [87 179] [88 179] [89 179] [87 180] [88 180] [89 180] [87 181])
+
+(def shapes (devconv/get-shapes rol-file))
+
+(first shapes)
+;; => {:type :straight-line, :lseq [[54 89 4] [55 88 65] [56 88 20] [57 87 65] [58 87 20] [59 85 132] [59 86 33] [60 84 5] [61 81 132] [61 82 160] [61 83 33] [62 79 132] [62 80 33] [63 78 5] [64 75 132] [64 76 160] [64 77 33] [65 72 132] [65 73 160] [65 74 33] [66 68 132] [66 69 160] [66 70 160] [66 71 33] [67 67 5] [68 66 5] [69 64 132] [69 65 33] [70 60 132] [70 61 160] [70 62 160] [70 63 33] [71 58 132] [71 59 33] [72 57 5] [73 56 5] [74 54 132] [74 55 33] [75 50 132] [75 51 160] [75 52 160] [75 53 33] [76 47 132] [76 48 160] [76 49 33] [77 45 132] [77 46 33] [78 43 132] [78 44 33] [79 42 5] [80 40 132] [80 41 33] [81 37 132] [81 38 160] [81 39 33] [82 36 5] [83 34 132] [83 35 33] [84 31 132] [84 32 160] [84 33 33] [85 29 132] [85 30 33] [86 27 132] [86 28 33] [87 25 132] [87 26 33] [88 24 5] [89 23 5] [90 20 132] [90 21 160] [90 22 33] [91 18 132] [91 19 33] [92 17 5] [93 15 132] [93 16 33] [94 13 132] [94 14 33] [95 11 132] [95 12 33] [96 9 132] [96 10 33] [97 8 5] [98 7 5] [99 6 5] [100 5 5] [101 4 1]], :id 1, :len 88}
+
+(abs (- 4 5))
+;; => 1
+
+(defn adiacent?
+  [[r1 c1 _] [r2 c2 _]]
+  (<= (+ (abs (- r1 r2)) (abs (- c1 c2))) 2))
+
+(adiacent? [54 89 4] [53 90])
+;; => true
+(adiacent? [54 89 4] [53 90])
+;; => true
+
+(count
+(np/argwhere junctions))
+;; => array([[ 27, 144],
+;;           [ 28, 144],
+;;           [ 28, 145],
+;;           [ 29, 144],
+;;           [ 52,  90],
+;;           [ 53,  90],
+;;           [ 53,  91],
+;;           [ 87, 179],
+;;           [ 87, 180],
+;;           [ 87, 181],
+;;           [ 88, 174],
+;;           [ 88, 175],
+;;           [ 88, 176],
+;;           [ 88, 177],
+;;           [ 88, 178],
+;;           [ 88, 179],
+;;           [ 88, 180],
+;;           [ 89, 174],
+;;           [ 89, 175],
+;;           [ 89, 176],
+;;           [ 89, 177],
+;;           [ 89, 178],
+;;           [ 89, 179],
+;;           [ 89, 180],
+;;           [ 90, 174],
+;;           [ 90, 175],
+;;           [ 90, 176]])
+
+(import [statistics :as stats])
+
+(stats/median [ 1 2 3 4 5])
+
+(defn median-point
+  [points]
+  [(int (stats/median (map first points)))
+   (int (stats/median (map second points)))])
+
+(median-point (take 4 nodes))
+;; => [28 144]
+
+nodes
+;; => [[27 144] [28 144] [28 145] [29 144] [52 90] [53 90] [53 91] [87 179] [87 180] [87 181] [88 174] [88 175] [88 176] [88 177] [88 178] [88 179] [88 180] [89 174] [89 175] [89 176] [89 177] [89 178] [89 179] [89 180] [90 174] [90 175] [90 176] [101 4]]
+
+(defmacro make-fn [m]
+ `(fn [& args#]
+    (eval
+      (cons '~m args#))))
+
+
+(defn clean-nodes
+  [nodes]
+(loop [grup [(first nodes)]
+       toprocess (rest nodes)
+       result []]
+  (if-not (seq toprocess)
+    (conj result (median-point grup))
+    (let [el (first toprocess)
+          new-toprocess (rest toprocess)]
+      (if (apply (make-fn or) (map #(adiacent? el %) grup))
+        (recur (conj grup el) new-toprocess result)
+        (recur [el] new-toprocess (conj result (median-point grup))))))))
+;; => [[28 144] [53 90] [87 180] [89 176] [101 4]]
+
+
+
+
+;; => [[28 144] [53 90] [87 180] [88 175] [88 178] [88 180] [89 175] [89 178] [89 180] [90 175] [101 4]]
+
+(count shapes)
+;; => 4
+
+
+(apply (make-fn or) [true false])
+;; => true
+
+(defn get-nodes
+  [skeleton]
+  (let [vecini (ndimage/convolve skeleton conv/kernel nil "constant" 0)
+        is-skel (np/equal skeleton 1)
+        nodes (np/argwhere (np/logical_and is-skel (np/logical_or (np/equal vecini 1) (np/greater vecini 2))))]
+    (clean-nodes
+    (mapv (fn [a] [(int (aget a 0)) (int (aget a 1))])
+      nodes))))
+
+(mapv vec
+ (get-nodes rol-sk))
+;; => [[np.int64(7) np.int64(196)] [np.int64(27) np.int64(144)] [np.int64(28) np.int64(144)] [np.int64(28) np.int64(145)] [np.int64(29) np.int64(144)] [np.int64(52) np.int64(90)] [np.int64(53) np.int64(90)] [np.int64(53) np.int64(91)] [np.int64(87) np.int64(179)] [np.int64(87) np.int64(180)] [np.int64(87) np.int64(181)] [np.int64(87) np.int64(182)] [np.int64(88) np.int64(174)] [np.int64(88) np.int64(175)] [np.int64(88) np.int64(176)] [np.int64(88) np.int64(177)] [np.int64(88) np.int64(178)] [np.int64(88) np.int64(179)] [np.int64(88) np.int64(180)] [np.int64(89) np.int64(174)] [np.int64(89) np.int64(175)] [np.int64(89) np.int64(176)] [np.int64(89) np.int64(177)] [np.int64(89) np.int64(178)] [np.int64(89) np.int64(179)] [np.int64(89) np.int64(180)] [np.int64(90) np.int64(174)] [np.int64(90) np.int64(175)] [np.int64(90) np.int64(176)] [np.int64(101) np.int64(4)]]
+
+
+(mapv (fn [a] [(int (aget a 0)) (int (aget a 1))])
+      (get-nodes rol-sk))
+;; => [[7 196] [27 144] [28 144] [28 145] [29 144] [52 90] [53 90] [53 91] [87 179] [87 180] [87 181] [87 182] [88 174] [88 175] [88 176] [88 177] [88 178] [88 179] [88 180] [89 174] [89 175] [89 176] [89 177] [89 178] [89 179] [89 180] [90 174] [90 175] [90 176] [101 4]]
+
+(get-nodes rol-sk)
+;; => [[7 196] [28 144] [53 90] [87 180] [89 176] [101 4]]
+
+#+end_src
